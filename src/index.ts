@@ -27,3 +27,5 @@ switch (LOG_LEVEL) {
     case 'LOG':
         console.debug = () => {};
 }
+
+console.debug(`loaded Smash lib (log level: ${LOG_LEVEL})`);
