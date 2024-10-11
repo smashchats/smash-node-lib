@@ -5,7 +5,6 @@ import {
     Identity,
     setEngine,
 } from '2key-ratchet';
-import { CryptoKey } from '@peculiar/webcrypto';
 import CryptoUtils from '@src/CryptoUtils.js';
 import { SMESocketManager } from '@src/SMESocketManager.js';
 import { SessionManager } from '@src/SessionManager.js';
@@ -21,9 +20,7 @@ import {
 } from '@src/types/index.js';
 import { EventEmitter } from 'events';
 
-type CryptoKeyPair = {
-    privateKey: CryptoKey;
-    publicKey: CryptoKey;
+type CryptoKeyPairWithThumbprint = CryptoKeyPair & {
     thumbprint: string;
 };
 
@@ -39,7 +36,9 @@ export default class SmashMessaging extends EventEmitter {
 
     static async parseIdentityJson(
         identity: IJsonIdentity,
-        ecKeyPairFromJson?: (keys: CryptoKeyPair) => Promise<IECKeyPair>,
+        ecKeyPairFromJson?: (
+            keys: CryptoKeyPairWithThumbprint,
+        ) => Promise<IECKeyPair>,
     ) {
         if (!!ecKeyPairFromJson) Curve.ecKeyPairFromJson = ecKeyPairFromJson;
         return await Identity.fromJSON(identity);
