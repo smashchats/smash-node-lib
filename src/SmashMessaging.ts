@@ -20,6 +20,9 @@ import {
 } from '@src/types/index.js';
 import { EventEmitter } from 'events';
 
+// Logging setup (you might want to move this to a separate file)
+type LogLevel = 'DEBUG' | 'LOG' | 'WARN' | 'ERROR';
+
 type CryptoKeyPairWithThumbprint = CryptoKeyPair & {
     thumbprint: string;
 };
@@ -51,7 +54,10 @@ export default class SmashMessaging extends EventEmitter {
     private smeSocketManager: SMESocketManager;
     // private processingDlq: boolean;
 
-    constructor(protected identity: Identity) {
+    constructor(
+        protected identity: Identity,
+        LOG_LEVEL = 'DEBUG' as LogLevel,
+    ) {
         super();
         this.dlq = {};
         this.peers = {};
@@ -61,6 +67,18 @@ export default class SmashMessaging extends EventEmitter {
             this.incomingMessagesHandler.bind(this),
             this.messagesStatusHandler.bind(this),
         );
+
+        switch (LOG_LEVEL) {
+            case 'ERROR':
+                console.warn = () => {};
+            // eslint-disable-next-line no-fallthrough
+            case 'WARN':
+                console.log = () => {};
+            // eslint-disable-next-line no-fallthrough
+            case 'LOG':
+                console.debug = () => {};
+        }
+        console.debug(`loaded Smash lib (log level: ${LOG_LEVEL})`);
     }
 
     async close() {
