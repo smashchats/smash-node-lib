@@ -27,7 +27,7 @@ const solveChallenge = async (
     );
 
     const symmetricKey = await CryptoUtils.singleton.deriveKey(
-        { ...auth.keyAlgorithm, public: smePublicKey },
+        { ...auth.keyAlgorithm, public: smePublicKey } as KeyAlgorithm,
         auth.preKeyPair.privateKey,
         auth.encryptionAlgorithm,
         false,
@@ -35,7 +35,7 @@ const solveChallenge = async (
     );
 
     const unencryptedChallenge = await CryptoUtils.singleton.decrypt(
-        { ...auth.encryptionAlgorithm, iv: ivBuffer },
+        { ...auth.encryptionAlgorithm, iv: ivBuffer } as KeyAlgorithm,
         symmetricKey,
         challengeBuffer,
     );

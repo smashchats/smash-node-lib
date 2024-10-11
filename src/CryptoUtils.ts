@@ -18,11 +18,11 @@ export default class CryptoUtils {
     constructor(private subtle: globalThis.SubtleCrypto) {}
 
     get decrypt() {
-        return this.subtle.decrypt;
+        return this.subtle.decrypt.bind(this.subtle);
     }
 
     get deriveKey() {
-        return this.subtle.deriveKey;
+        return this.subtle.deriveKey.bind(this.subtle);
     }
 
     async sign(signingKey: CryptoKey, message: ArrayBuffer) {
@@ -35,9 +35,9 @@ export default class CryptoUtils {
 
     async importKey(
         keyEncoded: string,
-        keyAlgorithm: globalThis.KeyAlgorithm = PK_ALG,
+        keyAlgorithm: KeyAlgorithm = PK_ALG,
         exportable: boolean = true,
-        usages: globalThis.KeyUsage[] = [],
+        usages: KeyUsage[] = [],
         encoding: BufferEncoding = ENCODING,
     ): Promise<CryptoKey> {
         return await this.subtle.importKey(
