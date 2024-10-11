@@ -11,7 +11,7 @@ export { SessionManager } from '@src/SessionManager.js';
 export { SignalSession } from '@src/SignalSession.js';
 export { SmashPeer } from '@src/SmashPeer.js';
 export { sortSmashMessages } from '@src/SmashTools.js';
-export { ECPublicKey, IJsonIdentity } from '2key-ratchet';
+export { ECPublicKey } from '2key-ratchet';
 
 // Logging setup (you might want to move this to a separate file)
 type LogLevel = 'DEBUG' | 'LOG' | 'WARN' | 'ERROR';
