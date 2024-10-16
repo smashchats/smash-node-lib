@@ -11,4 +11,4 @@ export { SessionManager } from '@src/SessionManager.js';
 export { SignalSession } from '@src/SignalSession.js';
 export { SmashPeer } from '@src/SmashPeer.js';
 export { sortSmashMessages } from '@src/SmashTools.js';
-export { ECPublicKey } from '2key-ratchet';
+export { ECPublicKey, Identity } from '2key-ratchet';
