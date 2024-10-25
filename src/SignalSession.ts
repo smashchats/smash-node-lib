@@ -7,6 +7,7 @@ import {
     PreKeyMessageProtocol,
 } from '2key-ratchet';
 import CryptoUtils from '@src/CryptoUtils.js';
+import { Logger } from '@src/Logger.js';
 import {
     ENCODING,
     EncapsulatedSmashMessage,
@@ -25,6 +26,7 @@ export class SignalSession {
         peer: SmashDID,
         identity: Identity,
         sme: SmashEndpoint,
+        logger: Logger,
     ) {
         const bundle = new PreKeyBundleProtocol();
         bundle.registrationId = 0; // warning: using fixed value, unsure about usage!
@@ -55,8 +57,9 @@ export class SignalSession {
         identity: Identity,
         sessionId: string,
         data: ArrayBuffer,
+        logger: Logger,
     ): Promise<[SignalSession, EncapsulatedSmashMessage[]]> {
-        console.debug('SignalSession::parseSession');
+        logger.debug('SignalSession::parseSession');
         const preKeyMessageProtocol =
             await PreKeyMessageProtocol.importProto(data);
         const expectedSessionId = await CryptoUtils.singleton.keySha1(

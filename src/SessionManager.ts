@@ -1,4 +1,5 @@
 import { Identity } from '2key-ratchet';
+import { Logger } from '@src/Logger.js';
 import { SignalSession } from '@src/SignalSession.js';
 import {
     EncapsulatedSmashMessage,
@@ -12,7 +13,10 @@ export class SessionManager {
     private sessionsByPeer: Record<string, SignalSession> = {};
     private sessionsByID: Record<string, SignalSession> = {};
 
-    constructor(private identity: Identity) {}
+    constructor(
+        private identity: Identity,
+        private logger: Logger,
+    ) {}
 
     getSessionByPeer(peer: SmashDID): SignalSession | undefined {
         return this.sessionsByPeer[peer.ik];
@@ -30,6 +34,7 @@ export class SessionManager {
             this.identity,
             sessionId,
             data,
+            this.logger,
         );
         this.persistSession(session);
         return [session, decryptedMessages];
@@ -42,11 +47,12 @@ export class SessionManager {
     }
 
     async initSession(peerDid: SmashDID, endpoint: SmashEndpoint) {
-        console.debug('SmashEndpoint::initSession');
+        this.logger.debug('SmashEndpoint::initSession');
         const session = await SignalSession.create(
             peerDid,
             this.identity,
             endpoint,
+            this.logger,
         );
         this.persistSession(session);
         return session;

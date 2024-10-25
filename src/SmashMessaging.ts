@@ -6,6 +6,7 @@ import {
     setEngine,
 } from '2key-ratchet';
 import CryptoUtils from '@src/CryptoUtils.js';
+import { LogLevel, Logger } from '@src/Logger.js';
 import { SMESocketManager } from '@src/SMESocketManager.js';
 import { SessionManager } from '@src/SessionManager.js';
 import { SmashPeer } from '@src/SmashPeer.js';
@@ -20,14 +21,14 @@ import {
 } from '@src/types/index.js';
 import { EventEmitter } from 'events';
 
-// Logging setup (you might want to move this to a separate file)
-type LogLevel = 'DEBUG' | 'LOG' | 'WARN' | 'ERROR';
-
 type CryptoKeyPairWithThumbprint = CryptoKeyPair & {
     thumbprint: string;
 };
 
+// TODO: safeguard crypto operations against errors
 export default class SmashMessaging extends EventEmitter {
+    private logger: Logger;
+
     static setCrypto(c: globalThis.Crypto) {
         setEngine('@peculiar/webcrypto', c);
         CryptoUtils.setCryptoSubtle(c.subtle);
@@ -56,29 +57,23 @@ export default class SmashMessaging extends EventEmitter {
 
     constructor(
         protected identity: Identity,
-        LOG_LEVEL = 'DEBUG' as LogLevel,
+        LOG_LEVEL: LogLevel = 'INFO',
+        LOG_ID: string = 'SmashMessaging',
     ) {
         super();
+        this.logger = new Logger(LOG_ID, LOG_LEVEL);
+
         this.dlq = {};
         this.peers = {};
         this.endpoints = [];
-        this.sessionManager = new SessionManager(identity);
+        this.sessionManager = new SessionManager(identity, this.logger);
         this.smeSocketManager = new SMESocketManager(
             this.incomingMessagesHandler.bind(this),
             this.messagesStatusHandler.bind(this),
+            this.logger,
         );
 
-        switch (LOG_LEVEL) {
-            case 'ERROR':
-                console.warn = () => {};
-            // eslint-disable-next-line no-fallthrough
-            case 'WARN':
-                console.log = () => {};
-            // eslint-disable-next-line no-fallthrough
-            case 'LOG':
-                console.debug = () => {};
-        }
-        console.debug(`loaded Smash lib (log level: ${LOG_LEVEL})`);
+        this.logger.info(`Loaded Smash lib (log level: ${LOG_LEVEL})`);
     }
 
     async close() {
@@ -106,7 +101,7 @@ export default class SmashMessaging extends EventEmitter {
     }
 
     private async messagesStatusHandler(messageIds: string[], status: string) {
-        console.debug(`messagesStatusHandler ${status} ${messageIds}`);
+        this.logger.debug(`messagesStatusHandler ${status} ${messageIds}`);
         messageIds.forEach((id) => this.emit('status', id, status));
     }
 
@@ -116,18 +111,18 @@ export default class SmashMessaging extends EventEmitter {
     ) {
         const peer: SmashPeer | undefined = this.peers[peerIk];
         if (!peer) {
-            console.debug(
+            this.logger.debug(
                 `Messages (${messages.length}) from unknown peer ${peerIk}`,
             );
             this.pushToUnknownPeerDLQ(peerIk, messages);
             const catchDidMessages = messages.map(async (message) => {
                 if (message.type === 'profile') {
-                    console.debug(`Received DID for peer ${peerIk}`);
+                    this.logger.debug(`Received DID for peer ${peerIk}`);
                     const peerDid = message.data as SmashDID;
                     if (peerIk !== peerDid.ik) {
                         const err =
                             'Received DID doesnt match Signal Session data.';
-                        console.warn(err);
+                        this.logger.warn(err);
                         throw new Error(err);
                     }
                     await this.flushDLQ(peerDid);
@@ -136,7 +131,9 @@ export default class SmashMessaging extends EventEmitter {
                 }
             });
             return Promise.any(catchDidMessages).catch(() =>
-                console.debug(`didnt catch any profile message for ${peerIk}`),
+                this.logger.debug(
+                    `didnt catch any profile message for ${peerIk}`,
+                ),
             );
         } else {
             const peerDid = peer.getDID();
@@ -149,7 +146,7 @@ export default class SmashMessaging extends EventEmitter {
         messages: EncapsulatedSmashMessage[],
         sender: SmashDID,
     ) {
-        console.debug(
+        this.logger.debug(
             `notifyNewMessages: ${messages.length}/${(this.totalMessages += messages.length)}`,
             JSON.stringify(messages, null, 2),
         );
@@ -162,7 +159,7 @@ export default class SmashMessaging extends EventEmitter {
         // TODO more than once
         // if (this.processingDlq) return;
         // this.processingDlq = true;
-        console.debug(
+        this.logger.debug(
             `> Flushing peer DLQ of size ${this.dlq[peerDid.ik].length}`,
         );
         this.peers[peerDid.ik] = await this.getOrCreatePeer(peerDid);
@@ -180,7 +177,11 @@ export default class SmashMessaging extends EventEmitter {
 
     protected async getOrCreatePeer(peerDid: SmashDID): Promise<SmashPeer> {
         if (!this.peers[peerDid.ik]) {
-            const peer = new SmashPeer(peerDid, this.sessionManager);
+            const peer = new SmashPeer(
+                peerDid,
+                this.sessionManager,
+                this.logger,
+            );
             await peer.configureEndpoints(this.smeSocketManager);
             peer.queueMessage({
                 type: 'profile',

@@ -1,4 +1,5 @@
 import { Identity } from '2key-ratchet';
+import { Logger } from '@src/Logger.js';
 import { SMESocketReadWrite, onMessagesFn } from '@src/SMESocketReadWrite.js';
 import {
     SMESocketWriteOnly,
@@ -13,6 +14,7 @@ export class SMESocketManager {
     constructor(
         private onMessagesCallback: onMessagesFn,
         private onMessagesStatusCallback: onMessagesStatusFn,
+        private logger: Logger,
     ) {
         this.smeSockets = {};
     }
@@ -29,6 +31,7 @@ export class SMESocketManager {
             this.smeSockets[url] = new SMESocketWriteOnly(
                 url,
                 this.onMessagesStatusCallback,
+                this.logger,
             );
         return this.smeSockets[url];
     }
@@ -43,6 +46,7 @@ export class SMESocketManager {
             sessionManager,
             this.onMessagesCallback,
             this.onMessagesStatusCallback,
+            this.logger,
         );
         if (this.smeSockets[smeConfig.url]) {
             Object.assign(this.smeSockets[smeConfig.url], smeSocket);

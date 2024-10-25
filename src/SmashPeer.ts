@@ -1,4 +1,5 @@
 import CryptoUtils from '@src/CryptoUtils.js';
+import { Logger } from '@src/Logger.js';
 import { SMESocketManager } from '@src/SMESocketManager.js';
 import { SMESocketWriteOnly } from '@src/SMESocketWriteOnly.js';
 import { SessionManager } from '@src/SessionManager.js';
@@ -26,12 +27,13 @@ export class SmashPeer {
     constructor(
         private did: SmashDID,
         private sessionManager: SessionManager,
+        private logger: Logger,
     ) {}
 
     async configureEndpoints(
         smeSocketManager: SMESocketManager,
     ): Promise<void> {
-        console.debug('SmashPeer::configureEndpoints');
+        this.logger.debug('SmashPeer::configureEndpoints');
         const endpointPromises = this.did.endpoints.map(
             async (endpointConfig) => {
                 const socket = smeSocketManager.getOrCreate(endpointConfig.url);
@@ -60,7 +62,7 @@ export class SmashPeer {
             timestamp: new Date().toISOString(),
         };
         this.messageQueue.push(encapsulatedMessage);
-        console.debug(
+        this.logger.debug(
             `> queued ${encapsulatedMessage.sha1} (${this.messageQueue.length})`,
         );
         return encapsulatedMessage;
@@ -88,7 +90,7 @@ export class SmashPeer {
                 this.messageQueue = [];
             }),
         );
-        console.debug(
+        this.logger.debug(
             `> flushed ${queuedMessages.length - this.messageQueue.length}/${queuedMessages.length} (${queuedMessagesSha1s})`,
         );
         // TODO: where to handle retries? (is refactor needed? rethink clean lib arch?)
@@ -99,7 +101,7 @@ export class SmashPeer {
     ): Promise<EncapsulatedSmashMessage> {
         const sentMessage = await this.queueMessage(message);
         await this.flushQueue();
-        console.debug(`> sent `, JSON.stringify(sentMessage));
+        this.logger.debug(`> sent `, JSON.stringify(sentMessage));
         return sentMessage;
     }
 
@@ -123,7 +125,7 @@ export class SmashPeer {
             }),
         );
         const results = await Promise.allSettled(updateNabPromises);
-        console.log(
+        this.logger.info(
             `> setRelationship with ${this.did.ik} to ${relationship}`,
             JSON.stringify(results),
         );

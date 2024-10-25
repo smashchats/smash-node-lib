@@ -1,14 +1,12 @@
 import SmashMessaging from '@src/SmashMessaging.js';
 import {
-    ActionSmashMessage,
+    ActionData,
     EncapsulatedSmashMessage,
     JoinAction,
     SMEConfigJSONWithoutDefaults,
     SME_DEFAULT_CONFIG,
     SmashDID,
 } from '@src/types/index.js';
-
-type ActionMessage = EncapsulatedSmashMessage & ActionSmashMessage;
 
 export default class SmashNAB extends SmashMessaging {
     async getJoinInfo(
@@ -69,14 +67,12 @@ export default class SmashNAB extends SmashMessaging {
             case 'text':
                 this.emit('text', sender, message.data as string);
                 break;
+            case 'discover':
+                this.emit('discover', sender);
+                break;
             case 'action':
-                this.handleAction(sender, message as ActionMessage);
+                this.emit('action', sender, message.data as ActionData);
                 break;
         }
-    }
-
-    // TODO: implement relationship persistence and time-relative update (local graph)
-    handleAction(sender: SmashDID, message: ActionMessage) {
-        this.emit('action', sender, message.data);
     }
 }

@@ -1,5 +1,6 @@
 import { Identity } from '2key-ratchet';
 import CryptoUtils from '@src/CryptoUtils.js';
+import { Logger } from '@src/Logger.js';
 import {
     SMESocketWriteOnly,
     onMessagesStatusFn,
@@ -43,7 +44,9 @@ const solveChallenge = async (
     const solvedChallenge = Buffer.from(unencryptedChallenge).toString(
         auth.challengeEncoding,
     );
-    console.log(`> SME Challenge (${data.challenge}) -> (${solvedChallenge})`);
+    console.debug(
+        `> SME Challenge (${data.challenge}) -> (${solvedChallenge})`,
+    );
     socket.emit('register', solvedChallenge);
 };
 
@@ -61,8 +64,9 @@ export class SMESocketReadWrite extends SMESocketWriteOnly {
         private sessionManager: SessionManager,
         private onMessagesCallback: onMessagesFn,
         onMessagesStatusCallback: onMessagesStatusFn,
+        logger: Logger,
     ) {
-        super(url, onMessagesStatusCallback);
+        super(url, onMessagesStatusCallback, logger);
     }
 
     public async initSocketWithAuth(
@@ -76,7 +80,7 @@ export class SMESocketReadWrite extends SMESocketWriteOnly {
             identity.signingKey.privateKey,
             auth.preKeyPair.publicKey.serialize(),
         );
-        this.socket = SMESocketWriteOnly.initSocket(auth.url, {
+        this.socket = SMESocketWriteOnly.initSocket(this.logger, auth.url, {
             key: preKey,
             keyAlgorithm: auth.keyAlgorithm,
         });
@@ -93,10 +97,12 @@ export class SMESocketReadWrite extends SMESocketWriteOnly {
     }
 
     private async processMessages(sessionId: string, data: ArrayBuffer) {
-        console.debug(`SMESocketReadWrite::processMessages for ${sessionId}`);
+        this.logger.debug(
+            `SMESocketReadWrite::processMessages for ${sessionId}`,
+        );
         const session = this.sessionManager.getSessionById(sessionId);
         if (session) {
-            console.log(`> Incoming data for session ${sessionId}`);
+            this.logger.info(`Incoming data for session ${sessionId}`);
             this.emitReceivedMessages(
                 await session.decryptData(data),
                 session.peerIk,
@@ -110,7 +116,7 @@ export class SMESocketReadWrite extends SMESocketWriteOnly {
         try {
             const [parsedSession, firstMessages] =
                 await this.sessionManager.parseSession(sessionId, data);
-            console.log(`> New session ${sessionId}`);
+            this.logger.info(`New session ${sessionId}`);
             this.emitReceivedMessages(firstMessages, parsedSession.peerIk);
             await this.processQueuedMessages(parsedSession);
         } catch (err) {
@@ -120,18 +126,19 @@ export class SMESocketReadWrite extends SMESocketWriteOnly {
                     'Cannot decode message for PreKeyMessage.',
                 )
             ) {
-                console.log(
-                    `> Queuing data for session ${sessionId} (${err.message})`,
+                this.logger.info(
+                    `Queuing data for session ${sessionId} (${err.message})`,
                 );
                 this.addToDlq(sessionId, data);
             } else {
+                this.logger.error(`Error processing messages for ${sessionId}`);
                 throw err;
             }
         }
     }
 
     private async processQueuedMessages(session: SignalSession) {
-        console.debug(
+        this.logger.debug(
             `processQueuedMessages for ${session.id} (${this.dlq[session.id]?.length})`,
         );
         if (this.dlq[session.id]) {
@@ -141,10 +148,12 @@ export class SMESocketReadWrite extends SMESocketWriteOnly {
                 ),
             );
             delete this.dlq[session.id];
-            console.debug(`> Cleared DLQ (${this.dlq[session.id]?.length})`);
-            console.debug(`>> streams:= ${decryptedMessages.length}`);
+            this.logger.debug(
+                `> Cleared DLQ (${this.dlq[session.id]?.length})`,
+            );
+            this.logger.debug(`>> streams:= ${decryptedMessages.length}`);
             for (const stream of decryptedMessages) {
-                console.debug(`>>> messages:= ${stream.length}`);
+                this.logger.debug(`>>> messages:= ${stream.length}`);
             }
             this.emitReceivedMessages(decryptedMessages.flat(), session.peerIk);
         }
@@ -155,7 +164,7 @@ export class SMESocketReadWrite extends SMESocketWriteOnly {
             this.dlq[sessionId] = [];
         }
         this.dlq[sessionId].push(data);
-        console.debug(
+        this.logger.debug(
             `> Added message(s) to DLQ (${this.dlq[sessionId].length})`,
         );
     }
@@ -164,7 +173,7 @@ export class SMESocketReadWrite extends SMESocketWriteOnly {
         messages: EncapsulatedSmashMessage[],
         peerIk: string,
     ) {
-        console.debug('SMESocketReadWrite::emitReceivedMessages');
+        this.logger.debug('SMESocketReadWrite::emitReceivedMessages');
         this.onMessagesCallback(messages, peerIk);
     }
 }

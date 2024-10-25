@@ -1,3 +1,4 @@
+import { Logger } from '@src/Logger.js';
 import { Socket, io } from 'socket.io-client';
 
 type SMEAuthParams = {
@@ -13,6 +14,7 @@ export class SMESocketWriteOnly {
     constructor(
         public readonly url: string,
         private onMessagesStatusCallback: onMessagesStatusFn,
+        protected logger: Logger,
     ) {}
 
     async close(TIMEOUT_MS = 3000): Promise<void> {
@@ -41,18 +43,22 @@ export class SMESocketWriteOnly {
         messageIds: string[],
     ) {
         if (!this.socket) {
-            this.socket = SMESocketWriteOnly.initSocket(this.url);
+            this.socket = SMESocketWriteOnly.initSocket(this.logger, this.url);
         }
         this.socket.emit('data', preKey, sessionId, buffer, () => {
-            console.debug(`${messageIds} "delivered"`);
+            this.logger.debug(`${messageIds} "delivered"`);
             this.onMessagesStatusCallback(messageIds, 'delivered');
         });
     }
 
-    protected static initSocket(url: string, auth?: SMEAuthParams) {
+    protected static initSocket(
+        logger: Logger,
+        url: string,
+        auth?: SMEAuthParams,
+    ) {
         const socket = io(url, { auth });
         socket.on('connect', () => {
-            console.log(`> Connected to SME ${url}`);
+            logger.info(`> Connected to SME ${url}`);
         });
         return socket;
     }
