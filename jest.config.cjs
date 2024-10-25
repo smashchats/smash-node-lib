@@ -1,6 +1,6 @@
 /** @type {import('ts-jest').JestConfigWithTsJest} **/
 module.exports = {
-    preset: 'ts-jest/presets/default-esm', // Use ESM preset
+    preset: 'ts-jest/presets/default-esm',
     moduleFileExtensions: ['ts', 'js', 'json'],
     testEnvironment: 'node',
     rootDir: './',

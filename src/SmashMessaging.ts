@@ -44,8 +44,14 @@ export default class SmashMessaging extends EventEmitter {
             keys: CryptoKeyPairWithThumbprint,
         ) => Promise<IECKeyPair>,
     ) {
-        if (!!ecKeyPairFromJson) Curve.ecKeyPairFromJson = ecKeyPairFromJson;
-        return await Identity.fromJSON(identity);
+        try {
+            if (!!ecKeyPairFromJson)
+                Curve.ecKeyPairFromJson = ecKeyPairFromJson;
+            return await Identity.fromJSON(identity);
+        } catch (err) {
+            console.error('Cannot parse identity json.');
+            throw err;
+        }
     }
 
     private dlq: Record<string, EncapsulatedSmashMessage[]>;

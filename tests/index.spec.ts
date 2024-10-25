@@ -17,10 +17,11 @@ import { TIMEOUT_MS, aliasWaitFor, delay } from './time.utils';
 import { peerArgs } from './user.utils';
 
 async function createTestPeer(
+    name: string,
     socketServerUrl?: string,
 ): Promise<SmashMessaging> {
     const [identity, config] = await peerArgs(socketServerUrl);
-    const peer = new SmashMessaging(identity);
+    const peer = new SmashMessaging(identity, 'DEBUG', name);
     await peer.initEndpoints(config);
     return peer;
 }
@@ -95,8 +96,8 @@ describe('SmashMessaging: Between peers registered to a SME', () => {
                 .forEach((client) => client.emit('data', sessionId, data));
         };
         bothConnectedToSME = waitFor(ioServer, 'connection', 2);
-        alice = await createTestPeer(socketServerUrl);
-        bob = await createTestPeer(socketServerUrl);
+        alice = await createTestPeer('alice', socketServerUrl);
+        bob = await createTestPeer('bob', socketServerUrl);
         bobDID = await bob.getDID();
         aliceDID = await alice.getDID();
         onBobMessageReceived = jest.fn();
@@ -227,6 +228,67 @@ describe('SmashMessaging: Between peers registered to a SME', () => {
             });
         });
     });
+
+    describe('Three users registered to the same SME', () => {
+        let charlie: SmashMessaging | undefined;
+        let charlieDID: SmashDID;
+        let onCharlieMessageReceived: jest.Mock;
+        let onCharlieStatusUpdated: jest.Mock;
+
+        beforeEach(async () => {
+            const charlieConnected = waitFor(ioServer, 'connection');
+            charlie = await createTestPeer('charlie', socketServerUrl);
+            charlieDID = await charlie.getDID();
+            onCharlieMessageReceived = jest.fn();
+            onCharlieStatusUpdated = jest.fn();
+            charlie.on('status', onCharlieStatusUpdated);
+            charlie.on('message', onCharlieMessageReceived);
+            await charlieConnected;
+        });
+
+        afterEach(async () => {
+            await charlie!.close();
+            charlie = undefined;
+        });
+
+        fit('Alice and Bob can message each other without errors while Charlie is connected', async () => {
+            const aliceToBobMessage = 'Hello Bob!';
+            const bobToAliceMessage = 'Hi Alice!';
+
+            const bobReceivedMessage = waitFor(
+                bob!,
+                'message',
+                1 + protocolOverheadSize,
+            );
+            const aliceReceivedMessage = waitFor(
+                alice!,
+                'message',
+                1 + protocolOverheadSize,
+            );
+
+            // Alice sends a message to Bob
+            await alice!.sendTextMessage(bobDID, aliceToBobMessage);
+            await bobReceivedMessage;
+
+            // Bob replies to Alice
+            await bob!.sendTextMessage(aliceDID, bobToAliceMessage);
+            await aliceReceivedMessage;
+
+            // Verify that messages were received correctly
+            expect(onBobMessageReceived).toHaveBeenCalledWith(
+                expect.objectContaining({ data: aliceToBobMessage }),
+                expect.anything(),
+            );
+            expect(onAliceMessageReceived).toHaveBeenCalledWith(
+                expect.objectContaining({ data: bobToAliceMessage }),
+                expect.anything(),
+            );
+
+            // Verify that Charlie didn't receive any messages
+            expect(onCharlieMessageReceived).not.toHaveBeenCalled();
+        });
+    });
+
     // TODO (later) Poste Restante
     // TODO (later) DID refresh + TODO timeout/retries/...
     // TODO P2P2

@@ -31,7 +31,7 @@ export async function waitForEvent(
     let eventsReceived = 0;
     const [timeoutPromise, cancelTimeout] = createCancellableDelay(timeout);
     cancellationFunctions.push(cancelTimeout);
-    console.log(
+    console.info(
         `<<< Waiting for ${eventName}, ID: ${id}, Timeout: ${timeout}ms`,
     );
 
@@ -45,7 +45,7 @@ export async function waitForEvent(
             (emitter as Socket).on(eventName, () => {
                 eventsReceived++;
                 if (eventsReceived === count) {
-                    console.log(
+                    console.info(
                         `<<< Event "${eventName}" received ${eventsReceived} times, ID: ${id}`,
                     );
                     cancelTimeout();

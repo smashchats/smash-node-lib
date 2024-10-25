@@ -1,7 +1,7 @@
 /**
  *  tests specific to the Smash Neighborhood Admin Bot API and Neighborhood-related actions
  */
-import { Identity, setEngine } from '2key-ratchet';
+import { Identity } from '2key-ratchet';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import {

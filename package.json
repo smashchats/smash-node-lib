@@ -11,7 +11,7 @@
     "scripts": {
         "start": "nodemon --ignore './scripts/*'",
         "test": "jest --config jest.config.cjs --coverage",
-        "build": "tsc && tsc-alias",
+        "build": "rm -rf ./dist/* && tsc && tsc-alias",
         "prettier-format": "prettier --config .prettierrc 'src/**/*.ts' --write",
         "script/json": "ts-node ./scripts/create-identity.ts",
         "script/id": "ts-node ./scripts/generate-identity-hsm.ts",

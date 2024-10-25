@@ -19,35 +19,43 @@ const solveChallenge = async (
     auth: SMEConfig,
     socket: Socket,
 ) => {
-    const ivBuffer = Buffer.from(data.iv, auth.challengeEncoding);
-    const challengeBuffer = Buffer.from(data.challenge, auth.challengeEncoding);
+    try {
+        const ivBuffer = Buffer.from(data.iv, auth.challengeEncoding);
+        const challengeBuffer = Buffer.from(
+            data.challenge,
+            auth.challengeEncoding,
+        );
 
-    const smePublicKey = await CryptoUtils.singleton.importKey(
-        auth.smePublicKey,
-        auth.keyAlgorithm,
-    );
+        const smePublicKey = await CryptoUtils.singleton.importKey(
+            auth.smePublicKey,
+            auth.keyAlgorithm,
+        );
 
-    const symmetricKey = await CryptoUtils.singleton.deriveKey(
-        { ...auth.keyAlgorithm, public: smePublicKey } as KeyAlgorithm,
-        auth.preKeyPair.privateKey,
-        auth.encryptionAlgorithm,
-        false,
-        ['encrypt', 'decrypt'],
-    );
+        const symmetricKey = await CryptoUtils.singleton.deriveKey(
+            { ...auth.keyAlgorithm, public: smePublicKey } as KeyAlgorithm,
+            auth.preKeyPair.privateKey,
+            auth.encryptionAlgorithm,
+            false,
+            ['encrypt', 'decrypt'],
+        );
 
-    const unencryptedChallenge = await CryptoUtils.singleton.decrypt(
-        { ...auth.encryptionAlgorithm, iv: ivBuffer } as KeyAlgorithm,
-        symmetricKey,
-        challengeBuffer,
-    );
+        const unencryptedChallenge = await CryptoUtils.singleton.decrypt(
+            { ...auth.encryptionAlgorithm, iv: ivBuffer } as KeyAlgorithm,
+            symmetricKey,
+            challengeBuffer,
+        );
 
-    const solvedChallenge = Buffer.from(unencryptedChallenge).toString(
-        auth.challengeEncoding,
-    );
-    console.debug(
-        `> SME Challenge (${data.challenge}) -> (${solvedChallenge})`,
-    );
-    socket.emit('register', solvedChallenge);
+        const solvedChallenge = Buffer.from(unencryptedChallenge).toString(
+            auth.challengeEncoding,
+        );
+        console.debug(
+            `> SME Challenge (${data.challenge}) -> (${solvedChallenge})`,
+        );
+        socket.emit('register', solvedChallenge);
+    } catch (err) {
+        console.error('Cannot solve challenge.');
+        throw err;
+    }
 };
 
 export type onMessagesFn = (
@@ -73,27 +81,32 @@ export class SMESocketReadWrite extends SMESocketWriteOnly {
         identity: Identity,
         auth: SMEConfig,
     ): Promise<SmashEndpoint> {
-        const preKey = await CryptoUtils.singleton.exportKey(
-            auth.preKeyPair.publicKey.key,
-        );
-        const signature = await CryptoUtils.singleton.signAsString(
-            identity.signingKey.privateKey,
-            auth.preKeyPair.publicKey.serialize(),
-        );
-        this.socket = SMESocketWriteOnly.initSocket(this.logger, auth.url, {
-            key: preKey,
-            keyAlgorithm: auth.keyAlgorithm,
-        });
-        this.socket.on('challenge', (data) =>
-            solveChallenge(data, auth, this.socket!),
-        );
-        // TODO: rename SME event to 'data' (or otherwise) to avoid confusion
-        this.socket.on('data', this.processMessages.bind(this));
-        return {
-            url: auth.url,
-            preKey,
-            signature,
-        };
+        try {
+            const preKey = await CryptoUtils.singleton.exportKey(
+                auth.preKeyPair.publicKey.key,
+            );
+            const signature = await CryptoUtils.singleton.signAsString(
+                identity.signingKey.privateKey,
+                auth.preKeyPair.publicKey.serialize(),
+            );
+            this.socket = SMESocketWriteOnly.initSocket(this.logger, auth.url, {
+                key: preKey,
+                keyAlgorithm: auth.keyAlgorithm,
+            });
+            this.socket.on('challenge', (data) =>
+                solveChallenge(data, auth, this.socket!),
+            );
+            // TODO: rename SME event to 'data' (or otherwise) to avoid confusion
+            this.socket.on('data', this.processMessages.bind(this));
+            return {
+                url: auth.url,
+                preKey,
+                signature,
+            };
+        } catch (err) {
+            this.logger.error('Cannot init socket with auth.');
+            throw err;
+        }
     }
 
     private async processMessages(sessionId: string, data: ArrayBuffer) {
@@ -131,8 +144,7 @@ export class SMESocketReadWrite extends SMESocketWriteOnly {
                 );
                 this.addToDlq(sessionId, data);
             } else {
-                this.logger.error(`Error processing messages for ${sessionId}`);
-                throw err;
+                this.logger.warn(`Unprocessable data for ${sessionId}`);
             }
         }
     }
@@ -142,20 +154,29 @@ export class SMESocketReadWrite extends SMESocketWriteOnly {
             `processQueuedMessages for ${session.id} (${this.dlq[session.id]?.length})`,
         );
         if (this.dlq[session.id]) {
-            const decryptedMessages = await Promise.all(
-                this.dlq[session.id].map((message) =>
-                    session.decryptData(message),
-                ),
-            );
-            delete this.dlq[session.id];
-            this.logger.debug(
-                `> Cleared DLQ (${this.dlq[session.id]?.length})`,
-            );
-            this.logger.debug(`>> streams:= ${decryptedMessages.length}`);
-            for (const stream of decryptedMessages) {
-                this.logger.debug(`>>> messages:= ${stream.length}`);
+            try {
+                const decryptedMessages = await Promise.all(
+                    this.dlq[session.id].map((message) =>
+                        session.decryptData(message),
+                    ),
+                );
+                delete this.dlq[session.id];
+                this.logger.debug(
+                    `> Cleared DLQ (${this.dlq[session.id]?.length})`,
+                );
+                this.logger.debug(`>> streams:= ${decryptedMessages.length}`);
+                for (const stream of decryptedMessages) {
+                    this.logger.debug(`>>> messages:= ${stream.length}`);
+                }
+                this.emitReceivedMessages(
+                    decryptedMessages.flat(),
+                    session.peerIk,
+                );
+            } catch (err) {
+                this.logger.warn(
+                    `Cannot process queued messages for ${session.id}`,
+                );
             }
-            this.emitReceivedMessages(decryptedMessages.flat(), session.peerIk);
         }
     }
 

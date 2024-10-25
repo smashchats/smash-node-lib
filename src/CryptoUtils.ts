@@ -1,4 +1,5 @@
 import { Curve } from '2key-ratchet';
+import { Logger } from '@src/Logger.js';
 import { ENCODING } from '@src/types/index.js';
 
 const EXPORT = 'spki';
@@ -15,7 +16,10 @@ export default class CryptoUtils {
         return this.instance;
     }
 
-    constructor(private subtle: globalThis.SubtleCrypto) {}
+    constructor(
+        private subtle: globalThis.SubtleCrypto,
+        private logger: Logger = new Logger('CryptoUtils'),
+    ) {}
 
     get decrypt() {
         return this.subtle.decrypt.bind(this.subtle);
@@ -26,7 +30,12 @@ export default class CryptoUtils {
     }
 
     async sign(signingKey: CryptoKey, message: ArrayBuffer) {
-        return await Curve.sign(signingKey, message);
+        try {
+            return await Curve.sign(signingKey, message);
+        } catch (err) {
+            this.logger.error('Cannot sign message.');
+            throw err;
+        }
     }
 
     async signAsString(signingKey: CryptoKey, message: ArrayBuffer) {
