@@ -1,4 +1,8 @@
 /** @type {import('ts-jest').JestConfigWithTsJest} **/
+
+const actualProcess = process;
+process.actual = () => actualProcess;
+
 module.exports = {
     preset: 'ts-jest/presets/default-esm',
     moduleFileExtensions: ['ts', 'js', 'json'],
@@ -19,4 +23,5 @@ module.exports = {
             },
         ],
     },
+    setupFilesAfterEnv: ['<rootDir>/tests/jest.setup.ts'],
 };

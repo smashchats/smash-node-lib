@@ -57,7 +57,7 @@ export class SignalSession {
             );
             return new SignalSession(sessionId, cipher, peer.ik, logger);
         } catch (err) {
-            logger.error('Cannot create session.');
+            logger.warn('Cannot create session.');
             throw err;
         }
     }
@@ -96,7 +96,7 @@ export class SignalSession {
             );
             return [session, decryptedMessages];
         } catch (err) {
-            logger.error('Cannot parse session.');
+            logger.warn('Cannot parse session.');
             throw err;
         }
     }
@@ -106,7 +106,7 @@ export class SignalSession {
             const data = Buffer.from(JSON.stringify(message));
             return (await this.cipher.encrypt(data)).exportProto();
         } catch (err) {
-            this.logger.error('Cannot encrypt messages.');
+            this.logger.warn('Cannot encrypt messages.');
             throw err;
         }
     }
@@ -117,7 +117,7 @@ export class SignalSession {
                 await MessageSignedProtocol.importProto(data),
             );
         } catch (err) {
-            this.logger.error('Cannot decrypt data.');
+            this.logger.warn('Cannot decrypt data.');
             throw err;
         }
     }
@@ -133,7 +133,7 @@ export class SignalSession {
                 decryptedData.toString(),
             ) as EncapsulatedSmashMessage[];
         } catch (err) {
-            this.logger.error('Cannot decrypt messages.');
+            this.logger.warn('Cannot decrypt messages.');
             throw err;
         }
     }

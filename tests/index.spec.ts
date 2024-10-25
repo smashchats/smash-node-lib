@@ -251,7 +251,7 @@ describe('SmashMessaging: Between peers registered to a SME', () => {
             charlie = undefined;
         });
 
-        fit('Alice and Bob can message each other without errors while Charlie is connected', async () => {
+        it('Alice and Bob can message each other without errors while Charlie is connected', async () => {
             const aliceToBobMessage = 'Hello Bob!';
             const bobToAliceMessage = 'Hi Alice!';
 

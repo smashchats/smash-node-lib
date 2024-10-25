@@ -80,6 +80,9 @@ export default class SmashMessaging extends EventEmitter {
         );
 
         this.logger.info(`Loaded Smash lib (log level: ${LOG_LEVEL})`);
+        process.on('unhandledRejection', (reason, promise) => {
+            SmashMessaging.handleError(reason, promise, this.logger);
+        });
     }
 
     async close() {
@@ -243,5 +246,27 @@ export default class SmashMessaging extends EventEmitter {
             ),
             endpoints: await Promise.all(endpoints),
         };
+    }
+
+    static handleError(reason: any, promise: Promise<any>, logger: Logger) {
+        if (
+            reason instanceof DOMException &&
+            reason.name === 'OperationError'
+        ) {
+            logger.warn(
+                '[SmashMessaging] Decryption OperationError: Possible key mismatch or corrupted data.',
+            );
+            logger.debug(
+                'Detailed cause:',
+                (reason as any).cause || 'No additional error cause found',
+            );
+        } else {
+            logger.error(
+                '[SmashMessaging] Unhandled rejection at:',
+                promise,
+                'reason:',
+                reason,
+            );
+        }
     }
 }

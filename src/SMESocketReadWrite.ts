@@ -53,7 +53,7 @@ const solveChallenge = async (
         );
         socket.emit('register', solvedChallenge);
     } catch (err) {
-        console.error('Cannot solve challenge.');
+        console.warn('Cannot solve challenge.');
         throw err;
     }
 };
