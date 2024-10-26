@@ -24,11 +24,14 @@ export interface ProfileListSmashMessage extends SmashMessage {
     data: SmashDID[];
 }
 
+export type Relationship = 'smash' | 'pass' | 'clear' | 'block';
+
+export interface ActionData {
+    target: SmashDID;
+    action: Relationship;
+}
+
 export interface ActionSmashMessage extends SmashMessage {
     type: 'action';
-    data: {
-        target: SmashDID;
-        action: 'smash' | 'pass' | 'clear' | 'block';
-    };
+    data: ActionData;
 }
-export type Relationship = 'smash' | 'pass' | 'clear' | 'block';

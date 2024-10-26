@@ -45,6 +45,14 @@ export default class SmashUser extends SmashMessaging {
         return this.setRelationship(userDid, 'clear');
     }
 
+    // TODO: handle for multiple NABs
+    discover() {
+        return this.neighborhoodAdmins[0].sendMessage({
+            type: 'discover',
+            data: {},
+        });
+    }
+
     emit(event: string | symbol, ...args: any[]): boolean {
         if (event === 'message') {
             const [message, sender] = args as [
