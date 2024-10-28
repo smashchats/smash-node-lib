@@ -12,3 +12,4 @@ export { SignalSession } from '@src/SignalSession.js';
 export { SmashPeer } from '@src/SmashPeer.js';
 export { sortSmashMessages } from '@src/SmashTools.js';
 export { ECPublicKey, Identity } from '2key-ratchet';
+export { Logger } from '@src/Logger.js';
