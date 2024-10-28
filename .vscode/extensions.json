@@ -1,5 +1,6 @@
 {
     "recommendations": [
+        "Orta.vscode-jest",
         "ms-vsliveshare.vsliveshare",
         "SonarSource.sonarlint-vscode"
     ]
