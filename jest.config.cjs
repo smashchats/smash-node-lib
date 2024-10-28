@@ -1,8 +1,5 @@
 /** @type {import('ts-jest').JestConfigWithTsJest} **/
 
-const actualProcess = process;
-process.actual = () => actualProcess;
-
 module.exports = {
     preset: 'ts-jest/presets/default-esm',
     moduleFileExtensions: ['ts', 'js', 'json'],
@@ -13,6 +10,7 @@ module.exports = {
     testPathIgnorePatterns: ['node_modules'],
     moduleNameMapper: {
         '^@src/(.*)\\.js$': '<rootDir>/src/$1.ts',
+        '^@tests/(.*)\\.js$': '<rootDir>/tests/$1.ts',
         'smash-node-lib': '<rootDir>/src/index.ts',
     },
     transform: {
@@ -23,4 +21,5 @@ module.exports = {
             },
         ],
     },
+    setupFilesAfterEnv: ['<rootDir>/tests/jest.setup.ts'],
 };

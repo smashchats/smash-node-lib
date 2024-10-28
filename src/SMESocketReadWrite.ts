@@ -96,7 +96,6 @@ export class SMESocketReadWrite extends SMESocketWriteOnly {
             this.socket.on('challenge', (data) =>
                 solveChallenge(data, auth, this.socket!),
             );
-            // TODO: rename SME event to 'data' (or otherwise) to avoid confusion
             this.socket.on('data', this.processMessages.bind(this));
             return {
                 url: auth.url,

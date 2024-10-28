@@ -1,0 +1,15 @@
+diff --git a/node_modules/jest-util/build/createProcessObject.js b/node_modules/jest-util/build/createProcessObject.js
+index 3111418..90c45d8 100644
+--- a/node_modules/jest-util/build/createProcessObject.js
++++ b/node_modules/jest-util/build/createProcessObject.js
+@@ -105,5 +105,10 @@ function createProcessObject() {
+       return process.domain;
+     }
+   });
++  Object.defineProperty(newProcess, 'original', {
++    get() {
++      return process;
++    }
++  });
+   return newProcess;
+ }

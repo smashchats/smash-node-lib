@@ -16,7 +16,8 @@
         "baseUrl": ".",
         "paths": {
             "smash-node-lib": ["src/index.js"],
-            "@src/*": ["src/*"]
+            "@src/*": ["src/*"],
+            "@tests/*": ["tests/*"]
         }
     },
     "include": ["src", "tests"],
