@@ -10,4 +10,5 @@ export interface SmashDID {
 export interface SmashProfile {
     title: string;
     did: SmashDID;
+    scores?: Record<string, number>;
 }
