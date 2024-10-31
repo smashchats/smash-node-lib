@@ -18,6 +18,7 @@ import {
     SmashDID,
     SmashEndpoint,
     SmashMessage,
+    SmashProfile,
 } from '@src/types/index.js';
 import { EventEmitter } from 'events';
 
@@ -63,6 +64,7 @@ export default class SmashMessaging extends EventEmitter {
 
     constructor(
         protected identity: Identity,
+        private title: string = '',
         LOG_LEVEL: LogLevel = 'INFO',
         LOG_ID: string = 'SmashMessaging',
     ) {
@@ -126,15 +128,15 @@ export default class SmashMessaging extends EventEmitter {
             this.pushToUnknownPeerDLQ(peerIk, messages);
             const catchDidMessages = messages.map(async (message) => {
                 if (message.type === 'profile') {
-                    this.logger.debug(`Received DID for peer ${peerIk}`);
-                    const peerDid = message.data as SmashDID;
-                    if (peerIk !== peerDid.ik) {
+                    this.logger.debug(`Received Profile for peer ${peerIk}`);
+                    const peerDid = message.data as SmashProfile;
+                    if (peerIk !== peerDid.did.ik) {
                         const err =
                             'Received DID doesnt match Signal Session data.';
                         this.logger.warn(err);
                         throw new Error(err);
                     }
-                    await this.flushDLQ(peerDid);
+                    await this.flushDLQ(peerDid.did);
                 } else {
                     throw '';
                 }
@@ -194,7 +196,7 @@ export default class SmashMessaging extends EventEmitter {
             await peer.configureEndpoints(this.smeSocketManager);
             peer.queueMessage({
                 type: 'profile',
-                data: await this.getDID(),
+                data: await this.getProfile(),
             } as ProfileSmashMessage);
             this.peers[peerDid.ik] = peer;
         }
@@ -223,6 +225,13 @@ export default class SmashMessaging extends EventEmitter {
     ) {
         const peer = await this.getOrCreatePeer(peerDid);
         return await peer.sendMessage({ ...message, after });
+    }
+
+    async getProfile(): Promise<SmashProfile> {
+        return {
+            title: this.title,
+            did: await this.getDID(),
+        }
     }
 
     getDID(): Promise<SmashDID> {

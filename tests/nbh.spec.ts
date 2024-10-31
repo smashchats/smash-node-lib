@@ -9,6 +9,7 @@ import {
     SmashDID,
     SmashMessaging,
     SmashNAB,
+    SmashProfile,
     SmashUser,
 } from 'smash-node-lib';
 import { Server, Socket } from 'socket.io';
@@ -149,12 +150,15 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
             expect(onSMEConnection).toHaveBeenCalledTimes(2);
         });
 
-        const discovered: SmashDID[] = [
+        const discovered: SmashProfile[] = [
             {
-                ik: 'any',
-                ek: 'any',
-                signature: 'any',
-                endpoints: [],
+                title: '',
+                did: {
+                    ik: 'any',
+                    ek: 'any',
+                    signature: 'any',
+                    endpoints: [],
+                },
             },
         ];
         const sendDiscoveredProfiles = async () => {

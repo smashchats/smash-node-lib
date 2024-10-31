@@ -1,3 +1,5 @@
+import { SmashDID, SmashProfile } from '@src/types/did.types.js';
+
 import { SmashDID } from '@src/types/did.types.js';
 
 export interface SmashMessage {
@@ -16,12 +18,12 @@ export interface JoinSmashMessage extends SmashMessage {
 
 export interface ProfileSmashMessage extends SmashMessage {
     type: 'profile';
-    data: SmashDID;
+    data: SmashProfile;
 }
 
 export interface ProfileListSmashMessage extends SmashMessage {
     type: 'profiles';
-    data: SmashDID[];
+    data: SmashProfile[];
 }
 
 export type Relationship = 'smash' | 'pass' | 'clear' | 'block';

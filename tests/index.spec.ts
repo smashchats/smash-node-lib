@@ -27,7 +27,7 @@ async function createTestPeer(
     socketServerUrl?: string,
 ): Promise<SmashMessaging> {
     const [identity, config] = await peerArgs(socketServerUrl);
-    const peer = new SmashMessaging(identity, 'DEBUG', name);
+    const peer = new SmashMessaging(identity, '', 'DEBUG', name);
     await peer.initEndpoints(config);
     return peer;
 }
@@ -202,6 +202,7 @@ describe('SmashMessaging: Between peers registered to a SME', () => {
             it('knows Alice identity (DID)', async () => {
                 expect(onBobMessageReceived).toHaveBeenCalledWith(
                     expect.anything(),
+                    // TODO: profile?
                     expect.objectContaining({
                         ik: aliceDID.ik,
                         ek: aliceDID.ek,

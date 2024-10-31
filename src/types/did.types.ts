@@ -6,3 +6,8 @@ export interface SmashDID {
     signature: string;
     endpoints: SmashEndpoint[];
 }
+
+export interface SmashProfile {
+    title: string;
+    did: SmashDID;
+}
