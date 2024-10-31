@@ -239,6 +239,18 @@ export default class SmashMessaging extends EventEmitter {
         return SmashMessaging.getDID(this.identity, this.endpoints);
     }
 
+    async updateMeta(meta: SmashProfileMeta) {
+        this.meta = meta;
+        const profile = await this.getProfile();
+        await Promise.all(Object.values(this.peers).map(
+            peer =>
+                peer.sendMessage({
+                    type: 'profile',
+                    data: profile,
+                } as ProfileSmashMessage)
+        ));
+    }
+
     private static async getDID(
         identity: Identity,
         endpoints: SmashEndpoint[],

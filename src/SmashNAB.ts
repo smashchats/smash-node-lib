@@ -6,6 +6,7 @@ import {
     SMEConfigJSONWithoutDefaults,
     SME_DEFAULT_CONFIG,
     SmashDID,
+    SmashProfile,
 } from '@src/types/index.js';
 
 export default class SmashNAB extends SmashMessaging {
@@ -72,6 +73,9 @@ export default class SmashNAB extends SmashMessaging {
                 break;
             case 'action':
                 this.emit('action', sender, message.data as ActionData);
+                break;
+            case 'profile':
+                this.emit('profile', sender, message.data as SmashProfile);
                 break;
         }
     }
