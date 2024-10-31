@@ -152,7 +152,6 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
 
         const discovered: SmashProfile[] = [
             {
-                title: '',
                 did: {
                     ik: 'any',
                     ek: 'any',

@@ -27,7 +27,7 @@ async function createTestPeer(
     socketServerUrl?: string,
 ): Promise<SmashMessaging> {
     const [identity, config] = await peerArgs(socketServerUrl);
-    const peer = new SmashMessaging(identity, '', 'DEBUG', name);
+    const peer = new SmashMessaging(identity, undefined, 'DEBUG', name);
     await peer.initEndpoints(config);
     return peer;
 }

@@ -7,8 +7,14 @@ export interface SmashDID {
     endpoints: SmashEndpoint[];
 }
 
-export interface SmashProfile {
+export interface SmashProfileMeta {
     title: string;
+    description: string;
+    picture: string;
+}
+
+export interface SmashProfile {
+    meta?: SmashProfileMeta;
     did: SmashDID;
     scores?: Record<string, number>;
 }

@@ -19,6 +19,7 @@ import {
     SmashEndpoint,
     SmashMessage,
     SmashProfile,
+    SmashProfileMeta,
 } from '@src/types/index.js';
 import { EventEmitter } from 'events';
 
@@ -64,7 +65,7 @@ export default class SmashMessaging extends EventEmitter {
 
     constructor(
         protected identity: Identity,
-        private title: string = '',
+        private meta?: SmashProfileMeta,
         LOG_LEVEL: LogLevel = 'INFO',
         LOG_ID: string = 'SmashMessaging',
     ) {
@@ -229,7 +230,7 @@ export default class SmashMessaging extends EventEmitter {
 
     async getProfile(): Promise<SmashProfile> {
         return {
-            title: this.title,
+            meta: this.meta,
             did: await this.getDID(),
         }
     }
