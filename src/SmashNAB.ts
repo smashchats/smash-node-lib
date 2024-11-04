@@ -72,7 +72,9 @@ export default class SmashNAB extends SmashMessaging {
                 this.emit('discover', sender);
                 break;
             case 'action':
-                this.emit('action', sender, message.data as ActionData);
+                // TODO: shall we pass the encapsulation info down the lib
+                // TODO: in other words, is there a reason for this middleware???
+                this.emit('action', sender, message.data as ActionData, new Date(message.timestamp));
                 break;
             case 'profile':
                 this.emit('profile', sender, message.data as SmashProfile);
