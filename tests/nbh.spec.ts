@@ -118,6 +118,59 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
         });
     });
 
+    it('join config includes non-default SME config values', async () => {
+        const customConfig = {
+            url: 'http://custom.url',
+            smePublicKey: 'customKey==',
+            keyAlgorithm: { name: 'ECDH', namedCurve: 'P-384' } as KeyAlgorithm,
+            challengeEncoding: 'base64' as const, // Same as default
+        };
+
+        const joinInfo = await nab.getJoinInfo([customConfig]);
+
+        expect(joinInfo.config?.sme?.[0]).toMatchObject({
+            url: customConfig.url,
+            smePublicKey: customConfig.smePublicKey,
+            keyAlgorithm: customConfig.keyAlgorithm,
+        });
+        // Should not include challengeEncoding since it matches default
+        expect(joinInfo.config?.sme?.[0]).not.toHaveProperty(
+            'challengeEncoding',
+        );
+    });
+
+    it('handles multiple SME configs with different non-default values', async () => {
+        const configs = [
+            {
+                url: 'http://sme1.url',
+                smePublicKey: 'key1==',
+                encryptionAlgorithm: { name: 'AES-CBC', length: 128 },
+            },
+            {
+                url: 'http://sme2.url',
+                smePublicKey: 'key2==',
+                keyAlgorithm: {
+                    name: 'ECDH',
+                    namedCurve: 'P-384',
+                } as KeyAlgorithm,
+            },
+        ];
+
+        const joinInfo = await nab.getJoinInfo(configs);
+
+        expect(joinInfo.config?.sme).toHaveLength(2);
+        expect(joinInfo.config?.sme?.[0]).toMatchObject({
+            url: configs[0].url,
+            smePublicKey: configs[0].smePublicKey,
+            encryptionAlgorithm: configs[0].encryptionAlgorithm,
+        });
+        expect(joinInfo.config?.sme?.[1]).toMatchObject({
+            url: configs[1].url,
+            smePublicKey: configs[1].smePublicKey,
+            keyAlgorithm: configs[1].keyAlgorithm,
+        });
+    });
+
     describe('when a user', () => {
         let user: SmashUser;
         let userIdentity: Identity;
