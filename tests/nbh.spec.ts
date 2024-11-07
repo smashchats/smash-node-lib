@@ -264,6 +264,7 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
                                 }),
                                 action: action,
                             }),
+                            expect.anything(),
                         );
                     }
                 };
