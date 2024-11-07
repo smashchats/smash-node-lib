@@ -1,3 +1,34 @@
+## TODO
+
+-   [ ] Implement 'did' prop as ik hash (instead of using did.ik as reference).
+-   [ ] Test edge cases (socket error, etc)
+-   [ ] Test messaging resilience/reliability
+
+## Trusting
+
+-   Endorsement
+
+{
+type: "endorsement",
+data: {
+content: 'did:key:sjkckjcklm',
+endorsement: {
+'signer.did': 'signer.sign(content)',
+},
+},
+}
+
+// 'content' is defined by the protocol (in order to display etc etc)
+
+{
+endorsements: { 'did':'sig', ... }
+}
+
+-   Add to trust wallet
+-   Trust wallet -> verify signatures function (N, N+1, count)
+
+## Random notes and references
+
 https://github.com/PeculiarVentures/webcrypto-docs/blob/master/CRYPTO_STORAGE.md
 https://github.com/PeculiarVentures/graphene
 
@@ -10,8 +41,6 @@ https://www.npmjs.com/package/node-webcrypto-p11
 https://github.com/PeculiarVentures/2key-ratchet/
 
 https://socket.io/docs/v4/client-api/
-
-
 
 apt-get update
 apt-get install -y --no-install-recommends git

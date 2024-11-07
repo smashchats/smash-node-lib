@@ -27,6 +27,7 @@ type CryptoKeyPairWithThumbprint = CryptoKeyPair & {
     thumbprint: string;
 };
 
+// TODO: retry in case message does not successfully send??
 // TODO: safeguard crypto operations against errors
 export default class SmashMessaging extends EventEmitter {
     private logger: Logger;
