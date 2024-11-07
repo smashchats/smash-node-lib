@@ -126,6 +126,19 @@ describe('SmashMessaging: Between peers registered to a SME', () => {
         jest.resetAllMocks();
     });
 
+    describe('Alice updates their profile metadata BEFORE chatting with Bob', () => {
+        it('Bob doesnt receive the update', async () => {
+            const updatedMeta = {
+                title: 'Alice',
+                description: 'Alice is a cool person',
+                picture: 'https://alice.com/picture.png',
+            };
+            await alice!.updateMeta(updatedMeta);
+            await delay(500);
+            expect(onBobMessageReceived).not.toHaveBeenCalled();
+        });
+    });
+
     describe('Alice sends one message to Bob', () => {
         const messageText = 'hello world 1';
         const messageSha1 = 'xnag7nDmlnLPyLo9ZP3lzDxy7Mc=';
@@ -175,6 +188,26 @@ describe('SmashMessaging: Between peers registered to a SME', () => {
             const messageTime =
                 new Date(aliceSentMessage.timestamp).getTime() / precision;
             expect(messageTime).toBeCloseTo(nowTime, 0);
+        });
+
+        describe('Alice updates their profile metadata AFTER chatting with Bob', () => {
+            it('Bob receives the update', async () => {
+                const updatedMeta = {
+                    title: 'Alice',
+                    description: 'Alice is a cool person',
+                    picture: 'https://alice.com/picture.png',
+                };
+                await alice!.updateMeta(updatedMeta);
+                await delay(500);
+                expect(onBobMessageReceived).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        data: expect.objectContaining({
+                            meta: updatedMeta,
+                        }),
+                    }),
+                    expect.anything(),
+                );
+            });
         });
 
         describe('then Bob', () => {
