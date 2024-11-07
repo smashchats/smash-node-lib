@@ -15,7 +15,7 @@ import {
 import { Server, Socket } from 'socket.io';
 
 // @ts-ignore
-import { aliasWaitFor } from './time.utils';
+import { aliasWaitFor, delay } from './time.utils';
 // @ts-ignore
 import { peerArgs } from './user.utils';
 
@@ -217,6 +217,20 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
                         expect.anything(),
                         discovered,
                     );
+                });
+            });
+
+            describe('on User discover profiles', () => {
+                const onNabDiscover = jest.fn();
+
+                beforeEach(async () => {
+                    nab.on('discover', onNabDiscover);
+                    await user.discover();
+                    await delay(500);
+                });
+
+                it('triggers a discover event on the NAB side', async () => {
+                    expect(onNabDiscover).toHaveBeenCalledTimes(1);
                 });
             });
 
