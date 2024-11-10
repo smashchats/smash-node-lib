@@ -257,6 +257,9 @@ export default class SmashMessaging extends EventEmitter {
         endpoints: SmashEndpoint[],
     ): Promise<SmashDID> {
         return {
+            id: await CryptoUtils.singleton.sha256(
+                identity.signingKey.publicKey.serialize(),
+            ),
             ik: await CryptoUtils.singleton.exportKey(
                 identity.signingKey.publicKey.key,
             ),

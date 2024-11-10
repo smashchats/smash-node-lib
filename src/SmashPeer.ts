@@ -56,14 +56,14 @@ export class SmashPeer {
     async queueMessage(message: SmashMessage) {
         const encapsulatedMessage = {
             ...message,
-            sha1: await CryptoUtils.singleton.sha1(
+            sha256: await CryptoUtils.singleton.sha256(
                 Buffer.from(JSON.stringify(message)),
             ),
             timestamp: new Date().toISOString(),
         };
         this.messageQueue.push(encapsulatedMessage);
         this.logger.debug(
-            `> queued ${encapsulatedMessage.sha1} (${this.messageQueue.length})`,
+            `> queued ${encapsulatedMessage.sha256} (${this.messageQueue.length})`,
         );
         return encapsulatedMessage;
     }
@@ -76,7 +76,7 @@ export class SmashPeer {
         //   then we should re-establish the protocol.
         // TODO: pick either P2P or Endpoints
         const queuedMessages = [...this.messageQueue];
-        const queuedMessagesSha1s = queuedMessages.map((m) => m.sha1);
+        const queuedMessagesSha256s = queuedMessages.map((m) => m.sha256);
         await Promise.allSettled(
             this.endpoints.map(async (endpoint) => {
                 endpoint.socket.sendData(
@@ -85,13 +85,13 @@ export class SmashPeer {
                     Buffer.from(
                         await endpoint.session.encryptMessages(queuedMessages),
                     ),
-                    queuedMessagesSha1s,
+                    queuedMessagesSha256s,
                 );
                 this.messageQueue = [];
             }),
         );
         this.logger.debug(
-            `> flushed ${queuedMessages.length - this.messageQueue.length}/${queuedMessages.length} (${queuedMessagesSha1s})`,
+            `> flushed ${queuedMessages.length - this.messageQueue.length}/${queuedMessages.length} (${queuedMessagesSha256s})`,
         );
         // TODO: where to handle retries? (is refactor needed? rethink clean lib arch?)
     }

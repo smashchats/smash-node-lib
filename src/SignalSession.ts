@@ -52,7 +52,7 @@ export class SignalSession {
             const protocol = await PreKeyBundleProtocol.importProto(bundle);
             const cipher = await AsymmetricRatchet.create(identity, protocol);
 
-            const sessionId = await CryptoUtils.singleton.keySha1(
+            const sessionId = await CryptoUtils.singleton.keySha256(
                 cipher.currentRatchetKey.publicKey.key,
             );
             return new SignalSession(sessionId, cipher, peer.ik, logger);
@@ -72,7 +72,7 @@ export class SignalSession {
         try {
             const preKeyMessageProtocol =
                 await PreKeyMessageProtocol.importProto(data);
-            const expectedSessionId = await CryptoUtils.singleton.keySha1(
+            const expectedSessionId = await CryptoUtils.singleton.keySha256(
                 preKeyMessageProtocol.baseKey.key,
             );
             if (expectedSessionId !== sessionId) {

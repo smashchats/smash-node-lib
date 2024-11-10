@@ -1,15 +1,15 @@
 import { SmashDID, SmashProfile } from '@src/types/did.types.js';
 
-type sha1 = string;
+type sha256 = string;
 
 export interface SmashMessage {
     type: 'join' | 'discover' | 'text' | 'profile' | 'profiles' | 'action';
     data: any;
-    after?: sha1;
+    after?: sha256;
 }
 
 export interface EncapsulatedSmashMessage extends SmashMessage {
-    sha1: sha1;
+    sha256: sha256;
     timestamp: string;
 }
 export interface JoinSmashMessage extends SmashMessage {

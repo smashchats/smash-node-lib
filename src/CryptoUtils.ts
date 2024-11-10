@@ -62,12 +62,12 @@ export default class CryptoUtils {
         return this.bufferToString(await this.subtle?.exportKey(EXPORT, key));
     }
 
-    async keySha1(key: CryptoKey): Promise<string> {
-        return this.sha1(await this.subtle.exportKey(EXPORT, key));
+    async keySha256(key: CryptoKey): Promise<string> {
+        return this.sha256(await this.subtle.exportKey(EXPORT, key));
     }
 
-    async sha1(buffer: ArrayBuffer): Promise<string> {
-        return this.bufferToString(await this.subtle.digest('SHA-1', buffer));
+    async sha256(buffer: ArrayBuffer): Promise<string> {
+        return this.bufferToString(await this.subtle.digest('SHA-256', buffer));
     }
 
     private bufferToString(arrayBuffer: ArrayBuffer): string {

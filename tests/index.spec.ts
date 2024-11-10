@@ -141,7 +141,7 @@ describe('SmashMessaging: Between peers registered to a SME', () => {
 
     describe('Alice sends one message to Bob', () => {
         const messageText = 'hello world 1';
-        const messageSha1 = 'xnag7nDmlnLPyLo9ZP3lzDxy7Mc=';
+        const messageSha256 = '7aXJNUMuvwCOEwf2qxarwitiUccWv+HLoCrXg+HWvzo=';
         let aliceSentMessage: EncapsulatedSmashMessage;
         let bobReceivedMessage: Promise<void>;
 
@@ -168,14 +168,14 @@ describe('SmashMessaging: Between peers registered to a SME', () => {
                 expect.any(Buffer),
             );
             expect(onAliceStatusUpdated).toHaveBeenCalledWith(
-                messageSha1,
+                messageSha256,
                 'delivered',
             );
         });
 
         it('contains a content-addressable ID', async () => {
             expect(aliceSentMessage).toMatchObject({
-                sha1: messageSha1,
+                sha256: messageSha256,
             } as EncapsulatedSmashMessage);
         });
 
@@ -253,7 +253,7 @@ describe('SmashMessaging: Between peers registered to a SME', () => {
                 await bob!.sendTextMessage(
                     receivedAliceDID,
                     bobReplyText,
-                    lastMessage.sha1,
+                    lastMessage.sha256,
                 );
                 await aliceReceivedReply;
                 expect(onAliceMessageReceived).toHaveBeenCalledWith(
@@ -382,15 +382,15 @@ describe('SmashMessaging: Between peers registered to a SME', () => {
                 await getDecreasingDelay();
                 await oldHandleData(...args);
             };
-            let prevSha1: string | undefined;
+            let prevSha256: string | undefined;
             for (let i = 0; i < messageCount; i++) {
-                prevSha1 = (
+                prevSha256 = (
                     await alice!.sendTextMessage(
                         bobDID,
                         originalOrder[i],
-                        prevSha1,
+                        prevSha256,
                     )
-                ).sha1;
+                ).sha256;
             }
             await waitForMessages;
             const receivedMessages = onBobMessageReceived.mock.calls.map(

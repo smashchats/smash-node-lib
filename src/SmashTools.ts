@@ -7,17 +7,17 @@ export const sortSmashMessages = (
     const orderedMessages: EncapsulatedSmashMessage[] = [];
     const messageMap = new Map<string, EncapsulatedSmashMessage>();
     messages.forEach((message) => {
-        messageMap.set(message.sha1, message);
+        messageMap.set(message.sha256, message);
     });
     const usedMessages = new Set<string>();
     // Arbitrarily start with any message and chain both forward and backward
     messages.forEach((message) => {
-        if (usedMessages.has(message.sha1)) return;
+        if (usedMessages.has(message.sha256)) return;
         const currentChain = [];
         let currentMessage: EncapsulatedSmashMessage | undefined = message;
-        while (currentMessage && !usedMessages.has(currentMessage.sha1)) {
+        while (currentMessage && !usedMessages.has(currentMessage.sha256)) {
             currentChain.push(currentMessage);
-            usedMessages.add(currentMessage.sha1);
+            usedMessages.add(currentMessage.sha256);
             currentMessage = currentMessage.after
                 ? messageMap.get(currentMessage.after)
                 : undefined;
