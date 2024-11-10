@@ -1,6 +1,7 @@
 import { SmashEndpoint } from '@src/types/sme.types.js';
 
 export interface SmashDID {
+    id: string;
     ik: string;
     ek: string;
     signature: string;

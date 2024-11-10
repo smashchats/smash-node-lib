@@ -8,7 +8,7 @@ import {
 } from '@src/types/index.js';
 
 export default class SmashUser extends SmashMessaging {
-    private neighborhoodAdminIKs: string[] = [];
+    private neighborhoodAdminIDs: string[] = [];
     private neighborhoodAdmins: SmashPeer[] = [];
 
     async join(joinAction: JoinAction) {
@@ -21,7 +21,7 @@ export default class SmashUser extends SmashMessaging {
         await nabPeer.sendMessage({ type: 'join', data: {} });
         // Add neighborhood admin (NAB) and emit user event
         const nabDid = nabPeer.getDID();
-        this.neighborhoodAdminIKs.push(nabDid.ik);
+        this.neighborhoodAdminIDs.push(nabDid.id);
         this.neighborhoodAdmins.push(nabPeer);
         this.emit('nbh_added', nabDid);
     }
@@ -67,7 +67,7 @@ export default class SmashUser extends SmashMessaging {
     handleMessage(sender: SmashDID, message: EncapsulatedSmashMessage) {
         switch (message.type) {
             case 'profiles':
-                if (this.neighborhoodAdminIKs.includes(sender.ik)) {
+                if (this.neighborhoodAdminIDs.includes(sender.id)) {
                     this.emit('nbh_profiles', sender, message.data as {});
                 }
                 break;

@@ -206,6 +206,7 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
         const discovered: SmashProfile[] = [
             {
                 did: {
+                    id: 'any',
                     ik: 'any',
                     ek: 'any',
                     signature: 'any',

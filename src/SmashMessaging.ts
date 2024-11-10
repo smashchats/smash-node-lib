@@ -118,27 +118,32 @@ export default class SmashMessaging extends EventEmitter {
         messageIds.forEach((id) => this.emit('status', id, status));
     }
 
+    private peerIkMapping: Record<string, string> = {};
+    private getPeerByIk(peerIk: string) {
+        return this.peers[this.peerIkMapping[peerIk]];
+    }
+
     private async incomingMessagesHandler(
         messages: EncapsulatedSmashMessage[],
         peerIk: string,
     ) {
-        const peer: SmashPeer | undefined = this.peers[peerIk];
+        const peer: SmashPeer | undefined = this.getPeerByIk(peerIk);
         if (!peer) {
             this.logger.debug(
-                `Messages (${messages.length}) from unknown peer ${peerIk}`,
+                `Messages (${messages.length}) from unknown IK ${peerIk}`,
             );
-            this.pushToUnknownPeerDLQ(peerIk, messages);
+            this.pushToUnknownPeerIkDLQ(peerIk, messages);
             const catchDidMessages = messages.map(async (message) => {
                 if (message.type === 'profile') {
-                    this.logger.debug(`Received Profile for peer ${peerIk}`);
+                    this.logger.debug(`Received Profile for IK ${peerIk}`);
                     const peerDid = message.data as SmashProfile;
                     if (peerIk !== peerDid.did.ik) {
                         const err =
-                            'Received DID doesnt match Signal Session data.';
+                            'Received IK doesnt match Signal Session data.';
                         this.logger.warn(err);
                         throw new Error(err);
                     }
-                    await this.flushDLQ(peerDid.did);
+                    await this.flushPeerIkDLQ(peerDid.did);
                 } else {
                     throw '';
                 }
@@ -166,21 +171,20 @@ export default class SmashMessaging extends EventEmitter {
         messages.forEach((message) => this.emit('message', message, sender));
     }
 
-    private async flushDLQ(peerDid: SmashDID) {
+    private async flushPeerIkDLQ(peerDid: SmashDID) {
         if (!this.dlq[peerDid.ik])
             throw new Error('Cannot find queue for this peer.');
-        // TODO more than once
-        // if (this.processingDlq) return;
-        // this.processingDlq = true;
         this.logger.debug(
             `> Flushing peer DLQ of size ${this.dlq[peerDid.ik].length}`,
         );
-        this.peers[peerDid.ik] = await this.getOrCreatePeer(peerDid);
+        const peer = await this.getOrCreatePeer(peerDid);
+        if (peer.getDID().ik !== peerDid.ik)
+            throw new Error('Peer IK mismatch.');
         this.notifyNewMessages(this.dlq[peerDid.ik], peerDid);
         delete this.dlq[peerDid.ik];
     }
 
-    private pushToUnknownPeerDLQ(
+    private pushToUnknownPeerIkDLQ(
         peerIk: string,
         messages: EncapsulatedSmashMessage[],
     ) {
@@ -189,7 +193,7 @@ export default class SmashMessaging extends EventEmitter {
     }
 
     protected async getOrCreatePeer(peerDid: SmashDID): Promise<SmashPeer> {
-        if (!this.peers[peerDid.ik]) {
+        if (!this.peers[peerDid.id]) {
             const peer = new SmashPeer(
                 peerDid,
                 this.sessionManager,
@@ -200,9 +204,10 @@ export default class SmashMessaging extends EventEmitter {
                 type: 'profile',
                 data: await this.getProfile(),
             } as ProfileSmashMessage);
-            this.peers[peerDid.ik] = peer;
+            this.peers[peerDid.id] = peer;
+            this.peerIkMapping[peerDid.ik] = peerDid.id;
         }
-        return this.peers[peerDid.ik];
+        return this.peers[peerDid.id];
     }
 
     sendTextMessage(
@@ -233,7 +238,7 @@ export default class SmashMessaging extends EventEmitter {
         return {
             meta: this.meta,
             did: await this.getDID(),
-        }
+        };
     }
 
     getDID(): Promise<SmashDID> {
@@ -243,13 +248,14 @@ export default class SmashMessaging extends EventEmitter {
     async updateMeta(meta: SmashProfileMeta) {
         this.meta = meta;
         const profile = await this.getProfile();
-        await Promise.all(Object.values(this.peers).map(
-            peer =>
+        await Promise.all(
+            Object.values(this.peers).map((peer) =>
                 peer.sendMessage({
                     type: 'profile',
                     data: profile,
-                } as ProfileSmashMessage)
-        ));
+                } as ProfileSmashMessage),
+            ),
+        );
     }
 
     private static async getDID(

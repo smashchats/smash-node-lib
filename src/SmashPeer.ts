@@ -126,7 +126,7 @@ export class SmashPeer {
         );
         const results = await Promise.allSettled(updateNabPromises);
         this.logger.info(
-            `> setRelationship with ${this.did.ik} to ${relationship}`,
+            `> setRelationship with ${this.did.id} to ${relationship}`,
             JSON.stringify(results),
         );
     }
