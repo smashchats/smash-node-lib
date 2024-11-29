@@ -23,9 +23,22 @@ import {
 } from '@src/types/index.js';
 import { EventEmitter } from 'events';
 
-type CryptoKeyPairWithThumbprint = CryptoKeyPair & {
-    thumbprint: string;
-};
+interface IJWKJson extends CryptoKey {
+    jwk?: JsonWebKey;
+}
+
+interface IJWKJsonKeyPair {
+    privateKey: IJWKJson;
+    publicKey: IJWKJson;
+    thumbprint?: string;
+}
+
+declare global {
+    interface CryptoKey {
+        toJSON: () => IJWKJson;
+        _exportedJwk?: JsonWebKey;
+    }
+}
 
 // TODO: retry in case message does not successfully send??
 // TODO: safeguard crypto operations against errors
@@ -37,24 +50,118 @@ export default class SmashMessaging extends EventEmitter {
         CryptoUtils.setCryptoSubtle(c.subtle);
     }
 
-    static generateIdentity() {
-        return Identity.create(0, 1, 0, false);
+    private static patchedGenerateKey: boolean = false;
+    static generateIdentity(
+        nbPreKeys: number = 1,
+        nbOnetimeKeys: number = 0,
+        extractable: boolean = false,
+    ) {
+        if (!this.patchedGenerateKey) {
+            // Patch crypto.subtle.generateKey if not already done
+            const originalGenerateKey = crypto.subtle.generateKey;
+            crypto.subtle.generateKey = async function (
+                this: SubtleCrypto,
+                ...args: Parameters<typeof originalGenerateKey>
+            ): ReturnType<typeof originalGenerateKey> {
+                const keyPairOrSingleKey = await originalGenerateKey.apply(
+                    this,
+                    args,
+                );
+                const attachJwk = async (key: CryptoKey) => {
+                    if (!key.extractable) return;
+                    key._exportedJwk = await crypto.subtle.exportKey(
+                        'jwk',
+                        key,
+                    );
+                };
+                if (keyPairOrSingleKey instanceof CryptoKey) {
+                    await attachJwk(keyPairOrSingleKey);
+                } else {
+                    await attachJwk(keyPairOrSingleKey.privateKey);
+                    await attachJwk(keyPairOrSingleKey.publicKey);
+                }
+                return keyPairOrSingleKey;
+            } as typeof crypto.subtle.generateKey;
+            this.patchedGenerateKey = true;
+        }
+        return Identity.create(0, nbPreKeys, nbOnetimeKeys, extractable);
     }
 
-    static async parseIdentityJson(
-        identity: IJsonIdentity,
-        ecKeyPairFromJson?: (
-            keys: CryptoKeyPairWithThumbprint,
-        ) => Promise<IECKeyPair>,
-    ) {
+    private static async reconstituteCryptoKey(
+        key: IJWKJson,
+    ): Promise<CryptoKey> {
+        if (!key.jwk) return key as CryptoKey;
+        return await crypto.subtle.importKey(
+            'jwk',
+            key.jwk,
+            key.algorithm,
+            true,
+            key.usages,
+        );
+    }
+
+    private static async reconstituteKeys(
+        identityJSON: IJsonIdentity,
+    ): Promise<IJsonIdentity> {
+        const reconstituteKeyPair = async (
+            keyPair: IJWKJsonKeyPair,
+        ): Promise<IJWKJsonKeyPair> => {
+            return {
+                privateKey: await this.reconstituteCryptoKey(
+                    keyPair.privateKey,
+                ),
+                publicKey: await this.reconstituteCryptoKey(keyPair.publicKey),
+                thumbprint: keyPair.thumbprint,
+            };
+        };
+        return {
+            id: 0,
+            signingKey: await reconstituteKeyPair(identityJSON.signingKey),
+            exchangeKey: await reconstituteKeyPair(identityJSON.exchangeKey),
+            preKeys: await Promise.all(
+                identityJSON.preKeys.map(reconstituteKeyPair),
+            ),
+            signedPreKeys: await Promise.all(
+                identityJSON.signedPreKeys.map(reconstituteKeyPair),
+            ),
+            createdAt: identityJSON.createdAt,
+        };
+    }
+
+    static async deserializeIdentity(
+        identityJSON: IJsonIdentity,
+        ecKeyPairFromJson?: (keys: IJWKJsonKeyPair) => Promise<IECKeyPair>,
+    ): Promise<Identity> {
         try {
             if (!!ecKeyPairFromJson)
                 Curve.ecKeyPairFromJson = ecKeyPairFromJson;
-            return await Identity.fromJSON(identity);
+            return Identity.fromJSON(await this.reconstituteKeys(identityJSON));
         } catch (err) {
             console.error('Cannot parse identity json.');
             throw err;
         }
+    }
+
+    static async serializeIdentity(identity: Identity): Promise<IJsonIdentity> {
+        // Patch CryptoKey prototype if not already done
+        if (!CryptoKey.prototype.toJSON) {
+            Object.defineProperty(CryptoKey.prototype, 'toJSON', {
+                value: function () {
+                    return {
+                        jwk: this._exportedJwk,
+                        algorithm: this.algorithm,
+                        usages: this.usages,
+                    } as IJWKJson;
+                },
+                writable: true,
+                configurable: true,
+            });
+        }
+        return await identity.toJSON();
+    }
+
+    exportIdentityToJSON(): Promise<IJsonIdentity> {
+        return SmashMessaging.serializeIdentity(this.identity);
     }
 
     private dlq: Record<string, EncapsulatedSmashMessage[]>;
