@@ -25,6 +25,7 @@
     "dependencies": {
         "@peculiar/webcrypto": "^1.4.6",
         "2key-ratchet": "^1.0.18",
+        "buffer": "^6.0.3",
         "simple-peer": "^9.11.1",
         "socket.io-client": "^4.8.0"
     },

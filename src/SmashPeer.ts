@@ -10,6 +10,7 @@ import {
     SmashDID,
     SmashMessage,
 } from '@src/types/index.js';
+import { Buffer } from 'buffer';
 
 export class SmashPeer {
     // TODO subscribe on changes like updates to DID, IK, EK, PK...

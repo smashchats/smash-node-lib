@@ -1,6 +1,7 @@
 import { Curve } from '2key-ratchet';
 import { Logger } from '@src/Logger.js';
 import { ENCODING } from '@src/types/index.js';
+import { Buffer } from 'buffer';
 
 const EXPORT = 'spki';
 const PK_ALG = { name: 'ECDH', namedCurve: 'P-256' };

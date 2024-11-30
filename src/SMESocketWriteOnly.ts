@@ -1,4 +1,5 @@
 import { Logger } from '@src/Logger.js';
+import { Buffer } from 'buffer';
 import { Socket, io } from 'socket.io-client';
 
 type SMEAuthParams = {

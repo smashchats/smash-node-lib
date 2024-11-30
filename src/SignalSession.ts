@@ -14,6 +14,7 @@ import {
     SmashDID,
     SmashEndpoint,
 } from '@src/types/index.js';
+import { Buffer } from 'buffer';
 
 export class SignalSession {
     constructor(

@@ -12,6 +12,7 @@ import {
     SMEConfig,
     SmashEndpoint,
 } from '@src/types/index.js';
+import { Buffer } from 'buffer';
 import { Socket } from 'socket.io-client';
 
 const solveChallenge = async (

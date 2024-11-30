@@ -1,3 +1,4 @@
+import { Buffer } from 'buffer';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import {
