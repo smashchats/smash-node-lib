@@ -23,6 +23,7 @@ export class SmashPeer {
 
     // TODO allow loading relationship at lib initialization time
     private relationship: Relationship = 'clear';
+    private lastRelationshipSha256: string = '0';
 
     constructor(
         private did: SmashDID,
@@ -115,17 +116,29 @@ export class SmashPeer {
         if (this.relationship === relationship) {
             return;
         }
+        // TODO: assume we only have one NAB to update
+        const nab = nabs[0];
+        const updateNabMessage = await nab.sendMessage({
+            type: 'action',
+            data: { target: this.did, action: relationship },
+            after: this.lastRelationshipSha256,
+        });
+        this.lastRelationshipSha256 = updateNabMessage.sha256;
         this.relationship = relationship;
-        const updateNabPromises = nabs.map((nab) =>
-            nab.sendMessage({
-                type: 'action',
-                data: { target: this.did, action: relationship },
-            }),
-        );
-        const results = await Promise.allSettled(updateNabPromises);
         this.logger.info(
-            `> setRelationship with ${this.did.id} to ${relationship}`,
-            JSON.stringify(results),
+            `> setRelationship with ${this.did.id} to ${relationship} (${updateNabMessage.sha256})`,
         );
+        // const updateNabPromises = nabs.map((nab) =>
+        //     nab.sendMessage({
+        //         type: 'action',
+        //         data: { target: this.did, action: relationship },
+        //         after: '0',
+        //     }),
+        // );
+        // const results = await Promise.allSettled(updateNabPromises);
+        // this.logger.info(
+        //     `> setRelationship with ${this.did.id} to ${relationship}`,
+        //     JSON.stringify(results),
+        // );
     }
 }

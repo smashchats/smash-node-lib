@@ -320,25 +320,18 @@ export default class SmashMessaging extends EventEmitter {
     sendTextMessage(
         peerDid: SmashDID,
         text: string,
-        after?: string,
+        after: string,
     ): Promise<EncapsulatedSmashMessage> {
-        return this.sendMessage(
-            peerDid,
-            {
-                type: 'text',
-                data: text,
-            },
+        return this.sendMessage(peerDid, {
+            type: 'text',
+            data: text,
             after,
-        );
+        });
     }
 
-    async sendMessage(
-        peerDid: SmashDID,
-        message: SmashMessage,
-        after?: string,
-    ) {
+    async sendMessage(peerDid: SmashDID, message: SmashMessage) {
         const peer = await this.getOrCreatePeer(peerDid);
-        return await peer.sendMessage({ ...message, after });
+        return await peer.sendMessage(message);
     }
 
     async getProfile(): Promise<SmashProfile> {

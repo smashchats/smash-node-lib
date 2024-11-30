@@ -5,7 +5,7 @@ type sha256 = string;
 export interface SmashMessage {
     type: 'join' | 'discover' | 'text' | 'profile' | 'profiles' | 'action';
     data: any;
-    after?: sha256;
+    after: sha256;
 }
 
 export interface EncapsulatedSmashMessage extends SmashMessage {

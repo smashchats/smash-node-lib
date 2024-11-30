@@ -154,7 +154,7 @@ describe('SmashMessaging: Between peers registered to a SME', () => {
 
     describe('Alice sends one message to Bob', () => {
         const messageText = 'hello world 1';
-        const messageSha256 = 'heCveufHMM3hVS3VT7VSzqjCiJUiR3vb9Q+cj2aWI5E=';
+        const messageSha256 = 'i1M92vd0lSfaQxVb3V018uMwghFYNd6xyWujvdUA+/Y=';
         let aliceSentMessage: EncapsulatedSmashMessage;
         let bobReceivedMessage: Promise<void>;
 
@@ -167,6 +167,7 @@ describe('SmashMessaging: Between peers registered to a SME', () => {
             aliceSentMessage = await alice!.sendTextMessage(
                 bobDID,
                 messageText,
+                '0',
             );
         });
 
@@ -317,11 +318,19 @@ describe('SmashMessaging: Between peers registered to a SME', () => {
             );
 
             // Alice sends a message to Bob
-            await alice!.sendTextMessage(bobDID, aliceToBobMessage);
+            const aliceSentMessage = await alice!.sendTextMessage(
+                bobDID,
+                aliceToBobMessage,
+                '0',
+            );
             await bobReceivedMessage;
 
             // Bob replies to Alice
-            await bob!.sendTextMessage(aliceDID, bobToAliceMessage);
+            await bob!.sendTextMessage(
+                aliceDID,
+                bobToAliceMessage,
+                aliceSentMessage.sha256,
+            );
             await aliceReceivedMessage;
 
             // Verify that messages were received correctly
@@ -357,10 +366,10 @@ describe('SmashMessaging: Between peers registered to a SME', () => {
                 2 + protocolOverheadSize,
             );
             const bobReceivedFirstMessage = waitFor(bob!, 'message', 1);
-            await alice!.sendTextMessage(bobDID, '0');
+            const firstMessage = await alice!.sendTextMessage(bobDID, '0', '0');
             await bobReceivedFirstMessage;
             await delay(50);
-            await alice!.sendTextMessage(bobDID, '1');
+            await alice!.sendTextMessage(bobDID, '1', firstMessage.sha256);
             await bobReceivedAllMessages;
             expect(onBobMessageReceived).toHaveBeenCalledTimes(
                 2 + protocolOverheadSize,
@@ -395,7 +404,7 @@ describe('SmashMessaging: Between peers registered to a SME', () => {
                 await getDecreasingDelay();
                 await oldHandleData(...args);
             };
-            let prevSha256: string | undefined;
+            let prevSha256: string = '0';
             for (let i = 0; i < messageCount; i++) {
                 prevSha256 = (
                     await alice!.sendTextMessage(

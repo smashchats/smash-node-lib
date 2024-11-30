@@ -18,7 +18,7 @@ export default class SmashUser extends SmashMessaging {
         }
         // Create or get NAB peer and send join message
         const nabPeer = await this.getOrCreatePeer(joinAction.did);
-        await nabPeer.sendMessage({ type: 'join', data: {} });
+        await nabPeer.sendMessage({ type: 'join', data: {}, after: '0' });
         // Add neighborhood admin (NAB) and emit user event
         const nabDid = nabPeer.getDID();
         this.neighborhoodAdminIDs.push(nabDid.id);
@@ -50,6 +50,7 @@ export default class SmashUser extends SmashMessaging {
         return this.neighborhoodAdmins[0].sendMessage({
             type: 'discover',
             data: {},
+            after: '0',
         });
     }
 
