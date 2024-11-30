@@ -33,13 +33,6 @@ interface IJWKJsonKeyPair {
     thumbprint?: string;
 }
 
-declare global {
-    interface CryptoKey {
-        toJSON: () => IJWKJson;
-        _exportedJwk?: JsonWebKey;
-    }
-}
-
 // TODO: retry in case message does not successfully send??
 // TODO: safeguard crypto operations against errors
 export default class SmashMessaging extends EventEmitter {
@@ -67,18 +60,20 @@ export default class SmashMessaging extends EventEmitter {
                     this,
                     args,
                 );
-                const attachJwk = async (key: CryptoKey) => {
+                const attachJwk = async (
+                    key: CryptoKey & { _exportedJwk?: JsonWebKey },
+                ) => {
                     if (!key.extractable) return;
                     key._exportedJwk = await crypto.subtle.exportKey(
                         'jwk',
                         key,
                     );
                 };
-                if (keyPairOrSingleKey instanceof CryptoKey) {
-                    await attachJwk(keyPairOrSingleKey);
-                } else {
+                if ('privateKey' in keyPairOrSingleKey) {
                     await attachJwk(keyPairOrSingleKey.privateKey);
                     await attachJwk(keyPairOrSingleKey.publicKey);
+                } else {
+                    await attachJwk(keyPairOrSingleKey);
                 }
                 return keyPairOrSingleKey;
             } as typeof crypto.subtle.generateKey;
@@ -143,21 +138,26 @@ export default class SmashMessaging extends EventEmitter {
     }
 
     static async serializeIdentity(identity: Identity): Promise<IJsonIdentity> {
-        // Patch CryptoKey prototype if not already done
-        if (!CryptoKey.prototype.toJSON) {
-            Object.defineProperty(CryptoKey.prototype, 'toJSON', {
-                value: function () {
+        const serializedIdentity = JSON.parse(
+            JSON.stringify(await identity.toJSON(), (_, value) => {
+                if (
+                    value &&
+                    typeof value === 'object' &&
+                    '_exportedJwk' in value
+                ) {
                     return {
-                        jwk: this._exportedJwk,
-                        algorithm: this.algorithm,
-                        usages: this.usages,
-                    } as IJWKJson;
-                },
-                writable: true,
-                configurable: true,
-            });
-        }
-        return await identity.toJSON();
+                        jwk: value._exportedJwk,
+                        algorithm: value.algorithm,
+                        usages: value.usages,
+                        extractable: value.extractable,
+                        type: value.type,
+                    };
+                }
+                return value;
+            }),
+        );
+
+        return serializedIdentity;
     }
 
     exportIdentityToJSON(): Promise<IJsonIdentity> {
