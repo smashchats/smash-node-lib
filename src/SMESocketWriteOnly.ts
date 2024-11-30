@@ -56,9 +56,29 @@ export class SMESocketWriteOnly {
         url: string,
         auth?: SMEAuthParams,
     ) {
+        logger.debug(`initSocket ${url} with auth`);
         const socket = io(url, { auth });
+        socket.on('ping', () => {
+            logger.debug(`> Ping from SME ${url}`);
+        });
         socket.on('connect', () => {
             logger.info(`> Connected to SME ${url}`);
+        });
+        socket.on('connect_error', (error: Error) => {
+            logger.warn(`> Connect error to SME ${url}: ${error}`);
+        });
+        socket.on('reconnect', () => {
+            logger.info(`> Reconnected to SME ${url}`);
+        });
+        socket.on('reconnect_attempt', (attempt: number) => {
+            logger.debug(`> Reconnect attempt ${attempt} to SME ${url}`);
+        });
+        socket.on('reconnect_error', (error: Error) => {
+            logger.warn(`> Reconnect error to SME ${url}: ${error}`);
+        });
+        socket.on('reconnect_failed', () => {
+            logger.error(`> Failed to connect to SME ${url}. Giving up.`);
+            // TODO: handle this
         });
         return socket;
     }
