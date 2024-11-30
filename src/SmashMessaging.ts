@@ -37,8 +37,10 @@ interface IJWKJsonKeyPair {
 // TODO: safeguard crypto operations against errors
 export default class SmashMessaging extends EventEmitter {
     private logger: Logger;
+    private static crypto: globalThis.Crypto;
 
     static setCrypto(c: globalThis.Crypto) {
+        this.crypto = c;
         setEngine('@peculiar/webcrypto', c);
         CryptoUtils.setCryptoSubtle(c.subtle);
     }
@@ -51,8 +53,9 @@ export default class SmashMessaging extends EventEmitter {
     ) {
         if (!this.patchedGenerateKey) {
             // Patch crypto.subtle.generateKey if not already done
-            const originalGenerateKey = crypto.subtle.generateKey;
-            crypto.subtle.generateKey = async function (
+            const c = this.crypto;
+            const originalGenerateKey = c.subtle.generateKey;
+            c.subtle.generateKey = async function (
                 this: SubtleCrypto,
                 ...args: Parameters<typeof originalGenerateKey>
             ): ReturnType<typeof originalGenerateKey> {
@@ -64,10 +67,7 @@ export default class SmashMessaging extends EventEmitter {
                     key: CryptoKey & { _exportedJwk?: JsonWebKey },
                 ) => {
                     if (!key.extractable) return;
-                    key._exportedJwk = await crypto.subtle.exportKey(
-                        'jwk',
-                        key,
-                    );
+                    key._exportedJwk = await c.subtle.exportKey('jwk', key);
                 };
                 if ('privateKey' in keyPairOrSingleKey) {
                     await attachJwk(keyPairOrSingleKey.privateKey);
@@ -76,7 +76,7 @@ export default class SmashMessaging extends EventEmitter {
                     await attachJwk(keyPairOrSingleKey);
                 }
                 return keyPairOrSingleKey;
-            } as typeof crypto.subtle.generateKey;
+            } as typeof c.subtle.generateKey;
             this.patchedGenerateKey = true;
         }
         return Identity.create(0, nbPreKeys, nbOnetimeKeys, extractable);
@@ -86,7 +86,7 @@ export default class SmashMessaging extends EventEmitter {
         key: IJWKJson,
     ): Promise<CryptoKey> {
         if (!key.jwk) return key as CryptoKey;
-        return await crypto.subtle.importKey(
+        return await this.crypto.subtle.importKey(
             'jwk',
             key.jwk,
             key.algorithm,
@@ -128,11 +128,10 @@ export default class SmashMessaging extends EventEmitter {
         ecKeyPairFromJson?: (keys: IJWKJsonKeyPair) => Promise<IECKeyPair>,
     ): Promise<Identity> {
         try {
-            if (!!ecKeyPairFromJson)
-                Curve.ecKeyPairFromJson = ecKeyPairFromJson;
+            if (ecKeyPairFromJson) Curve.ecKeyPairFromJson = ecKeyPairFromJson;
             return Identity.fromJSON(await this.reconstituteKeys(identityJSON));
         } catch (err) {
-            console.error('Cannot parse identity json.');
+            new Logger('SmashMessaging').error('Cannot parse identity json.');
             throw err;
         }
     }
@@ -377,9 +376,15 @@ export default class SmashMessaging extends EventEmitter {
         };
     }
 
-    static handleError(reason: any, promise: Promise<any>, logger: Logger) {
+    static handleError(
+        reason: unknown,
+        promise: Promise<unknown>,
+        logger: Logger,
+    ) {
         if (
-            reason instanceof DOMException &&
+            typeof reason === 'object' &&
+            reason !== null &&
+            'name' in reason &&
             reason.name === 'OperationError'
         ) {
             logger.warn(
@@ -387,7 +392,8 @@ export default class SmashMessaging extends EventEmitter {
             );
             logger.debug(
                 'Detailed cause:',
-                (reason as any).cause || 'No additional error cause found',
+                (reason as { cause?: string }).cause ||
+                    'No additional error cause found',
             );
         } else {
             logger.error(

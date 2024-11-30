@@ -19,6 +19,7 @@ const solveChallenge = async (
     data: { iv: string; challenge: string },
     auth: SMEConfig,
     socket: Socket,
+    logger: Logger,
 ) => {
     try {
         const ivBuffer = Buffer.from(data.iv, auth.challengeEncoding);
@@ -49,12 +50,12 @@ const solveChallenge = async (
         const solvedChallenge = Buffer.from(unencryptedChallenge).toString(
             auth.challengeEncoding,
         );
-        console.debug(
+        logger.debug(
             `> SME Challenge (${data.challenge}) -> (${solvedChallenge})`,
         );
         socket.emit('register', solvedChallenge);
     } catch (err) {
-        console.warn('Cannot solve challenge.');
+        logger.warn('Cannot solve challenge.');
         throw err;
     }
 };
@@ -62,7 +63,7 @@ const solveChallenge = async (
 export type onMessagesFn = (
     messages: EncapsulatedSmashMessage[],
     peerIk: string,
-) => any;
+) => void;
 
 export class SMESocketReadWrite extends SMESocketWriteOnly {
     // TODO: limit DLQs size and number
@@ -95,7 +96,7 @@ export class SMESocketReadWrite extends SMESocketWriteOnly {
                 keyAlgorithm: auth.keyAlgorithm,
             });
             this.socket.on('challenge', (data) =>
-                solveChallenge(data, auth, this.socket!),
+                solveChallenge(data, auth, this.socket!, this.logger),
             );
             this.socket.on('data', this.processMessages.bind(this));
             return {
@@ -172,7 +173,7 @@ export class SMESocketReadWrite extends SMESocketWriteOnly {
                     decryptedMessages.flat(),
                     session.peerIk,
                 );
-            } catch (err) {
+            } catch {
                 this.logger.warn(
                     `Cannot process queued messages for ${session.id}`,
                 );

@@ -11,12 +11,15 @@
     "scripts": {
         "start": "nodemon",
         "test": "jest --config jest.config.cjs --coverage",
-        "build": "rm -rf ./dist/* && tsc && tsc-alias",
+        "build": "rm -rf ./dist/* && tsc -p tsconfig.build.json && tsc-alias",
+        "build:checks": "npm run build && npm run circular-dependencies:check && npm run prettier-format:check && npm run eslint-dist:check",
         "prettier-format": "prettier --config .prettierrc 'src/**/*.ts' --write",
+        "prettier-format:check": "prettier --config .prettierrc --check 'src/**/*.ts'",
+        "circular-dependencies:check": "madge --circular dist/",
+        "eslint-dist:check": "eslint dist/**/*.js",
         "docker-build": "docker build . -t smash-nbh-bot",
         "docker-test": "docker build . -t softhsmv2 && docker build . -f Dockerfile.test",
         "prepare": "husky",
-        "check-circular": "npm run build && madge --circular dist/",
         "postinstall": "patch-package"
     },
     "keywords": [],
@@ -27,15 +30,16 @@
         "2key-ratchet": "^1.0.18",
         "buffer": "^6.0.3",
         "simple-peer": "^9.11.1",
-        "socket.io-client": "^4.8.0"
+        "socket.io-client": "^4.8.0",
+        "timers": "^0.1.1"
     },
     "devDependencies": {
-        "@eslint/js": "^9.11.1",
+        "@eslint/js": "^9.16.0",
         "@trivago/prettier-plugin-sort-imports": "^4.3.0",
         "@types/jest": "^29.5.13",
         "@types/simple-peer": "^9.11.8",
         "dotenv": "^16.4.5",
-        "eslint": "^9.11.1",
+        "eslint": "^9.16.0",
         "husky": "^9.1.6",
         "jest": "^29.7.0",
         "madge": "^8.0.0",
@@ -47,6 +51,6 @@
         "ts-node": "^10.9.2",
         "tsc-alias": "^1.8.10",
         "typescript": "^5.6.2",
-        "typescript-eslint": "^8.6.0"
+        "typescript-eslint": "^8.16.0"
     }
 }

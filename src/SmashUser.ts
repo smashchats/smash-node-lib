@@ -1,6 +1,6 @@
 import SmashMessaging from '@src/SmashMessaging.js';
 import { SmashPeer } from '@src/SmashPeer.js';
-import { SmashDID } from '@src/types/did.types.js';
+import { SmashDID, SmashProfile } from '@src/types/did.types.js';
 import {
     EncapsulatedSmashMessage,
     JoinAction,
@@ -54,7 +54,7 @@ export default class SmashUser extends SmashMessaging {
         });
     }
 
-    emit(event: string | symbol, ...args: any[]): boolean {
+    emit(event: string | symbol, ...args: unknown[]): boolean {
         if (event === 'message') {
             const [message, sender] = args as [
                 EncapsulatedSmashMessage,
@@ -69,7 +69,11 @@ export default class SmashUser extends SmashMessaging {
         switch (message.type) {
             case 'profiles':
                 if (this.neighborhoodAdminIDs.includes(sender.id)) {
-                    this.emit('nbh_profiles', sender, message.data as {});
+                    this.emit(
+                        'nbh_profiles',
+                        sender,
+                        message.data as SmashProfile[],
+                    );
                 }
                 break;
         }

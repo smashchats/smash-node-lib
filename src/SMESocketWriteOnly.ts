@@ -1,13 +1,14 @@
 import { Logger } from '@src/Logger.js';
 import { Buffer } from 'buffer';
 import { Socket, io } from 'socket.io-client';
+import { clearTimeout, setTimeout } from 'timers';
 
 type SMEAuthParams = {
     key: string;
     keyAlgorithm: KeyAlgorithm;
 };
 
-export type onMessagesStatusFn = (ids: string[], status: string) => any;
+export type onMessagesStatusFn = (ids: string[], status: string) => void;
 
 export class SMESocketWriteOnly {
     protected socket?: Socket;

@@ -2,6 +2,7 @@ import { Identity } from '2key-ratchet';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import {
+    Logger,
     ProfileListSmashMessage,
     Relationship,
     SMEConfigJSONWithoutDefaults,
@@ -14,8 +15,10 @@ import {
 } from 'smash-node-lib';
 import { Server, Socket } from 'socket.io';
 
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
 import { aliasWaitFor, delay } from './time.utils';
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
 import { peerArgs } from './user.utils';
 
@@ -62,8 +65,8 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
         socketServer.close();
     });
 
-    const waitForEventCancelFns: Function[] = [];
-    const waitFor = aliasWaitFor(waitForEventCancelFns);
+    const waitForEventCancelFns: (() => void)[] = [];
+    const waitFor = aliasWaitFor(waitForEventCancelFns, new Logger('nbh.spec'));
     let nab: SmashNAB;
     let nabDid: SmashDID;
     const onNabJoin: jest.Mock = jest.fn();

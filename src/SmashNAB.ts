@@ -42,12 +42,12 @@ export default class SmashNAB extends SmashMessaging {
                 !mandatory_keys.includes(key) &&
                 value !== SME_DEFAULT_CONFIG[key as default_keys]
             )
-                diff[key as default_keys] = value as any;
+                diff[key as default_keys] = value as never;
         }
         return diff as SMEConfigJSONWithoutDefaults;
     }
 
-    emit(event: string | symbol, ...args: any[]): boolean {
+    emit(event: string | symbol, ...args: unknown[]): boolean {
         const result = super.emit(event, ...args);
         if (event === 'message') {
             const [message, sender] = args as [
@@ -63,7 +63,7 @@ export default class SmashNAB extends SmashMessaging {
         switch (message.type) {
             case 'join':
                 // TODO: join config specific to nab (totp, past relationships, etc)
-                this.emit('join', sender, message.data as {});
+                this.emit('join', sender, message.data as JoinAction);
                 break;
             case 'discover':
                 this.emit('discover', sender);

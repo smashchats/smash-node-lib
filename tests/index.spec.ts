@@ -3,14 +3,17 @@ import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import {
     EncapsulatedSmashMessage,
+    Logger,
     SmashDID,
     SmashMessaging,
     sortSmashMessages,
 } from 'smash-node-lib';
 import { Server, Socket } from 'socket.io';
 
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
 import { aliasWaitFor, delay } from './time.utils';
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
 import { peerArgs } from './user.utils';
 
@@ -40,8 +43,11 @@ const ISO8601_TIMESTAMP_REGEX =
 // TODO Review coverage
 
 describe('SmashMessaging: Between peers registered to a SME', () => {
-    const waitForEventCancelFns: Function[] = [];
-    const waitFor = aliasWaitFor(waitForEventCancelFns);
+    const waitForEventCancelFns: (() => void)[] = [];
+    const waitFor = aliasWaitFor(
+        waitForEventCancelFns,
+        new Logger('index.spec'),
+    );
 
     let ioServer: Server;
     let RealDate: DateConstructor;
@@ -283,14 +289,14 @@ describe('SmashMessaging: Between peers registered to a SME', () => {
 
     describe('Three users registered to the same SME', () => {
         let charlie: SmashMessaging | undefined;
-        let charlieDID: SmashDID;
+        // let charlieDID: SmashDID;
         let onCharlieMessageReceived: jest.Mock;
         let onCharlieStatusUpdated: jest.Mock;
 
         beforeEach(async () => {
             const charlieConnected = waitFor(ioServer, 'connection');
             charlie = await createTestPeer('charlie', socketServerUrl);
-            charlieDID = await charlie.getDID();
+            // charlieDID = await charlie.getDID();
             onCharlieMessageReceived = jest.fn();
             onCharlieStatusUpdated = jest.fn();
             charlie.on('status', onCharlieStatusUpdated);

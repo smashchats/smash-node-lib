@@ -15,30 +15,32 @@ export class Logger extends EventEmitter {
         return levels.indexOf(level) >= levels.indexOf(this.logLevel);
     }
 
-    private log(level: LogLevel, message: string, ...args: any[]): void {
-        if (this.shouldLog(level)) {
+    private log(level: LogLevel, message: string, ...args: unknown[]): void {
+        if (
+            this.shouldLog(level) &&
+            typeof globalThis.console !== 'undefined'
+        ) {
             const timestamp = new Date().toISOString();
-            console[level.toLowerCase() as 'log' | 'info' | 'warn' | 'error'](
-                `[${this.logID}] [${timestamp}] [${level}] ${message}`,
-                ...args,
-            );
+            globalThis.console[
+                level.toLowerCase() as 'log' | 'info' | 'warn' | 'error'
+            ](`[${this.logID}] [${timestamp}] [${level}] ${message}`, ...args);
             this.emit('log', { level, message, args, timestamp });
         }
     }
 
-    debug(message: string, ...args: any[]): void {
+    debug(message: string, ...args: unknown[]): void {
         this.log('DEBUG', message, ...args);
     }
 
-    info(message: string, ...args: any[]): void {
+    info(message: string, ...args: unknown[]): void {
         this.log('INFO', message, ...args);
     }
 
-    warn(message: string, ...args: any[]): void {
+    warn(message: string, ...args: unknown[]): void {
         this.log('WARN', message, ...args);
     }
 
-    error(message: string, ...args: any[]): void {
+    error(message: string, ...args: unknown[]): void {
         this.log('ERROR', message, ...args);
     }
 }

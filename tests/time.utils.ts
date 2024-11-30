@@ -1,4 +1,5 @@
 import { EventEmitter } from 'events';
+import { Logger } from 'smash-node-lib';
 import { Socket } from 'socket.io';
 
 export function createCancellableDelay(
@@ -21,7 +22,8 @@ export const TIMEOUT_MS = 2000;
 
 let eventWaiterId = 0;
 export async function waitForEvent(
-    cancellationFunctions: Function[],
+    cancellationFunctions: (() => void)[],
+    logger: Logger,
     emitter: EventEmitter | Socket,
     eventName: string,
     count: number = 1,
@@ -31,13 +33,13 @@ export async function waitForEvent(
     let eventsReceived = 0;
     const [timeoutPromise, cancelTimeout] = createCancellableDelay(timeout);
     cancellationFunctions.push(cancelTimeout);
-    console.info(
+    logger.info(
         `<<< Waiting for ${eventName}, ID: ${id}, Timeout: ${timeout}ms`,
     );
 
     return Promise.race([
         timeoutPromise.then(() => {
-            console.warn(
+            logger.warn(
                 `<<< Timeout (${timeout}ms) while waiting for "${eventName}", ID: ${id}`,
             );
         }),
@@ -45,7 +47,7 @@ export async function waitForEvent(
             (emitter as Socket).on(eventName, () => {
                 eventsReceived++;
                 if (eventsReceived === count) {
-                    console.info(
+                    logger.info(
                         `<<< Event "${eventName}" received ${eventsReceived} times, ID: ${id}`,
                     );
                     cancelTimeout();
@@ -56,7 +58,7 @@ export async function waitForEvent(
     ]);
 }
 
-export function aliasWaitFor(fns: Function[]) {
+export function aliasWaitFor(fns: (() => void)[], logger: Logger) {
     return (
         ...args: [
             emitter: EventEmitter | Socket,
@@ -64,5 +66,5 @@ export function aliasWaitFor(fns: Function[]) {
             count?: number,
             timeout?: number,
         ]
-    ) => waitForEvent(fns, ...args);
+    ) => waitForEvent(fns, logger, ...args);
 }

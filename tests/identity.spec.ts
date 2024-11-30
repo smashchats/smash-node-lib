@@ -118,7 +118,7 @@ describe('SmashMessaging: Identity utilities', () => {
 
                 await expect(
                     SmashMessaging.deserializeIdentity(
-                        // @ts-expect-error
+                        // @ts-expect-error we are volunatarily omitting fields
                         invalidIdentity as IJsonIdentity,
                     ),
                 ).rejects.toThrow();
