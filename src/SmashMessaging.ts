@@ -191,9 +191,6 @@ export default class SmashMessaging extends EventEmitter {
         );
 
         this.logger.info(`Loaded Smash lib (log level: ${LOG_LEVEL})`);
-        process.on('unhandledRejection', (reason, promise) => {
-            SmashMessaging.handleError(reason, promise, this.logger);
-        });
     }
 
     async close() {

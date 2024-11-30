@@ -1,38 +1,36 @@
 ## TODO
 
--   [ ] Implement 'did' prop as ik hash (instead of using did.ik as reference). --> `did.id`
+-   [x] Implement 'did' prop as ik hash (instead of using did.ik as reference). --> `did.id`
 -   [ ] Test edge cases (socket error, etc)
 -   [ ] Test messaging resilience/reliability
--   [ ] Replace all occurences of SHA1 with SHA256
+-   [x] Replace all occurences of SHA1 with SHA256
 -   [ ] use a more generic typing for messages (eg, AT Records???)
 -   [ ] integrate pseudo code below into codebase & refreshed specs (!!)
         --> [ ] MOVE LATEST SPECS AS MD TO dev.smashchats.com NOTES
 
-
-
 ```typescript
 interface Message {
-    type: string,
-    version?: string, // semantic versioning
-    data: any,
+    type: string;
+    version?: string; // semantic versioning
+    data: any;
 }
 
 interface SmashTextMessage {
-    type: "com.smashchats.message.text",
-    data: string,
+    type: 'com.smashchats.message.text';
+    data: string;
 }
 
 interface SmashProfileMessage {
-    type: "com.smashchats.profile",
-    data: SmashProfile,
+    type: 'com.smashchats.profile';
+    data: SmashProfile;
 }
-``` 
+```
 
 ## Trusting
 
 Badges & Endorsements -> Own separate subprotocols
 
-- [ ] refactor Smash specs
+-   [ ] refactor Smash specs
 
 ### Trust Wallet
 
@@ -51,7 +49,7 @@ Badges & Endorsements -> Own separate subprotocols
     "data": {
         "uri": "<eg, at://<did>/<type>/<cid>>",
         "did": "<signer.did>",
-        "signature": "<signer.sign(content)>"
+        "signature": "<signer.sign(uri)>"
     }
 }
 ```
@@ -59,7 +57,7 @@ Badges & Endorsements -> Own separate subprotocols
 > **CID is Content-addressable ID!!**
 
 > the URI value is defined by the protocol (in order to display etc etc)
->    eg, 'at://did:plc:44ybard66vv44zksje25o7dz/com.smashchats.badge.verified/3jwdwj2ctlk26'
+> eg, 'at://did:plc:44ybard66vv44zksje25o7dz/com.smashchats.badge.verified/3jwdwj2ctlk26'
 > read more at: https://atproto.com/specs/at-uri-scheme
 
 ```typescript
@@ -74,6 +72,7 @@ interface Endorsable {
 #### Profile endorsement
 
 read as "I am endorsing this profile";
+
 > can mean "I have met them in person" and/or "I trust them" ...
 
 ```json
@@ -82,7 +81,7 @@ read as "I am endorsing this profile";
     "data": {
         "uri": "at://did:key:jksjbbnjnbs",
         "did": "did:plc:jnsjnsjndjksckj",
-        "signature": "knskjnsdkjndsqlkdqslkqdslk",
+        "signature": "knskjnsdkjndsqlkdqslkqdslk"
     }
 }
 ```
@@ -112,14 +111,15 @@ profile "title" (<did>)
 ```
 
 > on the client side: prioritized queue of crypto work!!
+
     --> crypto is compute expensive and can involve blocking operations.
     --> implement a prioritized cancellable queue
-> eg: when getting messages, decrypt them priority 1 , endorsements 2, badges 3, etc.
 
+> eg: when getting messages, decrypt them priority 1 , endorsements 2, badges 3, etc.
 
 ### Smash Badges
 
->>> IS THERE AN EXISTING SPEC/SUBPROTO WE COULD REUSE HERE INSTEAD???
+> > > IS THERE AN EXISTING SPEC/SUBPROTO WE COULD REUSE HERE INSTEAD???
 
 Assets are AT Records (blob etc) and should be collectable as an NFT (ERC 721).
 Smash Badges are a type of Assets.
@@ -133,7 +133,7 @@ Assets should be compatible with erc-721. // what does it mean? ; and https://at
         "type": "com.smashchats.types.units.size.cm",
         "value": 178,
         "signed": {},
-        "endorsed": {},
+        "endorsed": {}
     }
 }
 ```
@@ -141,36 +141,38 @@ Assets should be compatible with erc-721. // what does it mean? ; and https://at
 <!-- TODO: can we REUSE AT proto/Bsky profile for META? -->
 
 <!-- TODO: should we split messages: profile.did; profile.meta; profile.badges; profile.media; ... -->
+
 ```json
 {
     "type": "com.smashchats.profile",
     "data": {
         "did": {
             "id": "did:key:sjbncsbhjcsnbk",
-            "ik": "djksqcbnjkvscknjb",
+            "ik": "djksqcbnjkvscknjb"
         },
         "meta": {
             "title": "<title>",
-            "picture": "<base64:encoded>",
+            "picture": "<base64:encoded>"
         },
         "badges": [
             {
                 "name": "app.kinkhub.body.height",
                 "type": "com.smashchats.types.units.size.cm",
                 "value": 178,
-                "signed": { // DO WE NEED/WANT THIS??? (maybe not at first anyway, wait for use case)
-                    "<signer.did>": "<sig>", // DO WE NEED/WANT THIS??? (maybe not at first anyway, wait for use case)
+                "signed": {
+                    // DO WE NEED/WANT THIS??? (maybe not at first anyway, wait for use case)
+                    "<signer.did>": "<sig>" // DO WE NEED/WANT THIS??? (maybe not at first anyway, wait for use case)
                 }, // DO WE NEED/WANT THIS??? (maybe not at first anyway, wait for use case)
                 "endorsed": {
-                    "<signer.did>": "<sig>",
-                },
+                    "<signer.did>": "<sig>"
+                }
             }
         ],
         "media": [],
         "endorsed": {
-            "<signer.did>": "<sig>",
-        },
-    },
+            "<signer.did>": "<sig>"
+        }
+    }
 }
 ```
 
@@ -267,3 +269,11 @@ sh autogen.sh
 make
 sudo make install
 mkdir -p /usr/local/var/lib/softhsm/tokens/
+
+### Dev docs notes
+
+#### Process unhandledRejections
+
+process.on('unhandledRejection', (reason, promise) => {
+SmashMessaging.handleError(reason, promise, this.logger);
+});
