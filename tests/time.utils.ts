@@ -17,7 +17,7 @@ export async function delay(milliseconds: number): Promise<void> {
     return delayPromise;
 }
 
-export const TIMEOUT_MS = 15000;
+export const TIMEOUT_MS = 2000;
 
 let eventWaiterId = 0;
 export async function waitForEvent(

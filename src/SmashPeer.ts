@@ -54,13 +54,11 @@ export class SmashPeer {
     // TODO: refresh DID
 
     async queueMessage(message: SmashMessage) {
-        const encapsulatedMessage = {
-            ...message,
-            sha256: await CryptoUtils.singleton.sha256(
-                Buffer.from(JSON.stringify(message)),
-            ),
-            timestamp: new Date().toISOString(),
-        };
+        const timestamp = new Date().toISOString();
+        const sha256 = await CryptoUtils.singleton.sha256(
+            Buffer.from(JSON.stringify({ ...message, timestamp })),
+        );
+        const encapsulatedMessage = { ...message, sha256, timestamp };
         this.messageQueue.push(encapsulatedMessage);
         this.logger.debug(
             `> queued ${encapsulatedMessage.sha256} (${this.messageQueue.length})`,

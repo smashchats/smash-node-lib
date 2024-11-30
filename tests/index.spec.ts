@@ -43,6 +43,8 @@ describe('SmashMessaging: Between peers registered to a SME', () => {
     const waitFor = aliasWaitFor(waitForEventCancelFns);
 
     let ioServer: Server;
+    let RealDate: DateConstructor;
+    let mockedNow: Date;
     let socketServerUrl = '';
     const activeSockets: Socket[] = [];
     let handleServerData: (
@@ -68,6 +70,14 @@ describe('SmashMessaging: Between peers registered to a SME', () => {
     const protocolOverheadSize = 1;
 
     beforeAll((done) => {
+        RealDate = Date;
+        mockedNow = new RealDate('2024-01-01T00:00:00.000Z');
+        global.Date = class extends RealDate {
+            constructor() {
+                super();
+                return mockedNow;
+            }
+        } as DateConstructor;
         const httpServer = createServer();
         ioServer = new Server(httpServer);
         ioServer.on('connection', async (client: Socket) => {
@@ -88,9 +98,12 @@ describe('SmashMessaging: Between peers registered to a SME', () => {
 
     afterAll(() => {
         ioServer.close();
+        global.Date = Date;
     });
 
     beforeEach(async () => {
+        jest.spyOn(Date, 'now').mockImplementation(() => mockedNow.getTime());
+
         onSMEDataEvent = jest.fn();
         handleServerData = async (socket, peerId, sessionId, data) => {
             onSMEDataEvent(peerId, sessionId, data);
@@ -141,7 +154,7 @@ describe('SmashMessaging: Between peers registered to a SME', () => {
 
     describe('Alice sends one message to Bob', () => {
         const messageText = 'hello world 1';
-        const messageSha256 = '7aXJNUMuvwCOEwf2qxarwitiUccWv+HLoCrXg+HWvzo=';
+        const messageSha256 = 'heCveufHMM3hVS3VT7VSzqjCiJUiR3vb9Q+cj2aWI5E=';
         let aliceSentMessage: EncapsulatedSmashMessage;
         let bobReceivedMessage: Promise<void>;
 
@@ -181,7 +194,7 @@ describe('SmashMessaging: Between peers registered to a SME', () => {
 
         it('contains a valid timestamp', async () => {
             const precision = 1000; // s precision
-            const nowTime = Date.now() / precision;
+            const nowTime = mockedNow.getTime() / precision;
             expect(aliceSentMessage).toMatchObject({
                 timestamp: expect.stringMatching(ISO8601_TIMESTAMP_REGEX),
             } as EncapsulatedSmashMessage);
