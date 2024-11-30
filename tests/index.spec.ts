@@ -81,7 +81,7 @@ describe('SmashMessaging: Between peers registered to a SME', () => {
         httpServer.listen(() => {
             const port = (httpServer.address() as AddressInfo).port;
             socketServerUrl = `http://localhost:${port}`;
-            done();
+            setTimeout(done, 500);
         });
         SmashMessaging.setCrypto(crypto);
     });
