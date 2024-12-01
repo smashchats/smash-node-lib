@@ -1,6 +1,4 @@
 import { Identity } from '2key-ratchet';
-import { createServer } from 'node:http';
-import type { AddressInfo } from 'node:net';
 import {
     Logger,
     ProfileListSmashMessage,
@@ -13,8 +11,10 @@ import {
     SmashProfile,
     SmashUser,
 } from 'smash-node-lib';
-import { Server, Socket } from 'socket.io';
 
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore
+import { socketServerUrl } from './jest.global.cjs';
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
 import { aliasWaitFor, delay } from './time.utils';
@@ -35,34 +35,8 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
     // TODO (note) small-hash did when trusting and loop over verifies
     // --> note this adds no security whatsoever; albeit being a useful optimization
 
-    let socketServer: Server;
-    let socketServerUrl = '';
-    const activeSockets: Socket[] = [];
-    const onSMEConnection = jest.fn();
-
-    beforeAll((done) => {
-        const httpServer = createServer();
-        socketServer = new Server(httpServer);
-        socketServer.on('connection', async (client: Socket) => {
-            onSMEConnection(client);
-            activeSockets.push(client);
-            client.on('data', async (peerId, sessionId, data, acknowledge) => {
-                activeSockets
-                    .filter((socket) => client.id !== socket.id)
-                    .forEach((socket) => socket.emit('data', sessionId, data));
-                acknowledge();
-            });
-        });
-        httpServer.listen(() => {
-            const port = (httpServer.address() as AddressInfo).port;
-            socketServerUrl = `http://localhost:${port}`;
-            setTimeout(done, 500);
-        });
+    beforeAll(() => {
         SmashMessaging.setCrypto(crypto);
-    });
-
-    afterAll(() => {
-        socketServer.close();
     });
 
     const waitForEventCancelFns: (() => void)[] = [];
@@ -77,7 +51,7 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
         nabSMEConfig = config;
         nab = new SmashNAB(identity);
         await nab.initEndpoints(config);
-        await waitFor(socketServer, 'connection');
+        await delay(100);
         nabDid = await nab.getDID();
         nab.on('join', onNabJoin);
     });
@@ -200,10 +174,10 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
             // TODO check that updated config is shared with active peers
             // TODO ensure valid SME
             // TODO lib event (updated profile/SME config)
-            expect(onSMEConnection).toHaveBeenCalledTimes(1);
+            expect((await user.getDID()).endpoints.length).toBe(0);
             await user.join(await nab.getJoinInfo(nabSMEConfig));
-            await waitFor(socketServer, 'connection');
-            expect(onSMEConnection).toHaveBeenCalledTimes(2);
+            await delay(1500);
+            expect((await user.getDID()).endpoints.length).toBe(1);
         });
 
         const discovered: SmashProfile[] = [

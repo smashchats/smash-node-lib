@@ -1,6 +1,3 @@
-import { Buffer } from 'buffer';
-import { createServer } from 'node:http';
-import type { AddressInfo } from 'node:net';
 import {
     EncapsulatedSmashMessage,
     Logger,
@@ -8,8 +5,10 @@ import {
     SmashMessaging,
     sortSmashMessages,
 } from 'smash-node-lib';
-import { Server, Socket } from 'socket.io';
 
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore
+import { socketServerUrl } from './jest.global.cjs';
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
 import { aliasWaitFor, delay } from './time.utils';
@@ -49,20 +48,8 @@ describe('SmashMessaging: Between peers registered to a SME', () => {
         new Logger('index.spec'),
     );
 
-    let ioServer: Server;
     let RealDate: DateConstructor;
     let mockedNow: Date;
-    let socketServerUrl = '';
-    const activeSockets: Socket[] = [];
-    let handleServerData: (
-        socket: Socket,
-        peerId: string,
-        sessionId: string,
-        data: ArrayBuffer,
-    ) => Promise<void>;
-    let onSMEDataEvent: jest.Mock<void, [string, string, ArrayBuffer]>;
-    const serverReceivedMessages: Promise<void>[] = [];
-    let bothConnectedToSME: Promise<void>;
 
     let alice: SmashMessaging | undefined;
     let bob: SmashMessaging | undefined;
@@ -73,10 +60,9 @@ describe('SmashMessaging: Between peers registered to a SME', () => {
     let onBobStatusUpdated: jest.Mock;
     let onAliceStatusUpdated: jest.Mock;
 
-    // additional Smash messages automatically included in a session
     const protocolOverheadSize = 1;
 
-    beforeAll((done) => {
+    beforeAll(async () => {
         RealDate = Date;
         mockedNow = new RealDate('2024-01-01T00:00:00.000Z');
         global.Date = class extends RealDate {
@@ -85,40 +71,12 @@ describe('SmashMessaging: Between peers registered to a SME', () => {
                 return mockedNow;
             }
         } as DateConstructor;
-        const httpServer = createServer();
-        ioServer = new Server(httpServer);
-        ioServer.on('connection', async (client: Socket) => {
-            activeSockets.push(client);
-            serverReceivedMessages.push(waitFor(client, 'data'));
-            client.on('data', async (peerId, sessionId, data, acknowledge) => {
-                await handleServerData(client, peerId, sessionId, data);
-                acknowledge();
-            });
-        });
-        httpServer.listen(() => {
-            const port = (httpServer.address() as AddressInfo).port;
-            socketServerUrl = `http://localhost:${port}`;
-            setTimeout(done, 500);
-        });
         SmashMessaging.setCrypto(crypto);
-    });
-
-    afterAll(() => {
-        ioServer.close();
-        global.Date = Date;
+        await delay(1000);
     });
 
     beforeEach(async () => {
         jest.spyOn(Date, 'now').mockImplementation(() => mockedNow.getTime());
-
-        onSMEDataEvent = jest.fn();
-        handleServerData = async (socket, peerId, sessionId, data) => {
-            onSMEDataEvent(peerId, sessionId, data);
-            activeSockets
-                .filter((client) => client.id !== socket.id)
-                .forEach((client) => client.emit('data', sessionId, data));
-        };
-        bothConnectedToSME = waitFor(ioServer, 'connection', 2);
         alice = await createTestPeer('alice', socketServerUrl);
         bob = await createTestPeer('bob', socketServerUrl);
         bobDID = await bob.getDID();
@@ -134,15 +92,14 @@ describe('SmashMessaging: Between peers registered to a SME', () => {
     });
 
     afterEach(async () => {
+        alice?.removeAllListeners();
+        bob?.removeAllListeners();
         await alice!.close();
         await bob!.close();
         alice = undefined;
         bob = undefined;
         waitForEventCancelFns.forEach((cancel) => cancel());
         waitForEventCancelFns.length = 0;
-        activeSockets.forEach((socket) => socket.disconnect(true));
-        activeSockets.length = 0;
-        serverReceivedMessages.length = 0;
         jest.resetAllMocks();
     });
 
@@ -165,7 +122,26 @@ describe('SmashMessaging: Between peers registered to a SME', () => {
         let aliceSentMessage: EncapsulatedSmashMessage;
         let bobReceivedMessage: Promise<void>;
 
+        const getDataEvents = async (method: string = 'GET') => {
+            const url = `${socketServerUrl}/data-events`;
+            try {
+                const response = await fetch(url, { method });
+                if (!response.ok) {
+                    console.error(`Error response: ${await response.text()}`);
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+                return data;
+            } catch (error) {
+                console.error('Fetch error:', error);
+                throw error;
+            }
+        };
+
         beforeEach(async () => {
+            console.debug('clearing data events');
+            getDataEvents('DELETE');
+            await delay(100);
             bobReceivedMessage = waitFor(
                 bob!,
                 'message',
@@ -179,20 +155,39 @@ describe('SmashMessaging: Between peers registered to a SME', () => {
         });
 
         it("delivers the initial message to Bob's declared SME", async () => {
-            await delay(200); // give Alice some time to connect to SME
-            await Promise.race(serverReceivedMessages);
-            await delay(50); // give Alice some time to process ack
-            expect(onSMEDataEvent).toHaveBeenCalledTimes(1);
-            expect(onSMEDataEvent).toHaveBeenCalledWith(
-                bobDID.endpoints[0].preKey,
-                expect.any(String),
-                expect.any(Buffer),
-            );
+            const pollForDataEvent = async (
+                maxAttempts = 10,
+                interval = 100,
+            ): Promise<unknown[]> => {
+                for (let attempt = 0; attempt < maxAttempts; attempt++) {
+                    console.debug(`polling: attempt ${attempt}`);
+                    const events = await getDataEvents();
+                    if (events.length > 0) {
+                        console.debug(`polling: got ${events.length} events`);
+                        return events;
+                    } else {
+                        console.debug('polling: no events yet');
+                    }
+                    await delay(interval);
+                }
+                throw new Error('Timeout waiting for SME data event');
+            };
+
+            console.debug('polling for data events');
+            const events = await pollForDataEvent();
+            expect(events).toHaveLength(1);
+            expect(events[0]).toMatchObject({
+                peerId: bobDID.endpoints[0].preKey,
+                sessionId: expect.any(String),
+                data: expect.anything(),
+            });
+
             expect(onAliceStatusUpdated).toHaveBeenCalledWith(
                 messageSha256,
                 'delivered',
             );
-        });
+            await delay(2000);
+        }, 10000);
 
         it('contains a content-addressable ID', async () => {
             expect(aliceSentMessage).toMatchObject({
@@ -233,7 +228,6 @@ describe('SmashMessaging: Between peers registered to a SME', () => {
 
         describe('then Bob', () => {
             beforeEach(async () => {
-                await bothConnectedToSME;
                 await bobReceivedMessage;
             });
 
@@ -294,14 +288,13 @@ describe('SmashMessaging: Between peers registered to a SME', () => {
         let onCharlieStatusUpdated: jest.Mock;
 
         beforeEach(async () => {
-            const charlieConnected = waitFor(ioServer, 'connection');
             charlie = await createTestPeer('charlie', socketServerUrl);
             // charlieDID = await charlie.getDID();
             onCharlieMessageReceived = jest.fn();
             onCharlieStatusUpdated = jest.fn();
             charlie.on('status', onCharlieStatusUpdated);
             charlie.on('message', onCharlieMessageReceived);
-            await charlieConnected;
+            await delay(1000); // give Charlie some time to connect to SME
         });
 
         afterEach(async () => {
@@ -394,6 +387,25 @@ describe('SmashMessaging: Between peers registered to a SME', () => {
 
     describe('Alice sends multiple messages and they get delayed', () => {
         it('Bob receives them unordered and reorders them', async () => {
+            const activateDelay = async () => {
+                const url = `${socketServerUrl}/delay-next-5-messages`;
+                try {
+                    const response = await fetch(url);
+                    if (!response.ok) {
+                        console.error(
+                            `Error response: ${await response.text()}`,
+                        );
+                        throw new Error(
+                            `HTTP error! status: ${response.status}`,
+                        );
+                    }
+                    return;
+                } catch (error) {
+                    console.error('Fetch error:', error);
+                    throw error;
+                }
+            };
+            await activateDelay();
             const originalOrder = ['1', '2', '3', '4', '5'];
             const messageCount = originalOrder.length;
             const expectedReceivedOrder = ['1', '5', '4', '3', '2'];
@@ -402,15 +414,6 @@ describe('SmashMessaging: Between peers registered to a SME', () => {
                 'message',
                 messageCount + protocolOverheadSize,
             );
-            const delayAmount = 100;
-            let messageDelay = messageCount * delayAmount;
-            const decreaseDelay = () => (messageDelay -= delayAmount);
-            const getDecreasingDelay = () => delay(decreaseDelay());
-            const oldHandleData = handleServerData;
-            handleServerData = async (...args) => {
-                await getDecreasingDelay();
-                await oldHandleData(...args);
-            };
             let prevSha256: string = '0';
             for (let i = 0; i < messageCount; i++) {
                 prevSha256 = (
@@ -420,6 +423,7 @@ describe('SmashMessaging: Between peers registered to a SME', () => {
                         prevSha256,
                     )
                 ).sha256;
+                await delay(10);
             }
             await waitForMessages;
             const receivedMessages = onBobMessageReceived.mock.calls.map(
