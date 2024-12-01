@@ -6,7 +6,7 @@ index 3111418..90c45d8 100644
        return process.domain;
      }
    });
-+  Object.defineProperty(newProcess, 'original', {
++  Object.defineProperty(newProcess, 'actual', {
 +    get() {
 +      return process;
 +    }
