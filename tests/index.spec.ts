@@ -137,8 +137,7 @@ describe('SmashMessaging: Between peers registered to a SME', () => {
 
         beforeEach(async () => {
             logger.debug('clearing data events');
-            getDataEvents('DELETE');
-            await delay(100);
+            await getDataEvents('DELETE');
             bobReceivedMessage = waitFor(
                 bob!,
                 'message',
@@ -149,6 +148,7 @@ describe('SmashMessaging: Between peers registered to a SME', () => {
                 messageText,
                 '0',
             );
+            await delay(200);
         });
 
         it("delivers the initial message to Bob's declared SME", async () => {

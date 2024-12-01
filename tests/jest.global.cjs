@@ -77,7 +77,7 @@ module.exports = async function () {
                 dataEvents.length = 0;
                 console.log('Events cleared');
                 res.writeHead(200);
-                res.end();
+                res.end(JSON.stringify(dataEvents));
                 return;
             }
 
