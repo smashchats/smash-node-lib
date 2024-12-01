@@ -41,11 +41,9 @@ const ISO8601_TIMESTAMP_REGEX =
 // TODO Review coverage
 
 describe('SmashMessaging: Between peers registered to a SME', () => {
+    const logger = new Logger('index.spec');
     const waitForEventCancelFns: (() => void)[] = [];
-    const waitFor = aliasWaitFor(
-        waitForEventCancelFns,
-        new Logger('index.spec'),
-    );
+    const waitFor = aliasWaitFor(waitForEventCancelFns, logger);
 
     let RealDate: DateConstructor;
     let mockedNow: Date;
@@ -126,19 +124,19 @@ describe('SmashMessaging: Between peers registered to a SME', () => {
             try {
                 const response = await fetch(url, { method });
                 if (!response.ok) {
-                    console.error(`Error response: ${await response.text()}`);
+                    logger.error(`Error response: ${await response.text()}`);
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
                 const data = await response.json();
                 return data;
             } catch (error) {
-                console.error('Fetch error:', error);
+                logger.error('Fetch error:', error);
                 throw error;
             }
         };
 
         beforeEach(async () => {
-            console.debug('clearing data events');
+            logger.debug('clearing data events');
             getDataEvents('DELETE');
             await delay(100);
             bobReceivedMessage = waitFor(
@@ -159,20 +157,20 @@ describe('SmashMessaging: Between peers registered to a SME', () => {
                 interval = 100,
             ): Promise<unknown[]> => {
                 for (let attempt = 0; attempt < maxAttempts; attempt++) {
-                    console.debug(`polling: attempt ${attempt}`);
+                    logger.debug(`polling: attempt ${attempt}`);
                     const events = await getDataEvents();
                     if (events.length > 0) {
-                        console.debug(`polling: got ${events.length} events`);
+                        logger.debug(`polling: got ${events.length} events`);
                         return events;
                     } else {
-                        console.debug('polling: no events yet');
+                        logger.debug('polling: no events yet');
                     }
                     await delay(interval);
                 }
                 throw new Error('Timeout waiting for SME data event');
             };
 
-            console.debug('polling for data events');
+            logger.debug('polling for data events');
             const events = await pollForDataEvent();
             expect(events).toHaveLength(1);
             expect(events[0]).toMatchObject({
