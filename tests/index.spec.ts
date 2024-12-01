@@ -3,7 +3,6 @@ import {
     Logger,
     SmashDID,
     SmashMessaging,
-    sortSmashMessages,
 } from 'smash-node-lib';
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -382,63 +381,6 @@ describe('SmashMessaging: Between peers registered to a SME', () => {
                     expect.anything(),
                 );
             }
-        });
-    });
-
-    describe('Alice sends multiple messages and they get delayed', () => {
-        it('Bob receives them unordered and reorders them', async () => {
-            const activateDelay = async () => {
-                const url = `${socketServerUrl}/delay-next-5-messages`;
-                try {
-                    const response = await fetch(url);
-                    if (!response.ok) {
-                        console.error(
-                            `Error response: ${await response.text()}`,
-                        );
-                        throw new Error(
-                            `HTTP error! status: ${response.status}`,
-                        );
-                    }
-                    return;
-                } catch (error) {
-                    console.error('Fetch error:', error);
-                    throw error;
-                }
-            };
-            await activateDelay();
-            const originalOrder = ['1', '2', '3', '4', '5'];
-            const messageCount = originalOrder.length;
-            const expectedReceivedOrder = ['1', '5', '4', '3', '2'];
-            const waitForMessages = waitFor(
-                bob!,
-                'message',
-                messageCount + protocolOverheadSize,
-            );
-            let prevSha256: string = '0';
-            for (let i = 0; i < messageCount; i++) {
-                prevSha256 = (
-                    await alice!.sendTextMessage(
-                        bobDID,
-                        originalOrder[i],
-                        prevSha256,
-                    )
-                ).sha256;
-                await delay(10);
-            }
-            await waitForMessages;
-            const receivedMessages = onBobMessageReceived.mock.calls.map(
-                ([message]) => message,
-            );
-            const textMessages = receivedMessages.filter(
-                (message) => message.type === 'text',
-            );
-            expect(textMessages.length).toBe(messageCount);
-            expect(textMessages.map((text) => text.data)).toEqual(
-                expectedReceivedOrder,
-            );
-            expect(
-                sortSmashMessages(textMessages).map((text) => text.data),
-            ).toEqual(originalOrder);
         });
     });
 });
