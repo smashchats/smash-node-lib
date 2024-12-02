@@ -244,6 +244,7 @@ export default class SmashMessaging extends EventEmitter {
 
     // TODO: split profile from DID updates?
     // TODO: handle differential profile updates?
+    // TODO: handle updates from other peers IF signed (and with proper trusting level—ie. not from any peer & only ADDING not replacing/removing endpoints if not from the peer itself )
     private async incomingProfileHandler(
         peerIk: string,
         message: ProfileSmashMessage,
@@ -297,14 +298,14 @@ export default class SmashMessaging extends EventEmitter {
         sender: SmashDID,
     ) {
         this.logger.debug(
-            `notifyNewMessages: ${messages.length}/${(this.totalMessages += messages.length)}`,
+            `notifyNewMessages: ${messages?.length}/${(this.totalMessages += messages?.length)}`,
             JSON.stringify(messages, null, 2),
         );
         messages.forEach((message) => this.emit('message', message, sender));
     }
 
     private async flushPeerIkDLQ(peerDid: SmashDID) {
-        if (!this.dlq[peerDid.ik]) {
+        if (!this.dlq[peerDid.ik]?.length) {
             this.logger.info(`Cannot find queue for peer ${peerDid.id}`);
             return;
         }
@@ -331,6 +332,7 @@ export default class SmashMessaging extends EventEmitter {
         lastMessageTimestamp?: string,
     ): Promise<SmashPeer> {
         if (!this.peers[peerDid.id]) {
+            this.logger.debug(`CreatePeer ${peerDid.id}`);
             const peer = new SmashPeer(
                 peerDid,
                 lastMessageTimestamp

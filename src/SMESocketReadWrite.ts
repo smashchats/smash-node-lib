@@ -154,7 +154,7 @@ export class SMESocketReadWrite extends SMESocketWriteOnly {
         this.logger.debug(
             `processQueuedMessages for ${session.id} (${this.dlq[session.id]?.length})`,
         );
-        if (this.dlq[session.id]) {
+        if (this.dlq[session.id]?.length) {
             try {
                 const decryptedMessages = await Promise.all(
                     this.dlq[session.id].map((message) =>

@@ -55,7 +55,7 @@ export class SmashPeer {
     async configureEndpoints(
         dontSendSessionReset: boolean = false,
     ): Promise<void> {
-        this.logger.debug('SmashPeer::configureEndpoints');
+        this.logger.debug(`configureEndpoints (${this.did.endpoints.length})`);
         let shouldSendSessionReset = false;
         this.endpoints = await Promise.all(
             this.did.endpoints.map(async (endpointConfig: SmashEndpoint) => {

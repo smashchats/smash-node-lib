@@ -226,6 +226,8 @@ describe('[SmashMessaging] Between peers registered to a SME', () => {
                     data: expect.anything(),
                 });
 
+                await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
+
                 expect(alice.onStatus).toHaveBeenCalledWith(
                     TEST_MESSAGE.sha256,
                     'delivered',
