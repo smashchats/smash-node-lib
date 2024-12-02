@@ -30,7 +30,12 @@ export class SignalSession {
         this.createdAt = new Date();
     }
 
-    // Add session reset message type
+    isExpired(): boolean {
+        return (
+            Date.now() - this.createdAt.getTime() > SignalSession.SESSION_TTL_MS
+        );
+    }
+
     async createResetMessage(): Promise<EncapsulatedSmashMessage> {
         return {
             type: 'session_reset',
