@@ -46,6 +46,8 @@ describe('SmashMessaging: Edge cases', () => {
 
     const protocolOverheadSize = 1;
 
+    let dateSpy: jest.SpyInstance;
+
     beforeAll(async () => {
         SmashMessaging.setCrypto(crypto);
         await delay(1000);
@@ -70,6 +72,7 @@ describe('SmashMessaging: Edge cases', () => {
         waitForEventCancelFns.forEach((cancel) => cancel());
         waitForEventCancelFns.length = 0;
         jest.resetAllMocks();
+        if (dateSpy) dateSpy.mockRestore();
     });
 
     describe('Session recovery', () => {
@@ -90,7 +93,7 @@ describe('SmashMessaging: Edge cases', () => {
             );
 
             // 2. Mock Date to simulate time passing beyond TTL
-            const dateSpy = jest
+            dateSpy = jest
                 .spyOn(Date, 'now')
                 .mockImplementation(
                     () =>
@@ -137,8 +140,7 @@ describe('SmashMessaging: Edge cases', () => {
                 expect.anything(),
             );
 
-            await delay(2500);
-            dateSpy.mockRestore();
+            await delay(1000);
         }, 10000);
 
         it('Bob can recover communication after restart with lost session context', async () => {
