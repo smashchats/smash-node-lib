@@ -343,7 +343,7 @@ export default class SmashMessaging extends EventEmitter {
                 this.logger,
             );
             await peer.configureEndpoints();
-            peer.queueMessage({
+            await peer.queueMessage({
                 type: 'profile',
                 data: await this.getProfile(),
             } as ProfileSmashMessage);

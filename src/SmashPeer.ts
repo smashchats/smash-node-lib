@@ -74,6 +74,7 @@ export class SmashPeer {
         if (shouldSendSessionReset && !dontSendSessionReset) {
             await this.triggerSessionReset();
         }
+        await this.flushQueue();
     }
 
     // TODO: reset session
@@ -108,6 +109,7 @@ export class SmashPeer {
             endpoint.session.isExpired(),
         );
         if (hasExpiredEndpoints) {
+            this.logger.debug('hasExpiredEndpoints');
             await this.configureEndpoints();
         }
 

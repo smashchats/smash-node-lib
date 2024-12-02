@@ -100,8 +100,8 @@ export class SessionManager {
 
     // TODO deduplication of messages (received from different endpoints)
     async handleSessionReset(peer: SmashPeer): Promise<void> {
+        this.logger.debug('handleSessionReset');
         this.removeAllPeerSessions(peer.getDID());
         await peer.configureEndpoints(true);
-        await peer.flushQueue();
     }
 }
