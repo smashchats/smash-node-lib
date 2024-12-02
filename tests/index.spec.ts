@@ -15,6 +15,97 @@ import { aliasWaitFor, delay } from './time.utils';
 // @ts-ignore
 import { peerArgs } from './user.utils';
 
+// Extract constants
+const TEST_CONFIG = {
+    INITIAL_DATE: '2024-01-01T00:00:00.000Z',
+    PROTOCOL_OVERHEAD_SIZE: 1,
+    DEFAULT_POLL_ATTEMPTS: 20,
+    DEFAULT_POLL_INTERVAL: 500,
+    DEFAULT_SETUP_DELAY: 1000,
+    MESSAGE_DELIVERY_TIMEOUT: 12000,
+} as const;
+
+const ISO8601_TIMESTAMP_REGEX =
+    /^(?<year>-?(?:[1-9][0-9]*)?[0-9]{4})-(?<month>1[0-2]|0[1-9])-(?<day>3[01]|0[1-9]|[12][0-9])T(?<hour>2[0-3]|[01][0-9]):(?<minute>[0-5][0-9]):(?<second>[0-5][0-9])(?:\.(?<ms>[0-9]+))?(?<timezone>Z|[+-](?:2[0-3]|[01][0-9]):[0-5][0-9])$/;
+
+// Extract test types
+interface TestMessage {
+    text: string;
+    sha256?: string;
+}
+
+interface TestPeer {
+    messaging: SmashMessaging;
+    did: SmashDID;
+    onMessage: jest.Mock;
+    onStatus: jest.Mock;
+}
+
+// Extract test utilities
+class TestUtils {
+    private static logger = new Logger('TestUtils');
+
+    static async createPeer(
+        name: string,
+        serverUrl?: string,
+    ): Promise<TestPeer> {
+        const [identity, config] = await peerArgs(serverUrl);
+        const messaging = new SmashMessaging(
+            identity,
+            undefined,
+            'DEBUG',
+            name,
+        );
+        await messaging.initEndpoints(config);
+
+        const did = await messaging.getDID();
+        const onMessage = jest.fn();
+        const onStatus = jest.fn();
+
+        messaging.on('message', onMessage);
+        messaging.on('status', onStatus);
+
+        return { messaging, did, onMessage, onStatus };
+    }
+
+    static async getDataEvents(
+        serverUrl: string,
+        peerId: string,
+        method: string = 'GET',
+    ): Promise<unknown[]> {
+        const url = `${serverUrl}/data-events?peerId=${encodeURIComponent(peerId)}`;
+        try {
+            const response = await fetch(url, { method });
+            if (!response.ok) {
+                this.logger.error(`Error response: ${await response.text()}`);
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return await response.json();
+        } catch (error) {
+            this.logger.error('Fetch error:', error);
+            throw error;
+        }
+    }
+
+    static async pollForDataEvent(
+        serverUrl: string,
+        peerId: string,
+        maxAttempts = TEST_CONFIG.DEFAULT_POLL_ATTEMPTS,
+        interval = TEST_CONFIG.DEFAULT_POLL_INTERVAL,
+    ): Promise<unknown[]> {
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
+            this.logger.debug(`Polling attempt ${attempt + 1}/${maxAttempts}`);
+            const events = await this.getDataEvents(serverUrl, peerId);
+            if (events.length > 0) {
+                this.logger.debug(`Found ${events.length} events`);
+                return events;
+            }
+            await delay(interval);
+        }
+        throw new Error('Timeout waiting for SME data event');
+    }
+}
+
 /**
  * **************************************************************
  *  tests generic to all Smash Peers
@@ -24,46 +115,21 @@ import { peerArgs } from './user.utils';
 // TODO use case with only one peer configured with SME
 // describe('Only Bob is registered to an SME.', () => {
 
-async function createTestPeer(
-    name: string,
-    socketServerUrl?: string,
-): Promise<SmashMessaging> {
-    const [identity, config] = await peerArgs(socketServerUrl);
-    const peer = new SmashMessaging(identity, undefined, 'DEBUG', name);
-    await peer.initEndpoints(config);
-    return peer;
-}
-
-const ISO8601_TIMESTAMP_REGEX =
-    /^(?<year>-?(?:[1-9][0-9]*)?[0-9]{4})-(?<month>1[0-2]|0[1-9])-(?<day>3[01]|0[1-9]|[12][0-9])T(?<hour>2[0-3]|[01][0-9]):(?<minute>[0-5][0-9]):(?<second>[0-5][0-9])(?:\.(?<ms>[0-9]+))?(?<timezone>Z|[+-](?:2[0-3]|[01][0-9]):[0-5][0-9])$/;
-
-// TODO Consider running Jest with `--detectOpenHandles`
-// TODO Review coverage
-
-describe('SmashMessaging: Between peers registered to a SME', () => {
-    const logger = new Logger('index.spec');
+describe('[SmashMessaging] Between peers registered to a SME', () => {
+    const logger = new Logger('SmashMessaging');
     const waitForEventCancelFns: (() => void)[] = [];
     const waitFor = aliasWaitFor(waitForEventCancelFns, logger);
 
     let RealDate: DateConstructor;
     let mockedNow: Date;
-
-    let alice: SmashMessaging | undefined;
-    let bob: SmashMessaging | undefined;
-    let bobDID: SmashDID;
-    let aliceDID: SmashDID;
-    let onBobMessageReceived: jest.Mock;
-    let onAliceMessageReceived: jest.Mock;
-    let onBobStatusUpdated: jest.Mock;
-    let onAliceStatusUpdated: jest.Mock;
-
     let dateSpy: jest.SpyInstance;
 
-    const protocolOverheadSize = 1;
+    let alice: TestPeer;
+    let bob: TestPeer;
 
     beforeAll(async () => {
         RealDate = Date;
-        mockedNow = new RealDate('2024-01-01T00:00:00.000Z');
+        mockedNow = new RealDate(TEST_CONFIG.INITIAL_DATE);
         global.Date = class extends RealDate {
             constructor() {
                 super();
@@ -71,34 +137,26 @@ describe('SmashMessaging: Between peers registered to a SME', () => {
             }
         } as DateConstructor;
         SmashMessaging.setCrypto(crypto);
-        await delay(1000);
+        await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
     });
 
     beforeEach(async () => {
         dateSpy = jest
             .spyOn(Date, 'now')
             .mockImplementation(() => mockedNow.getTime());
-        alice = await createTestPeer('alice', socketServerUrl);
-        bob = await createTestPeer('bob', socketServerUrl);
-        bobDID = await bob.getDID();
-        aliceDID = await alice.getDID();
-        onBobMessageReceived = jest.fn();
-        onBobStatusUpdated = jest.fn();
-        bob.on('status', onBobStatusUpdated);
-        bob.on('message', onBobMessageReceived);
-        onAliceMessageReceived = jest.fn();
-        onAliceStatusUpdated = jest.fn();
-        alice.on('status', onAliceStatusUpdated);
-        alice.on('message', onAliceMessageReceived);
+
+        // Create test peers
+        alice = await TestUtils.createPeer('alice', socketServerUrl);
+        bob = await TestUtils.createPeer('bob', socketServerUrl);
     });
 
     afterEach(async () => {
-        alice?.removeAllListeners();
-        bob?.removeAllListeners();
-        await alice!.close();
-        await bob!.close();
-        alice = undefined;
-        bob = undefined;
+        // Cleanup peers
+        alice?.messaging.removeAllListeners();
+        bob?.messaging.removeAllListeners();
+        await alice?.messaging.close();
+        await bob?.messaging.close();
+        // Reset test state
         waitForEventCancelFns.forEach((cancel) => cancel());
         waitForEventCancelFns.length = 0;
         jest.resetAllMocks();
@@ -112,99 +170,87 @@ describe('SmashMessaging: Between peers registered to a SME', () => {
                 description: 'Alice is a cool person',
                 picture: 'https://alice.com/picture.png',
             };
-            await alice!.updateMeta(updatedMeta);
-            await delay(500);
-            expect(onBobMessageReceived).not.toHaveBeenCalled();
+            await alice.messaging.updateMeta(updatedMeta);
+            await delay(TEST_CONFIG.DEFAULT_POLL_INTERVAL);
+            expect(bob.onMessage).not.toHaveBeenCalled();
         });
     });
 
     describe('Alice sends one message to Bob', () => {
-        const messageText = 'hello world 1';
-        const messageSha256 = 'i1M92vd0lSfaQxVb3V018uMwghFYNd6xyWujvdUA+/Y=';
+        const TEST_MESSAGE: TestMessage = {
+            text: 'hello world 1',
+            sha256: 'i1M92vd0lSfaQxVb3V018uMwghFYNd6xyWujvdUA+/Y=',
+        };
+
         let aliceSentMessage: EncapsulatedSmashMessage;
         let bobReceivedMessage: Promise<void>;
 
-        const getDataEvents = async (method: string = 'GET') => {
-            const url = `${socketServerUrl}/data-events?peerId=${encodeURIComponent(bobDID.endpoints[0].preKey)}`;
-            try {
-                const response = await fetch(url, { method });
-                if (!response.ok) {
-                    logger.error(`Error response: ${await response.text()}`);
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                const data = await response.json();
-                return data;
-            } catch (error) {
-                logger.error('Fetch error:', error);
-                throw error;
-            }
-        };
-
         beforeEach(async () => {
-            logger.debug('clearing data events');
-            await getDataEvents('DELETE');
-            await delay(500);
-            bobReceivedMessage = waitFor(
-                bob!,
-                'message',
-                1 + protocolOverheadSize,
+            logger.debug('Setting up single message test');
+
+            // Clear existing events
+            await TestUtils.getDataEvents(
+                socketServerUrl,
+                bob.did.endpoints[0].preKey,
+                'DELETE',
             );
-            aliceSentMessage = await alice!.sendTextMessage(
-                bobDID,
-                messageText,
+            await delay(TEST_CONFIG.DEFAULT_POLL_INTERVAL);
+
+            // Setup message receipt expectation
+            bobReceivedMessage = waitFor(
+                bob.messaging,
+                'message',
+                1 + TEST_CONFIG.PROTOCOL_OVERHEAD_SIZE,
+            );
+
+            // Send test message
+            aliceSentMessage = await alice.messaging.sendTextMessage(
+                bob.did,
+                TEST_MESSAGE.text,
                 '0',
             );
         });
 
-        it("delivers the initial message to Bob's declared SME", async () => {
-            const pollForDataEvent = async (
-                maxAttempts = 20,
-                interval = 500,
-            ): Promise<unknown[]> => {
-                for (let attempt = 0; attempt < maxAttempts; attempt++) {
-                    logger.debug(`polling: attempt ${attempt}`);
-                    const events = await getDataEvents();
-                    if (events.length > 0) {
-                        logger.debug(`polling: got ${events.length} events`);
-                        return events;
-                    } else {
-                        logger.debug('polling: no events yet');
-                    }
-                    await delay(interval);
-                }
-                throw new Error('Timeout waiting for SME data event');
-            };
-            logger.debug('polling for data events');
-            const events = await pollForDataEvent();
-            expect(events).toHaveLength(1);
-            expect(events[0]).toMatchObject({
-                peerId: bobDID.endpoints[0].preKey,
-                sessionId: expect.any(String),
-                data: expect.anything(),
-            });
+        it(
+            "delivers the initial message to Bob's declared SME",
+            async () => {
+                const events = await TestUtils.pollForDataEvent(
+                    socketServerUrl,
+                    bob.did.endpoints[0].preKey,
+                );
 
-            expect(onAliceStatusUpdated).toHaveBeenCalledWith(
-                messageSha256,
-                'delivered',
-            );
+                expect(events).toHaveLength(1);
+                expect(events[0]).toMatchObject({
+                    peerId: bob.did.endpoints[0].preKey,
+                    sessionId: expect.any(String),
+                    data: expect.anything(),
+                });
 
-            await delay(1000);
-        }, 12000);
+                expect(alice.onStatus).toHaveBeenCalledWith(
+                    TEST_MESSAGE.sha256,
+                    'delivered',
+                );
+            },
+            TEST_CONFIG.MESSAGE_DELIVERY_TIMEOUT,
+        );
 
         it('contains a content-addressable ID', async () => {
             expect(aliceSentMessage).toMatchObject({
-                sha256: messageSha256,
+                sha256: TEST_MESSAGE.sha256,
             } as EncapsulatedSmashMessage);
         });
 
         it('contains a valid timestamp', async () => {
-            const precision = 1000; // s precision
-            const nowTime = mockedNow.getTime() / precision;
+            const TIMESTAMP_PRECISION = 1000; // seconds precision
+            const nowTime = mockedNow.getTime() / TIMESTAMP_PRECISION;
+
             expect(aliceSentMessage).toMatchObject({
                 timestamp: expect.stringMatching(ISO8601_TIMESTAMP_REGEX),
             } as EncapsulatedSmashMessage);
+
             const messageTime =
-                new Date(aliceSentMessage.timestamp).getTime() / precision;
+                new Date(aliceSentMessage.timestamp).getTime() /
+                TIMESTAMP_PRECISION;
             expect(messageTime).toBeCloseTo(nowTime, 0);
         });
 
@@ -215,13 +261,13 @@ describe('SmashMessaging: Between peers registered to a SME', () => {
                     description: 'Alice is a cool person',
                     picture: 'https://alice.com/picture.png',
                 };
-                await alice!.updateMeta(updatedMeta);
-                await delay(500);
-                expect(onBobMessageReceived).toHaveBeenCalledWith(
+
+                await alice.messaging.updateMeta(updatedMeta);
+                await delay(TEST_CONFIG.DEFAULT_POLL_INTERVAL);
+
+                expect(bob.onMessage).toHaveBeenCalledWith(
                     expect.objectContaining({
-                        data: expect.objectContaining({
-                            meta: updatedMeta,
-                        }),
+                        data: expect.objectContaining({ meta: updatedMeta }),
                     }),
                     expect.anything(),
                 );
@@ -234,14 +280,13 @@ describe('SmashMessaging: Between peers registered to a SME', () => {
             });
 
             it('receives the message once', async () => {
-                // receives the message + DID (protocol overhead)
-                expect(onBobMessageReceived).toHaveBeenCalledTimes(
-                    1 + protocolOverheadSize,
+                expect(bob.onMessage).toHaveBeenCalledTimes(
+                    1 + TEST_CONFIG.PROTOCOL_OVERHEAD_SIZE,
                 );
             });
 
             it('can decrypt the message content', async () => {
-                expect(onBobMessageReceived).toHaveBeenCalledWith(
+                expect(bob.onMessage).toHaveBeenCalledWith(
                     expect.objectContaining({
                         data: aliceSentMessage.data,
                     } as EncapsulatedSmashMessage),
@@ -250,33 +295,33 @@ describe('SmashMessaging: Between peers registered to a SME', () => {
             });
 
             it('knows Alice identity (DID)', async () => {
-                expect(onBobMessageReceived).toHaveBeenCalledWith(
+                expect(bob.onMessage).toHaveBeenCalledWith(
                     expect.anything(),
-                    // TODO: profile?
                     expect.objectContaining({
-                        ik: aliceDID.ik,
-                        ek: aliceDID.ek,
-                        endpoints: aliceDID.endpoints,
+                        ik: alice.did.ik,
+                        ek: alice.did.ek,
+                        endpoints: alice.did.endpoints,
                     } as SmashDID),
                 );
             });
 
             it('successfully replies to Alice', async () => {
-                const bobReplyText = 'hello back';
-                const lastMessage = onBobMessageReceived.mock.lastCall[0];
-                const receivedAliceDID = onBobMessageReceived.mock.lastCall[1];
+                const REPLY_MESSAGE = 'hello back';
+                const lastMessage = bob.onMessage.mock.lastCall[0];
+                const receivedAliceDID = bob.onMessage.mock.lastCall[1];
+
                 jest.resetAllMocks();
-                const aliceReceivedReply = waitFor(alice!, 'message');
-                await bob!.sendTextMessage(
+                const aliceReceivedReply = waitFor(alice.messaging, 'message');
+
+                await bob.messaging.sendTextMessage(
                     receivedAliceDID,
-                    bobReplyText,
+                    REPLY_MESSAGE,
                     lastMessage.sha256,
                 );
                 await aliceReceivedReply;
-                expect(onAliceMessageReceived).toHaveBeenCalledWith(
-                    expect.objectContaining({
-                        data: bobReplyText,
-                    }),
+
+                expect(alice.onMessage).toHaveBeenCalledWith(
+                    expect.objectContaining({ data: REPLY_MESSAGE }),
                     expect.anything(),
                 );
             });
@@ -284,69 +329,61 @@ describe('SmashMessaging: Between peers registered to a SME', () => {
     });
 
     describe('Three users registered to the same SME', () => {
-        let charlie: SmashMessaging | undefined;
-        // let charlieDID: SmashDID;
-        let onCharlieMessageReceived: jest.Mock;
-        let onCharlieStatusUpdated: jest.Mock;
+        let charlie: TestPeer;
 
         beforeEach(async () => {
-            charlie = await createTestPeer('charlie', socketServerUrl);
-            // charlieDID = await charlie.getDID();
-            onCharlieMessageReceived = jest.fn();
-            onCharlieStatusUpdated = jest.fn();
-            charlie.on('status', onCharlieStatusUpdated);
-            charlie.on('message', onCharlieMessageReceived);
-            await delay(1000); // give Charlie some time to connect to SME
+            charlie = await TestUtils.createPeer('charlie', socketServerUrl);
+            await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
         });
 
         afterEach(async () => {
-            await charlie!.close();
-            charlie = undefined;
+            await charlie.messaging.close();
         });
 
         it('Alice and Bob can message each other without errors while Charlie is connected', async () => {
-            const aliceToBobMessage = 'Hello Bob!';
-            const bobToAliceMessage = 'Hi Alice!';
+            const TEST_MESSAGES = {
+                aliceToBob: 'Hello Bob!',
+                bobToAlice: 'Hi Alice!',
+            };
 
-            const bobReceivedMessage = waitFor(
-                bob!,
-                'message',
-                1 + protocolOverheadSize,
-            );
-            const aliceReceivedMessage = waitFor(
-                alice!,
-                'message',
-                1 + protocolOverheadSize,
-            );
+            const messagePromises = {
+                bob: waitFor(
+                    bob.messaging,
+                    'message',
+                    1 + TEST_CONFIG.PROTOCOL_OVERHEAD_SIZE,
+                ),
+                alice: waitFor(
+                    alice.messaging,
+                    'message',
+                    1 + TEST_CONFIG.PROTOCOL_OVERHEAD_SIZE,
+                ),
+            };
 
-            // Alice sends a message to Bob
-            const aliceSentMessage = await alice!.sendTextMessage(
-                bobDID,
-                aliceToBobMessage,
+            // Message exchange
+            const aliceSentMessage = await alice.messaging.sendTextMessage(
+                bob.did,
+                TEST_MESSAGES.aliceToBob,
                 '0',
             );
-            await bobReceivedMessage;
+            await messagePromises.bob;
 
-            // Bob replies to Alice
-            await bob!.sendTextMessage(
-                aliceDID,
-                bobToAliceMessage,
+            await bob.messaging.sendTextMessage(
+                alice.did,
+                TEST_MESSAGES.bobToAlice,
                 aliceSentMessage.sha256,
             );
-            await aliceReceivedMessage;
+            await messagePromises.alice;
 
-            // Verify that messages were received correctly
-            expect(onBobMessageReceived).toHaveBeenCalledWith(
-                expect.objectContaining({ data: aliceToBobMessage }),
+            // Verify message delivery
+            expect(bob.onMessage).toHaveBeenCalledWith(
+                expect.objectContaining({ data: TEST_MESSAGES.aliceToBob }),
                 expect.anything(),
             );
-            expect(onAliceMessageReceived).toHaveBeenCalledWith(
-                expect.objectContaining({ data: bobToAliceMessage }),
+            expect(alice.onMessage).toHaveBeenCalledWith(
+                expect.objectContaining({ data: TEST_MESSAGES.bobToAlice }),
                 expect.anything(),
             );
-
-            // Verify that Charlie didn't receive any messages
-            expect(onCharlieMessageReceived).not.toHaveBeenCalled();
+            expect(charlie.onMessage).not.toHaveBeenCalled();
         });
     });
 
@@ -361,29 +398,41 @@ describe('SmashMessaging: Between peers registered to a SME', () => {
 
     describe('Alice sends two messages to Bob', () => {
         it('Bob receives the two messages', async () => {
-            // two messages + protocol overhead
-            const bobReceivedAllMessages = waitFor(
-                bob!,
-                'message',
-                2 + protocolOverheadSize,
+            const messagePromises = {
+                all: waitFor(
+                    bob.messaging,
+                    'message',
+                    2 + TEST_CONFIG.PROTOCOL_OVERHEAD_SIZE,
+                ),
+                first: waitFor(bob.messaging, 'message', 1),
+            };
+
+            const firstMessage = await alice.messaging.sendTextMessage(
+                bob.did,
+                '0',
+                '0',
             );
-            const bobReceivedFirstMessage = waitFor(bob!, 'message', 1);
-            const firstMessage = await alice!.sendTextMessage(bobDID, '0', '0');
-            await bobReceivedFirstMessage;
+            await messagePromises.first;
             await delay(50);
-            await alice!.sendTextMessage(bobDID, '1', firstMessage.sha256);
-            await bobReceivedAllMessages;
-            expect(onBobMessageReceived).toHaveBeenCalledTimes(
-                2 + protocolOverheadSize,
+            await alice.messaging.sendTextMessage(
+                bob.did,
+                '1',
+                firstMessage.sha256,
             );
-            for (let index = 0; index < 2; index++) {
-                expect(onBobMessageReceived).toHaveBeenCalledWith(
+            await messagePromises.all;
+
+            expect(bob.onMessage).toHaveBeenCalledTimes(
+                2 + TEST_CONFIG.PROTOCOL_OVERHEAD_SIZE,
+            );
+
+            [0, 1].forEach((index) => {
+                expect(bob.onMessage).toHaveBeenCalledWith(
                     expect.objectContaining({
                         data: `${index}`,
                     } as EncapsulatedSmashMessage),
                     expect.anything(),
                 );
-            }
+            });
         });
     });
 });
