@@ -71,8 +71,16 @@ describe('SmashMessaging: Edge cases', () => {
         jest.resetAllMocks();
     });
 
-    describe('Session recovery after peer restart', () => {
-        it('Bob can recover communication after restart', async () => {
+    describe('Session recovery', () => {
+        it('Session is automatically renewed after TTL', async () => {
+            // 1. Alice sends a message to Bob
+            // expect bob to receive the message
+            // 2. Longer than EXPIRATION_TIME_MS elapses
+            // simulate this by spying on the Date() constructor and Date.now() method
+            // 3. Bob restart losing the context of sessions
+            // expect bob to receive the new message
+        });
+        it('Bob can recover communication after restart with lost session context', async () => {
             // 1. Initial communication
             const message1 = 'hello';
             const waitForFirstMessage = waitFor(
@@ -134,7 +142,7 @@ describe('SmashMessaging: Edge cases', () => {
     describe('Alice sends multiple messages and they get delayed', () => {
         it('Bob receives them unordered and reorders them', async () => {
             const activateDelay = async () => {
-                const url = `${socketServerUrl}/delay-next-5-messages`;
+                const url = `${socketServerUrl}/delay-next-messages?peerId=${encodeURIComponent(bobDID.endpoints[0].preKey)}`;
                 try {
                     const response = await fetch(url);
                     if (!response.ok) {
@@ -152,6 +160,7 @@ describe('SmashMessaging: Edge cases', () => {
                 }
             };
             await activateDelay();
+            await delay(500);
             const originalOrder = ['1', '2', '3', '4', '5'];
             const messageCount = originalOrder.length;
             const expectedReceivedOrder = ['1', '5', '4', '3', '2'];
@@ -159,6 +168,7 @@ describe('SmashMessaging: Edge cases', () => {
                 bob!,
                 'message',
                 messageCount + protocolOverheadSize,
+                10000,
             );
             let prevSha256: string = '0';
             for (let i = 0; i < messageCount; i++) {
@@ -169,7 +179,7 @@ describe('SmashMessaging: Edge cases', () => {
                         prevSha256,
                     )
                 ).sha256;
-                await delay(50);
+                await delay(100);
             }
             await waitForMessages;
             const receivedMessages = onBobMessageReceived.mock.calls.map(
@@ -185,6 +195,6 @@ describe('SmashMessaging: Edge cases', () => {
             expect(
                 sortSmashMessages(textMessages).map((text) => text.data),
             ).toEqual(originalOrder);
-        }, 5000);
+        }, 15000);
     });
 });

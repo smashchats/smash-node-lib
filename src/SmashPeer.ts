@@ -45,7 +45,9 @@ export class SmashPeer {
         let shouldSendSessionReset = false;
         this.endpoints = await Promise.all(
             this.did.endpoints.map(async (endpointConfig: SmashEndpoint) => {
-                // if session is recent (<TTL), send session has been reset message
+                // if last message is before session TTL,
+                // then we need to send a session reset message
+                // to let the other peer know that the session has been renewed earlier than expected
                 if (
                     Date.now() - this.lastMessageTime <
                     SignalSession.SESSION_TTL_MS

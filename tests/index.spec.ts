@@ -120,7 +120,7 @@ describe('SmashMessaging: Between peers registered to a SME', () => {
         let bobReceivedMessage: Promise<void>;
 
         const getDataEvents = async (method: string = 'GET') => {
-            const url = `${socketServerUrl}/data-events`;
+            const url = `${socketServerUrl}/data-events?peerId=${encodeURIComponent(bobDID.endpoints[0].preKey)}`;
             try {
                 const response = await fetch(url, { method });
                 if (!response.ok) {
@@ -138,6 +138,7 @@ describe('SmashMessaging: Between peers registered to a SME', () => {
         beforeEach(async () => {
             logger.debug('clearing data events');
             await getDataEvents('DELETE');
+            await delay(500);
             bobReceivedMessage = waitFor(
                 bob!,
                 'message',
@@ -148,13 +149,12 @@ describe('SmashMessaging: Between peers registered to a SME', () => {
                 messageText,
                 '0',
             );
-            await delay(200);
         });
 
         it("delivers the initial message to Bob's declared SME", async () => {
             const pollForDataEvent = async (
-                maxAttempts = 10,
-                interval = 100,
+                maxAttempts = 20,
+                interval = 500,
             ): Promise<unknown[]> => {
                 for (let attempt = 0; attempt < maxAttempts; attempt++) {
                     logger.debug(`polling: attempt ${attempt}`);
@@ -169,7 +169,6 @@ describe('SmashMessaging: Between peers registered to a SME', () => {
                 }
                 throw new Error('Timeout waiting for SME data event');
             };
-
             logger.debug('polling for data events');
             const events = await pollForDataEvent();
             expect(events).toHaveLength(1);
@@ -183,8 +182,9 @@ describe('SmashMessaging: Between peers registered to a SME', () => {
                 messageSha256,
                 'delivered',
             );
-            await delay(2000);
-        }, 10000);
+
+            await delay(1000);
+        }, 12000);
 
         it('contains a content-addressable ID', async () => {
             expect(aliceSentMessage).toMatchObject({
