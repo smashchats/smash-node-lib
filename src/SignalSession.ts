@@ -18,7 +18,7 @@ import {
 import { Buffer } from 'buffer';
 
 export class SignalSession {
-    public readonly createdAt: Date;
+    public readonly createdAtTime: number;
     public static readonly SESSION_TTL_MS = EXPIRATION_TIME_MS;
 
     constructor(
@@ -27,13 +27,11 @@ export class SignalSession {
         public readonly peerIk: string,
         private logger: Logger,
     ) {
-        this.createdAt = new Date();
+        this.createdAtTime = Date.now();
     }
 
     isExpired(): boolean {
-        return (
-            Date.now() - this.createdAt.getTime() > SignalSession.SESSION_TTL_MS
-        );
+        return Date.now() - this.createdAtTime > SignalSession.SESSION_TTL_MS;
     }
 
     async createResetMessage(): Promise<EncapsulatedSmashMessage> {
