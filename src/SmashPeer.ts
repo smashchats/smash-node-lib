@@ -38,6 +38,20 @@ export class SmashPeer {
         private logger: Logger,
     ) {}
 
+    // TODO: should validate endpointConfig.preKey signature!!!
+    private async createEndpoint(endpointConfig: SmashEndpoint) {
+        const socket = this.smeSocketManager.getOrCreate(endpointConfig.url);
+        return {
+            peerId: endpointConfig.preKey,
+            socket,
+            session: await this.sessionManager.initSession(
+                this.did,
+                endpointConfig,
+            ),
+            messageQueue: new Set(this.messageQueue),
+        };
+    }
+
     async configureEndpoints(
         dontSendSessionReset: boolean = false,
     ): Promise<void> {
@@ -54,18 +68,7 @@ export class SmashPeer {
                 ) {
                     shouldSendSessionReset = true;
                 }
-                const socket = this.smeSocketManager.getOrCreate(
-                    endpointConfig.url,
-                );
-                return {
-                    peerId: endpointConfig.preKey,
-                    socket,
-                    session: await this.sessionManager.initSession(
-                        this.did,
-                        endpointConfig,
-                    ),
-                    messageQueue: new Set(this.messageQueue),
-                };
+                return this.createEndpoint(endpointConfig);
             }),
         );
         if (shouldSendSessionReset && !dontSendSessionReset) {
@@ -100,6 +103,14 @@ export class SmashPeer {
         // If we miss either condition ((1) or (2)),
         //   then we should re-establish the protocol.
         // TODO: pick either P2P or Endpoints
+
+        const hasExpiredEndpoints = this.endpoints.some((endpoint) =>
+            endpoint.session.isExpired(),
+        );
+        if (hasExpiredEndpoints) {
+            await this.configureEndpoints();
+        }
+
         await Promise.allSettled(
             this.endpoints.map(async (endpoint) => {
                 const undeliveredMessages = Array.from(endpoint.messageQueue);

@@ -1,5 +1,6 @@
 import {
     Logger,
+    SignalSession,
     SmashDID,
     SmashMessaging,
     sortSmashMessages,
@@ -74,12 +75,72 @@ describe('SmashMessaging: Edge cases', () => {
     describe('Session recovery', () => {
         it('Session is automatically renewed after TTL', async () => {
             // 1. Alice sends a message to Bob
-            // expect bob to receive the message
-            // 2. Longer than EXPIRATION_TIME_MS elapses
-            // simulate this by spying on the Date() constructor and Date.now() method
-            // 3. Bob restart losing the context of sessions
-            // expect bob to receive the new message
-        });
+            const message1 = 'initial message';
+            const waitForFirstMessage = waitFor(
+                bob!,
+                'message',
+                1 + protocolOverheadSize,
+            );
+            await alice!.sendTextMessage(bobDID, message1, '0');
+            await waitForFirstMessage;
+
+            expect(onBobMessageReceived).toHaveBeenCalledWith(
+                expect.objectContaining({ data: message1 }),
+                expect.anything(),
+            );
+
+            // 2. Mock Date to simulate time passing beyond TTL
+            const dateSpy = jest
+                .spyOn(Date, 'now')
+                .mockImplementation(
+                    () =>
+                        new Date().getTime() +
+                        SignalSession.SESSION_TTL_MS +
+                        1000,
+                );
+
+            // 3. Simulate Bob restart with lost session context
+            const bobIdentity = await bob!.exportIdentityToJSON();
+            await bob!.close();
+            bob = new SmashMessaging(
+                await SmashMessaging.deserializeIdentity(bobIdentity),
+                undefined,
+                'DEBUG',
+                'bob',
+            );
+            await bob.initEndpoints([
+                {
+                    url: socketServerUrl,
+                    smePublicKey: 'smePublicKey==',
+                },
+            ]);
+            const newOnBobMessageReceived = jest.fn();
+            bob.on('message', newOnBobMessageReceived);
+
+            await delay(1000);
+
+            // 4. Try sending another message
+            const message2 = 'message after session expiry';
+            const waitForSecondMessage = waitFor(
+                bob!,
+                'message',
+                1 + protocolOverheadSize,
+                6000,
+            );
+
+            await alice!.sendTextMessage(bobDID, message2, '0');
+            await waitForSecondMessage;
+
+            // 5. Verify message received
+            expect(newOnBobMessageReceived).toHaveBeenCalledWith(
+                expect.objectContaining({ data: message2 }),
+                expect.anything(),
+            );
+
+            await delay(2500);
+            dateSpy.mockRestore();
+        }, 10000);
+
         it('Bob can recover communication after restart with lost session context', async () => {
             // 1. Initial communication
             const message1 = 'hello';

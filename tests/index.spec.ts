@@ -57,6 +57,8 @@ describe('SmashMessaging: Between peers registered to a SME', () => {
     let onBobStatusUpdated: jest.Mock;
     let onAliceStatusUpdated: jest.Mock;
 
+    let dateSpy: jest.SpyInstance;
+
     const protocolOverheadSize = 1;
 
     beforeAll(async () => {
@@ -73,7 +75,9 @@ describe('SmashMessaging: Between peers registered to a SME', () => {
     });
 
     beforeEach(async () => {
-        jest.spyOn(Date, 'now').mockImplementation(() => mockedNow.getTime());
+        dateSpy = jest
+            .spyOn(Date, 'now')
+            .mockImplementation(() => mockedNow.getTime());
         alice = await createTestPeer('alice', socketServerUrl);
         bob = await createTestPeer('bob', socketServerUrl);
         bobDID = await bob.getDID();
@@ -98,6 +102,7 @@ describe('SmashMessaging: Between peers registered to a SME', () => {
         waitForEventCancelFns.forEach((cancel) => cancel());
         waitForEventCancelFns.length = 0;
         jest.resetAllMocks();
+        dateSpy.mockRestore();
     });
 
     describe('Alice updates their profile metadata BEFORE chatting with Bob', () => {
