@@ -15,6 +15,7 @@ import {
     ProfileSmashMessage,
     SMEConfigJSONWithoutDefaults,
     SME_DEFAULT_CONFIG,
+    SmashChatMessage,
     SmashDID,
     SmashEndpoint,
     SmashMessage,
@@ -31,6 +32,11 @@ interface IJWKJsonKeyPair {
     privateKey: IJWKJson;
     publicKey: IJWKJson;
     thumbprint?: string;
+}
+
+interface SmashChat {
+    with: SmashDID;
+    lastMessageTimestamp: string;
 }
 
 // TODO: retry in case message does not successfully send??
@@ -178,7 +184,6 @@ export default class SmashMessaging extends EventEmitter {
     ) {
         super();
         this.logger = new Logger(LOG_ID, LOG_LEVEL);
-
         this.dlq = {};
         this.peers = {};
         this.endpoints = [];
@@ -198,7 +203,18 @@ export default class SmashMessaging extends EventEmitter {
         return;
     }
 
-    async initEndpoints(endpoints: SMEConfigJSONWithoutDefaults[]) {
+    async initChats(chats: SmashChat[]) {
+        chats.forEach(async (chat) => {
+            this.peers[chat.with.id] = await this.getOrCreatePeer(
+                chat.with,
+                chat.lastMessageTimestamp,
+            );
+        });
+    }
+
+    async initEndpoints(
+        endpoints: SMEConfigJSONWithoutDefaults[],
+    ): Promise<void> {
         const newEndpoints = await Promise.all(
             endpoints.map((smeConfig) => {
                 return this.smeSocketManager.initWithAuth(
@@ -226,40 +242,53 @@ export default class SmashMessaging extends EventEmitter {
         return this.peers[this.peerIkMapping[peerIk]];
     }
 
-    private async incomingMessagesHandler(
-        messages: EncapsulatedSmashMessage[],
+    // TODO: split profile from DID updates?
+    // TODO: handle differential profile updates?
+    private async incomingProfileHandler(
         peerIk: string,
+        message: ProfileSmashMessage,
+    ) {
+        this.logger.debug(`Received Profile for IK ${peerIk}`);
+        const newProfile = message.data;
+        if (peerIk !== newProfile.did.ik) {
+            // TODO: handle IK upgrades
+            const err = 'Received IK doesnt match Signal Session data.';
+            this.logger.error(err);
+            throw new Error(err);
+        }
+        // send all pending messages
+        await this.flushPeerIkDLQ(newProfile.did);
+    }
+
+    private async incomingMessagesHandler(
+        peerIk: string,
+        messages: EncapsulatedSmashMessage[],
     ) {
         const peer: SmashPeer | undefined = this.getPeerByIk(peerIk);
         if (!peer) {
             this.logger.debug(
-                `Messages (${messages.length}) from unknown IK ${peerIk}`,
+                `DLQd ${messages.length} messages from unknown peer (IK: ${peerIk})`,
             );
             this.pushToUnknownPeerIkDLQ(peerIk, messages);
-            const catchDidMessages = messages.map(async (message) => {
-                if (message.type === 'profile') {
-                    this.logger.debug(`Received Profile for IK ${peerIk}`);
-                    const peerDid = message.data as SmashProfile;
-                    if (peerIk !== peerDid.did.ik) {
-                        const err =
-                            'Received IK doesnt match Signal Session data.';
-                        this.logger.warn(err);
-                        throw new Error(err);
-                    }
-                    await this.flushPeerIkDLQ(peerDid.did);
-                } else {
-                    throw '';
-                }
-            });
-            return Promise.any(catchDidMessages).catch(() =>
-                this.logger.debug(
-                    `didnt catch any profile message for ${peerIk}`,
-                ),
-            );
         } else {
             const peerDid = peer.getDID();
             this.notifyNewMessages(messages, peerDid);
         }
+        await Promise.all(
+            messages.map(async (message) => {
+                switch (message.type) {
+                    case 'profile':
+                        this.incomingProfileHandler(
+                            peerIk,
+                            message as ProfileSmashMessage,
+                        );
+                        break;
+                    case 'session_reset':
+                        this.sessionManager.handleSessionReset(peer);
+                        break;
+                }
+            }),
+        );
     }
 
     totalMessages = 0;
@@ -275,8 +304,10 @@ export default class SmashMessaging extends EventEmitter {
     }
 
     private async flushPeerIkDLQ(peerDid: SmashDID) {
-        if (!this.dlq[peerDid.ik])
-            throw new Error('Cannot find queue for this peer.');
+        if (!this.dlq[peerDid.ik]) {
+            this.logger.info(`Cannot find queue for peer ${peerDid.id}`);
+            return;
+        }
         this.logger.debug(
             `> Flushing peer DLQ of size ${this.dlq[peerDid.ik].length}`,
         );
@@ -295,14 +326,21 @@ export default class SmashMessaging extends EventEmitter {
         this.dlq[peerIk].push(...messages);
     }
 
-    protected async getOrCreatePeer(peerDid: SmashDID): Promise<SmashPeer> {
+    protected async getOrCreatePeer(
+        peerDid: SmashDID,
+        lastMessageTimestamp?: string,
+    ): Promise<SmashPeer> {
         if (!this.peers[peerDid.id]) {
             const peer = new SmashPeer(
                 peerDid,
+                lastMessageTimestamp
+                    ? new Date(lastMessageTimestamp).getTime()
+                    : 0,
                 this.sessionManager,
+                this.smeSocketManager,
                 this.logger,
             );
-            await peer.configureEndpoints(this.smeSocketManager);
+            await peer.configureEndpoints();
             peer.queueMessage({
                 type: 'profile',
                 data: await this.getProfile(),
@@ -322,7 +360,7 @@ export default class SmashMessaging extends EventEmitter {
             type: 'text',
             data: text,
             after,
-        });
+        } as SmashChatMessage);
     }
 
     async sendMessage(peerDid: SmashDID, message: SmashMessage) {
@@ -376,6 +414,7 @@ export default class SmashMessaging extends EventEmitter {
         };
     }
 
+    // TODO demo usage in test suite
     static handleError(
         reason: unknown,
         promise: Promise<unknown>,

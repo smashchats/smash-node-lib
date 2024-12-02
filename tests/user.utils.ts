@@ -4,7 +4,7 @@ import { SMEConfigJSONWithoutDefaults, SmashMessaging } from 'smash-node-lib';
 export async function peerArgs(
     socketServerUrl?: string,
 ): Promise<[Identity, SMEConfigJSONWithoutDefaults[]]> {
-    const identity = await SmashMessaging.generateIdentity();
+    const identity = await SmashMessaging.generateIdentity(1, 0, true);
     const config = socketServerUrl
         ? [
               {

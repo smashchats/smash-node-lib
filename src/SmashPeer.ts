@@ -7,7 +7,9 @@ import { SignalSession } from '@src/SignalSession.js';
 import {
     EncapsulatedSmashMessage,
     Relationship,
+    SessionResetSmashMessage,
     SmashDID,
+    SmashEndpoint,
     SmashMessage,
 } from '@src/types/index.js';
 import { Buffer } from 'buffer';
@@ -19,8 +21,10 @@ export class SmashPeer {
         peerId: string;
         socket: SMESocketWriteOnly;
         session: SignalSession;
+        messageQueue: Set<EncapsulatedSmashMessage>;
     }[] = [];
-    private messageQueue: EncapsulatedSmashMessage[] = [];
+
+    private messageQueue: Set<EncapsulatedSmashMessage> = new Set();
 
     // TODO allow loading relationship at lib initialization time
     private relationship: Relationship = 'clear';
@@ -28,28 +32,43 @@ export class SmashPeer {
 
     constructor(
         private did: SmashDID,
+        private lastMessageTime: number,
         private sessionManager: SessionManager,
+        private smeSocketManager: SMESocketManager,
         private logger: Logger,
     ) {}
 
     async configureEndpoints(
-        smeSocketManager: SMESocketManager,
+        dontSendSessionReset: boolean = false,
     ): Promise<void> {
         this.logger.debug('SmashPeer::configureEndpoints');
-        const endpointPromises = this.did.endpoints.map(
-            async (endpointConfig) => {
-                const socket = smeSocketManager.getOrCreate(endpointConfig.url);
-                this.endpoints.push({
+        let shouldSendSessionReset = false;
+        this.endpoints = await Promise.all(
+            this.did.endpoints.map(async (endpointConfig: SmashEndpoint) => {
+                // if session is recent (<TTL), send session has been reset message
+                if (
+                    Date.now() - this.lastMessageTime <
+                    SignalSession.SESSION_TTL_MS
+                ) {
+                    shouldSendSessionReset = true;
+                }
+                const socket = this.smeSocketManager.getOrCreate(
+                    endpointConfig.url,
+                );
+                return {
                     peerId: endpointConfig.preKey,
                     socket,
                     session: await this.sessionManager.initSession(
                         this.did,
                         endpointConfig,
                     ),
-                });
-            },
+                    messageQueue: new Set(this.messageQueue),
+                };
+            }),
         );
-        await Promise.all(endpointPromises);
+        if (shouldSendSessionReset && !dontSendSessionReset) {
+            await this.triggerSessionReset();
+        }
     }
 
     // TODO: reset session
@@ -61,11 +80,15 @@ export class SmashPeer {
             Buffer.from(JSON.stringify({ ...message, timestamp })),
         );
         const encapsulatedMessage = { ...message, sha256, timestamp };
-        this.messageQueue.push(encapsulatedMessage);
+        this.messageQueue.add(encapsulatedMessage);
+        for (const endpoint of this.endpoints) {
+            endpoint.messageQueue.add(encapsulatedMessage);
+        }
         this.logger.debug(
-            `> queued ${encapsulatedMessage.sha256} (${this.messageQueue.length})`,
+            `> queued ${encapsulatedMessage.sha256} (${this.messageQueue.size})`,
         );
         return encapsulatedMessage;
+        // TODO: when to clear the general message queue?? (on Received not implemented)
     }
 
     async flushQueue() {
@@ -75,23 +98,24 @@ export class SmashPeer {
         // If we miss either condition ((1) or (2)),
         //   then we should re-establish the protocol.
         // TODO: pick either P2P or Endpoints
-        const queuedMessages = [...this.messageQueue];
-        const queuedMessagesSha256s = queuedMessages.map((m) => m.sha256);
         await Promise.allSettled(
             this.endpoints.map(async (endpoint) => {
+                const undeliveredMessages = Array.from(endpoint.messageQueue);
                 endpoint.socket.sendData(
                     endpoint.peerId,
                     endpoint.session.id,
                     Buffer.from(
-                        await endpoint.session.encryptMessages(queuedMessages),
+                        await endpoint.session.encryptMessages(
+                            undeliveredMessages,
+                        ),
                     ),
-                    queuedMessagesSha256s,
+                    undeliveredMessages.map((m) => m.sha256),
                 );
-                this.messageQueue = [];
+                endpoint.messageQueue.clear();
+                this.logger.debug(
+                    `> flushed ${undeliveredMessages.length} messages to ${endpoint.socket.url}`,
+                );
             }),
-        );
-        this.logger.debug(
-            `> flushed ${queuedMessages.length - this.messageQueue.length}/${queuedMessages.length} (${queuedMessagesSha256s})`,
         );
         // TODO: where to handle retries? (is refactor needed? rethink clean lib arch?)
     }
@@ -141,5 +165,13 @@ export class SmashPeer {
         //     `> setRelationship with ${this.did.id} to ${relationship}`,
         //     JSON.stringify(results),
         // );
+    }
+
+    async triggerSessionReset(): Promise<EncapsulatedSmashMessage> {
+        this.logger.debug(`Triggering session reset for ${this.did.ik}`);
+        await this.sessionManager.handleSessionReset(this);
+        return this.sendMessage({
+            type: 'session_reset',
+        } as SessionResetSmashMessage);
     }
 }

@@ -61,8 +61,8 @@ const solveChallenge = async (
 };
 
 export type onMessagesFn = (
-    messages: EncapsulatedSmashMessage[],
     peerIk: string,
+    messages: EncapsulatedSmashMessage[],
 ) => void;
 
 export class SMESocketReadWrite extends SMESocketWriteOnly {
@@ -196,6 +196,6 @@ export class SMESocketReadWrite extends SMESocketWriteOnly {
         peerIk: string,
     ) {
         this.logger.debug('SMESocketReadWrite::emitReceivedMessages');
-        this.onMessagesCallback(messages, peerIk);
+        this.onMessagesCallback(peerIk, messages);
     }
 }

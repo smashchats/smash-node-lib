@@ -8,6 +8,7 @@ import {
 } from '2key-ratchet';
 import CryptoUtils from '@src/CryptoUtils.js';
 import { Logger } from '@src/Logger.js';
+import { EXPIRATION_TIME_MS } from '@src/const.js';
 import {
     ENCODING,
     EncapsulatedSmashMessage,
@@ -17,12 +18,32 @@ import {
 import { Buffer } from 'buffer';
 
 export class SignalSession {
+    public readonly createdAt: Date;
+    public static readonly SESSION_TTL_MS = EXPIRATION_TIME_MS;
+
     constructor(
         public readonly id: string,
         private cipher: AsymmetricRatchet,
         public readonly peerIk: string,
         private logger: Logger,
-    ) {}
+    ) {
+        this.createdAt = new Date();
+    }
+
+    // Add session reset message type
+    async createResetMessage(): Promise<EncapsulatedSmashMessage> {
+        return {
+            type: 'session_reset',
+            data: {
+                sessionId: this.id,
+                timestamp: new Date().toISOString(),
+            },
+            sha256: await CryptoUtils.singleton.sha256(
+                Buffer.from(JSON.stringify({ sessionId: this.id })),
+            ),
+            timestamp: new Date().toISOString(),
+        };
+    }
 
     static async create(
         peer: SmashDID,

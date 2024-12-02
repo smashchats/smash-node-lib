@@ -38,6 +38,7 @@ describe('SmashMessaging: Edge cases', () => {
     const waitFor = aliasWaitFor(waitForEventCancelFns, logger);
 
     let alice: SmashMessaging | undefined;
+    let aliceDID: SmashDID;
     let bob: SmashMessaging | undefined;
     let bobDID: SmashDID;
     let onBobMessageReceived: jest.Mock;
@@ -53,6 +54,7 @@ describe('SmashMessaging: Edge cases', () => {
         alice = await createTestPeer('alice', socketServerUrl);
         bob = await createTestPeer('bob', socketServerUrl);
         bobDID = await bob.getDID();
+        aliceDID = await alice.getDID();
         onBobMessageReceived = jest.fn();
         bob.on('message', onBobMessageReceived);
     });
@@ -67,6 +69,66 @@ describe('SmashMessaging: Edge cases', () => {
         waitForEventCancelFns.forEach((cancel) => cancel());
         waitForEventCancelFns.length = 0;
         jest.resetAllMocks();
+    });
+
+    describe('Session recovery after peer restart', () => {
+        it('Bob can recover communication after restart', async () => {
+            // 1. Initial communication
+            const message1 = 'hello';
+            const waitForFirstMessage = waitFor(
+                bob!,
+                'message',
+                1 + protocolOverheadSize,
+            );
+            await alice!.sendTextMessage(bobDID, message1, '0');
+            await waitForFirstMessage;
+
+            // Verify first message received
+            expect(onBobMessageReceived).toHaveBeenCalledWith(
+                expect.objectContaining({ data: message1 }),
+                expect.anything(),
+            );
+
+            // 2. Simulate Bob restart - create new instance with same identity
+            const bobIdentity = await bob!.exportIdentityToJSON();
+            await bob!.close();
+            bob = new SmashMessaging(
+                await SmashMessaging.deserializeIdentity(bobIdentity),
+                undefined,
+                'DEBUG',
+                'bob',
+            );
+            await bob.initEndpoints([
+                {
+                    url: socketServerUrl,
+                    smePublicKey: 'smePublicKey==',
+                },
+            ]);
+            await bob.initChats([
+                {
+                    with: aliceDID,
+                    lastMessageTimestamp: new Date().toISOString(),
+                },
+            ]);
+            const newOnBobMessageReceived = jest.fn();
+            bob.on('message', newOnBobMessageReceived);
+
+            // 3. Alice tries to send another message
+            const message2 = 'are you there?';
+            const waitForSecondMessage = waitFor(
+                bob!,
+                'message',
+                1 + protocolOverheadSize,
+            );
+
+            await alice!.sendTextMessage(bobDID, message2, '0');
+            await waitForSecondMessage;
+
+            expect(newOnBobMessageReceived).toHaveBeenCalledWith(
+                expect.objectContaining({ data: message2 }),
+                expect.anything(),
+            );
+        }, 10000);
     });
 
     describe('Alice sends multiple messages and they get delayed', () => {
