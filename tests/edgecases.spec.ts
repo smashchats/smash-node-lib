@@ -107,7 +107,7 @@ describe('SmashMessaging: Edge cases', () => {
                         prevSha256,
                     )
                 ).sha256;
-                await delay(10);
+                await delay(50);
             }
             await waitForMessages;
             const receivedMessages = onBobMessageReceived.mock.calls.map(
@@ -123,6 +123,6 @@ describe('SmashMessaging: Edge cases', () => {
             expect(
                 sortSmashMessages(textMessages).map((text) => text.data),
             ).toEqual(originalOrder);
-        });
+        }, 5000);
     });
 });

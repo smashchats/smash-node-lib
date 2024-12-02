@@ -107,7 +107,7 @@ module.exports = async function () {
             client.on('data', async (peerId, sessionId, data, acknowledge) => {
                 let delayMs = 0;
                 if (messagesToDelay > 0) {
-                    delayMs = messagesToDelay * 100;
+                    delayMs = messagesToDelay * 200;
                     messagesToDelay = messagesToDelay - 1;
                     console.log(`Delaying SME message for ${delayMs}ms`);
                 }
