@@ -1,4 +1,3 @@
 [submodule "dev-bootstrap"]
 	path = docs
-	url = rad://z2dLMfyx3gbHATBwus2EwzUs4MmMG/z6MkpzZDoFM7tPZPXqvaVCtMFxKJQAxghVRJZxsf8s8SqBvm
-	branch = contributing
+	url = rad://z2dLMfyx3gbHATBwus2EwzUs4MmMG
