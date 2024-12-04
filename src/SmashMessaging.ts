@@ -297,6 +297,7 @@ export default class SmashMessaging extends EventEmitter {
         messages: EncapsulatedSmashMessage[],
         sender: SmashDID,
     ) {
+        if (!messages?.length) return;
         this.logger.debug(
             `notifyNewMessages: ${messages?.length}/${(this.totalMessages += messages?.length)}`,
             JSON.stringify(messages, null, 2),
