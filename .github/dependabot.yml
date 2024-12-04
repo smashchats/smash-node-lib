@@ -6,14 +6,14 @@
 
 version: 2
 updates:
-  # Check for DevContainer updates (already in your config)
-  - package-ecosystem: "devcontainers"
-    directory: "/"
-    schedule:
-      interval: weekly
+    # Check for DevContainer updates (already in your config)
+    - package-ecosystem: 'devcontainers'
+      directory: '/'
+      schedule:
+          interval: weekly
 
-  # Check for Node.js (npm) updates
-  - package-ecosystem: "npm"
-    directory: "/"
-    schedule:
-      interval: weekly
+    # Check for Node.js (npm) updates
+    - package-ecosystem: 'npm'
+      directory: '/'
+      schedule:
+          interval: weekly
