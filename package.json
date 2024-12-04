@@ -37,7 +37,7 @@
         "@trivago/prettier-plugin-sort-imports": "^4.3.0",
         "@types/jest": "^29.5.13",
         "@types/simple-peer": "^9.11.8",
-        "dotenv": "^16.4.5",
+        "dotenv": "^16.4.7",
         "eslint": "^9.16.0",
         "husky": "^9.1.6",
         "jest": "^29.7.0",
