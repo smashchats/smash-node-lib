@@ -57,7 +57,7 @@ module.exports = async function () {
 
             // Handle preflight requests
             if (req.method === 'OPTIONS') {
-                console.log('Handling OPTIONS request');
+                // console.log('Handling OPTIONS request');
                 res.writeHead(204);
                 res.end();
                 return;
@@ -67,7 +67,7 @@ module.exports = async function () {
                 req.method === 'GET' &&
                 req.url.startsWith('/delay-next-messages')
             ) {
-                console.log('Handling GET /delay-next-messages request');
+                // console.log('Handling GET /delay-next-messages request');
                 const peerId = getPeerIdFromUrl(req.url);
                 if (!peerId) {
                     res.writeHead(400);
@@ -75,16 +75,16 @@ module.exports = async function () {
                     return;
                 }
                 messagesToDelay[peerId] = 10;
-                console.log(
-                    `Set delay for peerId ${peerId}: ${messagesToDelay[peerId]} messages`,
-                );
+                // console.log(
+                //     `Set delay for peerId ${peerId}: ${messagesToDelay[peerId]} messages`,
+                // );
                 res.writeHead(200);
                 res.end();
                 return;
             }
 
             if (req.method === 'GET' && req.url.startsWith('/data-events')) {
-                console.log('Handling GET /data-events request');
+                // console.log('Handling GET /data-events request');
                 const peerId = getPeerIdFromUrl(req.url);
                 const filteredEvents = peerId
                     ? dataEvents.filter((event) => event.peerId === peerId)
@@ -95,7 +95,7 @@ module.exports = async function () {
             }
 
             if (req.method === 'DELETE' && req.url.startsWith('/data-events')) {
-                console.log('Handling DELETE /data-events request');
+                // console.log('Handling DELETE /data-events request');
                 const peerId = getPeerIdFromUrl(req.url);
                 if (peerId) {
                     let index = dataEvents.length;
@@ -107,14 +107,14 @@ module.exports = async function () {
                 } else {
                     dataEvents.length = 0;
                 }
-                console.log('Events cleared');
+                // console.log('Events cleared');
                 res.writeHead(200);
                 res.end(JSON.stringify(dataEvents));
                 return;
             }
 
             // Handle unknown routes
-            console.log(`Unknown route: ${req.method} ${req.url}`);
+            // console.log(`Unknown route: ${req.method} ${req.url}`);
             res.writeHead(404);
             res.end('Not found');
         });
@@ -137,16 +137,16 @@ module.exports = async function () {
                 : 'ANONYMOUS';
             activeSockets[clientKeyId] = client;
             client.on('data', async (peerId, sessionId, data, acknowledge) => {
-                console.log(
-                    `Received data for peerId ${peerId}, sessionId: ${sessionId} (${messagesToDelay[peerId]} messages to delay)`,
-                );
+                // console.log(
+                //     `Received data for peerId ${peerId}, sessionId: ${sessionId} (${messagesToDelay[peerId]} messages to delay)`,
+                // );
                 let delayMs = 0;
                 if (messagesToDelay[peerId]) {
                     delayMs = messagesToDelay[peerId] * 250;
                     messagesToDelay[peerId] = messagesToDelay[peerId] - 1;
-                    console.log(
-                        `Delaying SME message for ${delayMs}ms (peerId: ${peerId})`,
-                    );
+                    // console.log(
+                    //     `Delaying SME message for ${delayMs}ms (peerId: ${peerId})`,
+                    // );
                 }
                 dataEvents.push({ peerId, sessionId, data });
                 Object.keys(activeSockets)

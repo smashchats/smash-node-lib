@@ -1,12 +1,19 @@
+# Smash-Node-Lib
+
+![Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/rw110-bot/66dfa344179fb9863c863cb55e5ffc5b/raw/jest-coverage-comment__main.json)
+
+<!-- ![License](https://img.shields.io/github/license/unstaticlabs/smash-node-lib)
+![Version](https://img.shields.io/github/package-json/v/unstaticlabs/smash-node-lib) -->
+
 ## TODO
 
--   [x] Implement 'did' prop as ik hash (instead of using did.ik as reference). --> `did.id`
--   [ ] Test edge cases (socket error, etc)
--   [ ] Test messaging resilience/reliability
--   [x] Replace all occurences of SHA1 with SHA256
--   [ ] use a more generic typing for messages (eg, AT Records???)
--   [ ] integrate pseudo code below into codebase & refreshed specs (!!)
-        --> [ ] MOVE LATEST SPECS AS MD TO dev.smashchats.com NOTES
+- [x] Implement 'did' prop as ik hash (instead of using did.ik as reference). --> `did.id`
+- [ ] Test edge cases (socket error, etc)
+- [ ] Test messaging resilience/reliability
+- [x] Replace all occurences of SHA1 with SHA256
+- [ ] use a more generic typing for messages (eg, AT Records???)
+- [ ] integrate pseudo code below into codebase & refreshed specs (!!)
+      --> [ ] MOVE LATEST SPECS AS MD TO dev.smashchats.com NOTES
 
 ```typescript
 interface Message {
@@ -30,12 +37,12 @@ interface SmashProfileMessage {
 
 Badges & Endorsements -> Own separate subprotocols
 
--   [ ] refactor Smash specs
+- [ ] refactor Smash specs
 
 ### Trust Wallet
 
--   Add to trust wallet
--   Trust wallet -> verify signatures function (N, N+1, count)
+- Add to trust wallet
+- Trust wallet -> verify signatures function (N, N+1, count)
 
 #### Crypto Wallet
 
