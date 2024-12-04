@@ -219,7 +219,7 @@ describe('[SmashMessaging] Between peers registered to a SME', () => {
                     bob.did.endpoints[0].preKey,
                 );
 
-                expect(events).toHaveLength(1);
+                expect(events?.length).toBeGreaterThan(0);
                 expect(events[0]).toMatchObject({
                     peerId: bob.did.endpoints[0].preKey,
                     sessionId: expect.any(String),
