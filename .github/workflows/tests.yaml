@@ -77,7 +77,7 @@ jobs:
                   username: 'github-actions@unstaticlabs.com'
                   password: 'not_required'
                   subject: 'Smash-Node-Lib Tests Failed'
-                  html_body: ${{ steps.coverageComment.outputs.summaryHtml }}
+                  body: ${{ steps.coverageComment.outputs.summaryHtml }}
                   convert_markdown: true
                   to: 'ci@unstaticlabs.com'
                   from: 'Github Actions'
