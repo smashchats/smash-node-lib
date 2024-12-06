@@ -6,6 +6,7 @@ import { TIMEOUT_MS } from './time.utils';
 
 const logger = new Logger('jest', 'INFO');
 jest.setTimeout(TIMEOUT_MS);
+(process as Process).actual.setMaxListeners(100);
 
 type Process = NodeJS.Process & { actual: NodeJS.Process };
 
