@@ -146,6 +146,7 @@ export class SMESocketReadWrite extends SMESocketWriteOnly {
                 this.addToDlq(sessionId, data);
             } else {
                 this.logger.warn(`Unprocessable data for ${sessionId}`);
+                throw err;
             }
         }
     }

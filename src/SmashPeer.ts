@@ -10,7 +10,7 @@ import {
     SessionResetSmashMessage,
     SmashDID,
     SmashEndpoint,
-    SmashMessage,
+    SmashMessage
 } from '@src/types/index.js';
 import { Buffer } from 'buffer';
 
@@ -82,9 +82,7 @@ export class SmashPeer {
 
     async queueMessage(message: SmashMessage) {
         const timestamp = new Date().toISOString();
-        const sha256 = await CryptoUtils.singleton.sha256(
-            Buffer.from(JSON.stringify({ ...message, timestamp })),
-        );
+        const sha256 = await CryptoUtils.singleton.sha256fromObject({ ...message, timestamp });
         const encapsulatedMessage = { ...message, sha256, timestamp };
         this.messageQueue.add(encapsulatedMessage);
         for (const endpoint of this.endpoints) {

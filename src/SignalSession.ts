@@ -10,10 +10,9 @@ import CryptoUtils from '@src/CryptoUtils.js';
 import { Logger } from '@src/Logger.js';
 import { EXPIRATION_TIME_MS } from '@src/const.js';
 import {
-    ENCODING,
     EncapsulatedSmashMessage,
     SmashDID,
-    SmashEndpoint,
+    SmashEndpoint
 } from '@src/types/index.js';
 import { Buffer } from 'buffer';
 
@@ -34,20 +33,6 @@ export class SignalSession {
         return Date.now() - this.createdAtTime > SignalSession.SESSION_TTL_MS;
     }
 
-    async createResetMessage(): Promise<EncapsulatedSmashMessage> {
-        return {
-            type: 'session_reset',
-            data: {
-                sessionId: this.id,
-                timestamp: new Date().toISOString(),
-            },
-            sha256: await CryptoUtils.singleton.sha256(
-                Buffer.from(JSON.stringify({ sessionId: this.id })),
-            ),
-            timestamp: new Date().toISOString(),
-        };
-    }
-
     static async create(
         peer: SmashDID,
         identity: Identity,
@@ -63,16 +48,13 @@ export class SignalSession {
             bundle.identity.exchangeKey = await ECPublicKey.create(
                 await CryptoUtils.singleton.importKey(peer.ek),
             );
-            bundle.identity.signature = Buffer.from(peer.signature, ENCODING);
+            bundle.identity.signature = CryptoUtils.singleton.stringToBuffer(peer.signature);
 
             bundle.preKeySigned.id = 0; // warning: using fixed value, unsure about usage!
             bundle.preKeySigned.key = await ECPublicKey.create(
                 await CryptoUtils.singleton.importKey(sme.preKey),
             );
-            bundle.preKeySigned.signature = Buffer.from(
-                sme.signature,
-                ENCODING,
-            );
+            bundle.preKeySigned.signature = CryptoUtils.singleton.stringToBuffer(sme.signature);
 
             const protocol = await PreKeyBundleProtocol.importProto(bundle);
             const cipher = await AsymmetricRatchet.create(identity, protocol);
@@ -129,7 +111,7 @@ export class SignalSession {
     async encryptMessages(message: EncapsulatedSmashMessage[]) {
         try {
             const data = Buffer.from(JSON.stringify(message));
-            return (await this.cipher.encrypt(data)).exportProto();
+            return (await this.cipher.encrypt(data as unknown as ArrayBuffer)).exportProto();
         } catch (err) {
             this.logger.warn('Cannot encrypt messages.');
             throw err;
