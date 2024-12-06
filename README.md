@@ -137,6 +137,6 @@ This project is licensed under our own extended **AGPL-3.0**. See the [LICENSE](
 
 ## **Contact**
 
-- **Developer Chat**: [Smash Developers Telegram Group](https://t.me/+kbJ8MNR1tjViZjdk)
+- **Developer Chat**: Smash Developers Telegram Group (request access to maintainers)
 - **Security Issues**: [security@smashchats.com](mailto:security@smashchats.com)
 - **Email**: [contribute@smashchats.com](mailto:contribute@smashchats.com)

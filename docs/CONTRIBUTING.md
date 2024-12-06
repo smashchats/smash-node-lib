@@ -157,7 +157,7 @@ A web interface for browsing issues will be introduced later.
 Here are some resources to help you contribute effectively:
 
 - [Smash Protocol Developer Notes](https://dev.smashchats.com/)
-- [Smash Developers Telegram Group](https://t.me/+kbJ8MNR1tjViZjdk)
+- Smash Developers Telegram Group (request access to maintainers)
 - [Radicle Documentation](https://radicle.xyz/docs/)
 - [Project README](../README.md)
 

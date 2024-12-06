@@ -88,7 +88,7 @@ Check out the [test suites](../tests) for detailed examples of how to use the li
 
 > WIP
 
-**Developer Chat**: [Smash Developers Telegram Group](https://t.me/+kbJ8MNR1tjViZjdk)
+**Developer Chat**: Smash Developers Telegram Group (request access to maintainers)
 
 ## **Contributing**
 
