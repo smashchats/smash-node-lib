@@ -2,7 +2,7 @@
 
 Welcome to the official documentation for the **Smash-Node-Lib**, the core library for implementing the **Smash Protocol**—a modular, peer-to-peer social messaging and curated content-sharing protocol.
 
-![Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/rw110-bot/66dfa344179fb9863c863cb55e5ffc5b/raw/jest-coverage-comment__main.json)
+![Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/smashchatsdev/237cf77f566685841725f2001c1987f7/raw/jest-coverage-comment__main.json)
 
 This documentation is designed to guide developers, contributors, and users of the library through the Smash Protocol, the Smash-Node-Lib library, and the broader Smash ecosystem.
 

@@ -17,6 +17,7 @@ jobs:
         steps:
             - uses: actions/checkout@v4
               with:
+                  persist-credentials: false
                   fetch-depth: 0 # Required for coverage comment updates in README
             - name: Use Node.js ${{ matrix.node-version }}
               uses: actions/setup-node@v4
@@ -42,6 +43,7 @@ jobs:
               id: coverageComment
               uses: MishaKav/jest-coverage-comment@main
               with:
+                  github-token: ${{ secrets.TOKEN }}
                   title: 'Test Coverage Report'
                   coverage-summary-path: ./coverage/coverage-summary.json
                   junitxml-path: ./junit.xml
@@ -61,7 +63,7 @@ jobs:
               uses: schneegans/dynamic-badges-action@v1.7.0
               with:
                   auth: ${{ secrets.JEST_COVERAGE_COMMENT }}
-                  gistID: 66dfa344179fb9863c863cb55e5ffc5b
+                  gistID: 237cf77f566685841725f2001c1987f7
                   filename: jest-coverage-comment__main.json
                   label: Coverage
                   message: ${{ steps.coverageComment.outputs.coverage }}%

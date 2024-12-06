@@ -3,7 +3,7 @@
 This ES Module library provides the core functionality for implementing and interacting with the **Smash Protocol**—a modular, **1:N social messaging** and **curated content-sharing** protocol.
 It powers the free and open digital neighborhoods of tomorrow, promoting decentralization, interoperability, and user ownership.
 
-![Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/rw110-bot/66dfa344179fb9863c863cb55e5ffc5b/raw/jest-coverage-comment__main.json)
+![Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/smashchatsdev/237cf77f566685841725f2001c1987f7/raw/jest-coverage-comment__main.json)
 
 <!-- ![License](https://img.shields.io/github/license/unstaticlabs/smash-node-lib)
 ![Version](https://img.shields.io/github/package-json/v/unstaticlabs/smash-node-lib) -->
