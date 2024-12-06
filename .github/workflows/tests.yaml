@@ -31,6 +31,10 @@ jobs:
                   npm install -D jest-junit
                   npm test -- --coverage --coverageReporters json-summary --reporters=default --reporters=jest-junit
 
+            - name: Run Build Check
+              run: |
+                  npm run build:checks
+
             - name: Tailscale
               if: failure()
               uses: tailscale/github-action@v2
