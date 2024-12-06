@@ -67,11 +67,28 @@ export default class CryptoUtils {
         return this.sha256(await this.subtle.exportKey(EXPORT, key));
     }
 
+    async sha256fromObject(
+        object: unknown,
+        encoding: BufferEncoding = 'utf8',
+    ): Promise<string> {
+        return this.sha256(
+            this.stringToBuffer(JSON.stringify(object), encoding),
+        );
+    }
+
+    async sha256fromString(string: string): Promise<string> {
+        return this.sha256(this.stringToBuffer(string));
+    }
+
     async sha256(buffer: ArrayBuffer): Promise<string> {
         return this.bufferToString(await this.subtle.digest('SHA-256', buffer));
     }
 
     private bufferToString(arrayBuffer: ArrayBuffer): string {
         return Buffer.from(arrayBuffer).toString(ENCODING);
+    }
+
+    stringToBuffer(string: string, encoding: BufferEncoding = ENCODING) {
+        return Buffer.from(string, encoding) as unknown as ArrayBuffer;
     }
 }
