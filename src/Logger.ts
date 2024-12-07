@@ -21,9 +21,51 @@ export class Logger extends EventEmitter {
             typeof globalThis.console !== 'undefined'
         ) {
             const timestamp = new Date().toISOString();
-            globalThis.console[
-                level.toLowerCase() as 'log' | 'info' | 'warn' | 'error'
-            ](`[${this.logID}] [${timestamp}] [${level}] ${message}`, ...args);
+            const formattedMessage = `[${this.logID}] [${timestamp}] [${level}] ${message}`;
+
+            // Color codes for different log levels
+            const colors = {
+                ERROR: '\x1b[31m',
+                WARN: '\x1b[33m',
+                INFO: '\x1b[36m',
+                DEBUG: '\x1b[90m',
+            };
+
+            const colorCode = colors[level];
+            const resetCode = '\x1b[0m';
+
+            // Apply color to both message and args
+            const coloredArgs = args.map(
+                (arg) => `${colorCode}${arg}${resetCode}`,
+            );
+
+            switch (level) {
+                case 'ERROR':
+                    globalThis.console.error(
+                        colorCode + formattedMessage,
+                        ...coloredArgs,
+                    );
+                    break;
+                case 'WARN':
+                    globalThis.console.warn(
+                        colorCode + formattedMessage,
+                        ...coloredArgs,
+                    );
+                    break;
+                case 'INFO':
+                    globalThis.console.info(
+                        colorCode + formattedMessage,
+                        ...coloredArgs,
+                    );
+                    break;
+                case 'DEBUG':
+                    globalThis.console.debug(
+                        colorCode + formattedMessage,
+                        ...coloredArgs,
+                    );
+                    break;
+            }
+
             this.emit('log', { level, message, args, timestamp });
         }
     }
