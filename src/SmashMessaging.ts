@@ -250,15 +250,16 @@ export default class SmashMessaging extends EventEmitter {
         message: ProfileSmashMessage,
     ) {
         this.logger.debug(`Received Profile for IK ${peerIk}`);
-        const newProfile = message.data;
-        if (peerIk !== newProfile.did.ik) {
+        const peerDid = message.data.did;
+        if (peerIk !== peerDid.ik) {
             // TODO: handle IK upgrades
             const err = 'Received IK doesnt match Signal Session data.';
             this.logger.error(err);
             throw new Error(err);
         }
         // send all pending messages
-        await this.flushPeerIkDLQ(newProfile.did);
+        await this.getOrCreatePeer(peerDid);
+        await this.flushPeerIkDLQ(peerIk);
     }
 
     private async incomingMessagesHandler(
@@ -305,19 +306,16 @@ export default class SmashMessaging extends EventEmitter {
         messages.forEach((message) => this.emit('message', message, sender));
     }
 
-    private async flushPeerIkDLQ(peerDid: SmashDID) {
-        if (!this.dlq[peerDid.ik]?.length) {
-            this.logger.info(`Cannot find queue for peer ${peerDid.id}`);
+    private async flushPeerIkDLQ(peerIk: string) {
+        if (!this.dlq[peerIk]?.length) {
+            this.logger.info(`Cannot find queue for peer ${peerIk}`);
             return;
         }
         this.logger.debug(
-            `> Flushing peer DLQ of size ${this.dlq[peerDid.ik].length}`,
+            `> Flushing peer DLQ of size ${this.dlq[peerIk].length}`,
         );
-        const peer = await this.getOrCreatePeer(peerDid);
-        if (peer.getDID().ik !== peerDid.ik)
-            throw new Error('Peer IK mismatch.');
-        this.notifyNewMessages(this.dlq[peerDid.ik], peerDid);
-        delete this.dlq[peerDid.ik];
+        this.incomingMessagesHandler(peerIk, this.dlq[peerIk]);
+        delete this.dlq[peerIk];
     }
 
     private pushToUnknownPeerIkDLQ(
