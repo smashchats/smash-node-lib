@@ -12,7 +12,6 @@ import {
     SMEConfig,
     SmashEndpoint,
 } from '@src/types/index.js';
-import { Buffer } from 'buffer';
 import { Socket } from 'socket.io-client';
 
 const solveChallenge = async (
@@ -22,19 +21,24 @@ const solveChallenge = async (
     logger: Logger,
 ) => {
     try {
-        const ivBuffer = Buffer.from(data.iv, auth.challengeEncoding);
-        const challengeBuffer = Buffer.from(
+        const ivBuffer = CryptoUtils.singleton.stringToBuffer(
+            data.iv,
+            auth.challengeEncoding,
+        );
+        const challengeBuffer = CryptoUtils.singleton.stringToBuffer(
             data.challenge,
             auth.challengeEncoding,
         );
-
         const smePublicKey = await CryptoUtils.singleton.importKey(
             auth.smePublicKey,
             auth.keyAlgorithm,
         );
 
         const symmetricKey = await CryptoUtils.singleton.deriveKey(
-            { ...auth.keyAlgorithm, public: smePublicKey } as KeyAlgorithm,
+            {
+                ...auth.keyAlgorithm,
+                public: smePublicKey,
+            } as KeyAlgorithm,
             auth.preKeyPair.privateKey,
             auth.encryptionAlgorithm,
             false,
@@ -42,20 +46,28 @@ const solveChallenge = async (
         );
 
         const unencryptedChallenge = await CryptoUtils.singleton.decrypt(
-            { ...auth.encryptionAlgorithm, iv: ivBuffer } as KeyAlgorithm,
+            {
+                ...auth.encryptionAlgorithm,
+                iv: ivBuffer,
+            } as KeyAlgorithm,
             symmetricKey,
             challengeBuffer,
         );
 
-        const solvedChallenge = Buffer.from(unencryptedChallenge).toString(
+        const solvedChallenge = CryptoUtils.singleton.bufferToString(
+            unencryptedChallenge,
             auth.challengeEncoding,
         );
+
         logger.debug(
             `> SME Challenge (${data.challenge}) -> (${solvedChallenge})`,
         );
         socket.emit('register', solvedChallenge);
     } catch (err) {
-        logger.warn('Cannot solve challenge.');
+        logger.warn(
+            'Cannot solve challenge.',
+            err instanceof Error ? err.message : err,
+        );
         throw err;
     }
 };
@@ -83,6 +95,7 @@ export class SMESocketReadWrite extends SMESocketWriteOnly {
         identity: Identity,
         auth: SMEConfig,
     ): Promise<SmashEndpoint> {
+        this.logger.debug('SMESocketReadWrite::initSocketWithAuth');
         try {
             const preKey = await CryptoUtils.singleton.exportKey(
                 auth.preKeyPair.publicKey.key,
@@ -95,9 +108,16 @@ export class SMESocketReadWrite extends SMESocketWriteOnly {
                 key: preKey,
                 keyAlgorithm: auth.keyAlgorithm,
             });
-            this.socket.on('challenge', (data) =>
-                solveChallenge(data, auth, this.socket!, this.logger),
-            );
+            this.logger.debug('auth:= ', JSON.stringify(auth, null, 2));
+            this.socket.on('challenge', async (data) => {
+                this.logger.debug(
+                    'SMESocketReadWrite::challenge',
+                    this.socket?.id,
+                );
+                this.logger.debug('auth:= ', JSON.stringify(auth, null, 2));
+                this.logger.debug('data:= ', JSON.stringify(data, null, 2));
+                await solveChallenge(data, auth, this.socket!, this.logger);
+            });
             this.socket.on('data', this.processMessages.bind(this));
             return {
                 url: auth.url,

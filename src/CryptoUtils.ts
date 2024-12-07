@@ -52,7 +52,7 @@ export default class CryptoUtils {
     ): Promise<CryptoKey> {
         return await this.subtle.importKey(
             EXPORT,
-            Buffer.from(keyEncoded, encoding),
+            this.stringToBuffer(keyEncoded, encoding),
             keyAlgorithm,
             exportable,
             usages,
@@ -67,13 +67,8 @@ export default class CryptoUtils {
         return this.sha256(await this.subtle.exportKey(EXPORT, key));
     }
 
-    async sha256fromObject(
-        object: unknown,
-        encoding: BufferEncoding = 'utf8',
-    ): Promise<string> {
-        return this.sha256(
-            this.stringToBuffer(JSON.stringify(object), encoding),
-        );
+    async sha256fromObject(object: unknown): Promise<string> {
+        return this.sha256(this.objectToBuffer(object));
     }
 
     async sha256fromString(string: string): Promise<string> {
@@ -84,11 +79,22 @@ export default class CryptoUtils {
         return this.bufferToString(await this.subtle.digest('SHA-256', buffer));
     }
 
-    private bufferToString(arrayBuffer: ArrayBuffer): string {
-        return Buffer.from(arrayBuffer).toString(ENCODING);
+    bufferToString(
+        arrayBuffer: ArrayBuffer,
+        encoding: BufferEncoding = ENCODING,
+    ) {
+        return Buffer.from(arrayBuffer).toString(encoding);
     }
 
     stringToBuffer(string: string, encoding: BufferEncoding = ENCODING) {
         return Buffer.from(string, encoding) as unknown as ArrayBuffer;
+    }
+
+    bufferToObject(arrayBuffer: ArrayBuffer) {
+        return JSON.parse(this.bufferToString(arrayBuffer, 'utf8'));
+    }
+
+    objectToBuffer(object: unknown) {
+        return this.stringToBuffer(JSON.stringify(object), 'utf8');
     }
 }

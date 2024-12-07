@@ -1,5 +1,4 @@
 import { Logger } from '@src/Logger.js';
-import { Buffer } from 'buffer';
 import { Socket, io } from 'socket.io-client';
 import { clearTimeout, setTimeout } from 'timers';
 
@@ -41,7 +40,7 @@ export class SMESocketWriteOnly {
     public sendData(
         preKey: string,
         sessionId: string,
-        buffer: Buffer,
+        buffer: ArrayBuffer,
         messageIds: string[],
     ) {
         if (!this.socket) {
@@ -58,7 +57,7 @@ export class SMESocketWriteOnly {
         url: string,
         auth?: SMEAuthParams,
     ) {
-        logger.debug(`initSocket ${url} with auth`);
+        logger.debug(`SMESocketWriteOnly::initSocket ${url} with auth`);
         const socket = io(url, { auth });
         socket.on('ping', () => {
             logger.debug(`> Ping from SME ${url}`);

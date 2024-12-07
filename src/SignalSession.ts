@@ -14,7 +14,6 @@ import {
     SmashDID,
     SmashEndpoint,
 } from '@src/types/index.js';
-import { Buffer } from 'buffer';
 
 export class SignalSession {
     public readonly createdAtTime: number;
@@ -113,10 +112,8 @@ export class SignalSession {
 
     async encryptMessages(message: EncapsulatedSmashMessage[]) {
         try {
-            const data = Buffer.from(JSON.stringify(message));
-            return (
-                await this.cipher.encrypt(data as unknown as ArrayBuffer)
-            ).exportProto();
+            const data = CryptoUtils.singleton.objectToBuffer(message);
+            return (await this.cipher.encrypt(data)).exportProto();
         } catch (err) {
             this.logger.warn('Cannot encrypt messages.');
             throw err;
@@ -138,12 +135,10 @@ export class SignalSession {
         message: MessageSignedProtocol,
     ): Promise<EncapsulatedSmashMessage[]> {
         try {
-            const decryptedData = Buffer.from(
+            const decryptedData = CryptoUtils.singleton.bufferToObject(
                 await this.cipher.decrypt(message),
             );
-            return JSON.parse(
-                decryptedData.toString(),
-            ) as EncapsulatedSmashMessage[];
+            return decryptedData as EncapsulatedSmashMessage[];
         } catch (err) {
             this.logger.warn('Cannot decrypt messages.');
             throw err;

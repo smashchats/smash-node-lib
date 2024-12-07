@@ -120,11 +120,7 @@ export class SmashPeer {
                 endpoint.socket.sendData(
                     endpoint.peerId,
                     endpoint.session.id,
-                    Buffer.from(
-                        await endpoint.session.encryptMessages(
-                            undeliveredMessages,
-                        ),
-                    ),
+                    await endpoint.session.encryptMessages(undeliveredMessages),
                     undeliveredMessages.map((m) => m.sha256),
                 );
                 endpoint.messageQueue.clear();
