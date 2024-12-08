@@ -119,6 +119,41 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 ```
 
+### **Processing messages**
+
+1. The Smash messaging protocol might deliver messages out of order.
+2. The Smash messaging protocol might deliver duplicate messages.
+
+#### Deduplication
+
+All messages bear a `message.sha256` hash.
+This property is used to detect duplicates.
+Already processed messages can safely be discarded if a duplicate is detected.
+
+#### Re-ordering
+
+Two properties of the message protocol ensure that messages can get re-ordered:
+
+1. `message.timestamp`: sender's claimed timestamp of when the message was first queued.
+2. `message.after`: the `sha256` hash of the message that this message depends on.
+
+> If present, the `message.after` property is deemed trustable.
+> Indeed, as it requires the sender to know the `sha256` hash of the previous message,
+> this property can't be set to fake messages sent after a message that wasn't previously received by the sender.
+> The sender could however always set this property to the `sha256` hash of a previously received message.
+> This is impossible to enforce, but should not be harmful as long as clearly indicated.
+
+Developers **should** always set `message.after` to the `sha256` hash of the previous message.
+This ensures that messages can get re-ordered correctly.
+When this value is unknown or ignored, the convention is to set it to the `0` value or to an empty string.
+
+When the `message.after` property is unavailable, re-ordering is limited to the `message.timestamp` property.
+
+#### Out of order messages
+
+Messages received with inconsistent `timestamp` and `message.after` ordering should be **flagged** as suspicious.
+Same for messages with a `timestamp` that is too far in the past, or, in the future (out of sync clocks).
+
 ## **References**
 
 - [Signal Protocol](https://github.com/PeculiarVentures/2key-ratchet): Secure communication library used in Smash-Node-Lib (Peculiar Ventures implementation of the [Signal Protocol](https://signal.org/docs/)).
