@@ -67,6 +67,7 @@ describe('SmashMessaging: Edge cases', () => {
         bob?.removeAllListeners();
         await alice!.close();
         await bob!.close();
+        await delay(500);
         alice = undefined;
         bob = undefined;
         waitForEventCancelFns.forEach((cancel) => cancel());
@@ -93,6 +94,7 @@ describe('SmashMessaging: Edge cases', () => {
             );
 
             // 2. Mock Date to simulate time passing beyond TTL
+            // WARNING: this only works because the library uses Date.now() when comparing SESSION_TTL_MS
             dateSpy = jest
                 .spyOn(Date, 'now')
                 .mockImplementation(
