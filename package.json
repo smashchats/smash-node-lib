@@ -8,6 +8,9 @@
         "dist/src/**/*"
     ],
     "type": "module",
+    "publishConfig": {
+        "registry": "https://nexus.unstaticlabs.com/repository/npm-hosted/"
+    },
     "scripts": {
         "dev": "nodemon",
         "test": "jest --config jest.config.cjs",
@@ -20,7 +23,8 @@
         "circular-dependencies:check": "madge --circular dist/",
         "eslint-dist:check": "eslint dist/**/*.js",
         "prepare": "husky",
-        "postinstall": "patch-package"
+        "postinstall": "patch-package",
+        "publish-nexus": "node ./publish.cjs"
     },
     "keywords": [],
     "author": "",

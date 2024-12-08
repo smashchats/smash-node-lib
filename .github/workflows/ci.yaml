@@ -1,0 +1,216 @@
+name: CI/CD Pipeline
+
+on:
+    push:
+        branches: ['v0.0.0-alpha'] # Trigger on push to the v0.0.0-alpha branch
+    pull_request:
+        branches: ['v0.0.0-alpha'] # Trigger on pull requests to the v0.0.0-alpha branch
+
+jobs:
+    install:
+        runs-on: ubuntu-24.04
+        outputs:
+            cache-key: ${{ steps.set-cache-key.outputs.cache-key }}
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+                  persist-credentials: false
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: '22.x'
+
+            - name: Install Dependencies
+              run: npm ci
+
+            - name: Set Cache Key Output
+              id: set-cache-key
+              run: echo "cache-key=${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}" >> $GITHUB_OUTPUT
+
+            - name: Cache Dependencies
+              uses: actions/cache/save@v4
+              with:
+                  path: |
+                      node_modules
+                      ~/.npm
+                  key: ${{ steps.set-cache-key.outputs.cache-key }}
+
+            - name: Print Cache Key
+              run: echo "cache-key=${{ steps.set-cache-key.outputs.cache-key }}"
+
+    test:
+        runs-on: ubuntu-24.04
+        needs: install # Run after install job
+        outputs:
+            coverage: ${{ steps.coverageComment.outputs.coverage }}
+            coverage-color: ${{ steps.coverageComment.outputs.color }}
+            summary-html: ${{ steps.coverageComment.outputs.summaryHtml }}
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+                  persist-credentials: false
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: '22.x'
+
+            - name: Restore Cache # Restore cached dependencies
+              uses: actions/cache/restore@v4
+              with:
+                  path: |
+                      node_modules
+                      ~/.npm
+                  key: ${{ needs.install.outputs.cache-key }}
+
+            - run: npm install jest-junit
+
+            - name: Run Tests
+              run: npm test -- --coverage --coverageReporters json-summary --reporters=default --reporters=jest-junit
+
+            - name: Process Coverage Report
+              id: coverageComment
+              uses: MishaKav/jest-coverage-comment@main
+              with:
+                  github-token: ${{ secrets.TOKEN }}
+                  title: 'Test Coverage Report'
+                  coverage-summary-path: ./coverage/coverage-summary.json
+                  junitxml-path: ./junit.xml
+                  junitxml-title: 'Test Summary'
+                  badge-title: 'Coverage'
+                  hide-comment: false
+                  create-new-comment: false
+
+    quality:
+        needs: install # Run after install job
+        runs-on: ubuntu-24.04
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+                  persist-credentials: false
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: '22.x'
+
+            - name: Restore Cache
+              uses: actions/cache/restore@v4
+              with:
+                  path: |
+                      node_modules
+                      ~/.npm
+                  key: ${{ needs.install.outputs.cache-key }}
+            - name: Run Command
+              run: npm run build:checks
+
+    publish:
+        needs: [install, quality, test]
+        if: github.ref_name == 'v0.0.0-alpha' # Only run on the v0.0.0-alpha branch
+        runs-on: ubuntu-24.04
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+                  persist-credentials: false
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: '22.x'
+
+            - name: Restore Cache
+              uses: actions/cache/restore@v4
+              with:
+                  path: |
+                      node_modules
+                      ~/.npm
+                  key: ${{ needs.install.outputs.cache-key }}
+
+            - name: Configure npm for Nexus
+              run: |
+                  echo "//nexus.unstaticlabs.com/repository/npm-hosted/:username=${NEXUS_USERNAME}" > ~/.npmrc
+                  echo "//nexus.unstaticlabs.com/repository/npm-hosted/:_password=$(echo -n ${NEXUS_PASSWORD} | base64)" >> ~/.npmrc
+                  echo "registry=https://nexus.unstaticlabs.com/repository/npm-hosted/" >> ~/.npmrc
+              env:
+                  NEXUS_USERNAME: ${{ secrets.NEXUS_USERNAME }}
+                  NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
+
+            - name: Run Publish Script
+              run: npm run publish-nexus
+
+    update-badges:
+        needs: test # Run after test job
+        if: github.ref_name == 'v0.0.0-alpha' # Only run on the v0.0.0-alpha branch
+        runs-on: ubuntu-24.04
+        steps:
+            - name: Update Coverage Badge
+              uses: schneegans/dynamic-badges-action@v1.7.0
+              with:
+                  auth: ${{ secrets.JEST_COVERAGE_COMMENT }} # Use token for gist authentication
+                  gistID: 237cf77f566685841725f2001c1987f7 # Gist ID for badge
+                  filename: jest-coverage-comment__main.json # Filename in gist
+                  label: Coverage
+                  message: ${{ needs.test.outputs.coverage }}% # Coverage percentage
+                  color: ${{ needs.test.outputs.coverage-color }} # Badge color
+                  namedLogo: javascript # Badge logo
+
+    notify-failure:
+        needs: test # Run after test job
+        if: failure() # Only run if previous jobs failed
+        runs-on: ubuntu-24.04
+        steps:
+            - name: Setup Tailscale
+              uses: tailscale/github-action@v2
+              with:
+                  oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+                  oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+                  tags: tag:ci
+
+            - name: Wait for Tailscale
+              run: sleep 10
+
+            - name: Send Failure Email
+              uses: dawidd6/action-send-mail@v3
+              with:
+                  server_address: '100.115.61.18'
+                  server_port: '2526'
+                  username: 'github-actions@unstaticlabs.com'
+                  password: 'not_required'
+                  subject: 'Smash-Node-Lib Tests Failed'
+                  body: ${{ needs.test.outputs.summary-html }}
+                  convert_markdown: true
+                  to: 'ci@unstaticlabs.com'
+                  from: 'Github Actions'
+
+    notify-publish-failure:
+        needs: publish
+        if: failure() # Only run if previous jobs failed
+        runs-on: ubuntu-24.04
+        steps:
+            - name: Setup Tailscale
+              uses: tailscale/github-action@v2
+              with:
+                  oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+                  oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+                  tags: tag:ci
+
+            - name: Wait for Tailscale
+              run: sleep 10
+
+            - name: Send Failure Email
+              uses: dawidd6/action-send-mail@v3
+              with:
+                  server_address: '100.115.61.18'
+                  server_port: '2526'
+                  username: 'github-actions@unstaticlabs.com'
+                  password: 'not_required'
+                  subject: 'Smash-Node-Lib Publishing Failed'
+                  body: 'Publishing failed for commit ${{ github.sha }}'
+                  convert_markdown: true
+                  to: 'ci@unstaticlabs.com'
+                  from: 'Github Actions'
