@@ -15,6 +15,7 @@
         "dev": "nodemon",
         "test": "jest --config jest.config.cjs",
         "test:coverage": "npm run test -- --coverage",
+        "test:watch": "npm run test -- --watchAll",
         "build": "rm -rf ./dist/* && tsc -p tsconfig.build.json && tsc-alias",
         "build:checks": "npm run prettier:check && npm run build && npm run circular-dependencies:check && npm run eslint-dist:check",
         "prettier": "prettier --config .prettierrc 'src/**/*.ts'",
