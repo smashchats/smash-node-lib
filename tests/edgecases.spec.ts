@@ -202,6 +202,130 @@ describe('SmashMessaging: Edge cases', () => {
                 expect.anything(),
             );
         }, 10000);
+
+        describe('Session reset race conditions', () => {
+            it('handles simultaneous session resets gracefully', async () => {
+                // 1. Initial communication to establish sessions
+                const message1 = 'initial message';
+                const waitForFirstMessage = waitFor(
+                    bob!,
+                    'message',
+                    1 + protocolOverheadSize,
+                );
+                await alice!.sendTextMessage(bobDID, message1, '0');
+                await waitForFirstMessage;
+
+                const firstMessageCount = 1 + protocolOverheadSize;
+                const secondMessageCount = 1 + protocolOverheadSize;
+                const sessionResetCount = 1;
+                expect(onBobMessageReceived).toHaveBeenCalledTimes(
+                    firstMessageCount,
+                );
+                expect(onBobMessageReceived).toHaveBeenCalledWith(
+                    expect.objectContaining({ data: message1 }),
+                    expect.anything(),
+                );
+
+                // 2. Mock Date to simulate time near TTL for both peers
+                // WARNING: this only works because the library uses Date.now() when comparing SESSION_TTL_MS
+                dateSpy = jest
+                    .spyOn(Date, 'now')
+                    .mockImplementation(
+                        () =>
+                            new Date().getTime() +
+                            SignalSession.SESSION_TTL_MS -
+                            1000,
+                    );
+
+                // 3. Force both peers to trigger resets simultaneously
+                // 3a. Close both peers
+                const bobIdentity = await bob!.exportIdentityToJSON();
+                await bob!.close();
+                const aliceIdentity = await alice!.exportIdentityToJSON();
+                await alice!.close();
+                await delay(500);
+
+                // 3b. Restart both peers
+                bob = new SmashMessaging(
+                    await SmashMessaging.deserializeIdentity(bobIdentity),
+                    undefined,
+                    'DEBUG',
+                    'bob',
+                );
+                bob.on('message', onBobMessageReceived);
+                alice = new SmashMessaging(
+                    await SmashMessaging.deserializeIdentity(aliceIdentity),
+                    undefined,
+                    'DEBUG',
+                    'alice',
+                );
+                await bob.initEndpoints([
+                    {
+                        url: socketServerUrl,
+                        smePublicKey: 'smePublicKey==',
+                    },
+                ]);
+                await alice.initEndpoints([
+                    {
+                        url: socketServerUrl,
+                        smePublicKey: 'smePublicKey==',
+                    },
+                ]);
+                await delay(1000);
+                expect(onBobMessageReceived).toHaveBeenCalledTimes(
+                    firstMessageCount,
+                );
+
+                // 3c. Init chats for both peers
+                const currentTime = new Date().toISOString();
+                const aliceResetPromise = alice!.initChats([
+                    {
+                        with: bobDID,
+                        lastMessageTimestamp: currentTime,
+                    },
+                ]);
+                const bobResetPromise = bob!.initChats([
+                    {
+                        with: aliceDID,
+                        lastMessageTimestamp: currentTime,
+                    },
+                ]);
+
+                await Promise.all([aliceResetPromise, bobResetPromise]);
+                await delay(1000);
+
+                expect(
+                    onBobMessageReceived.mock.calls.length,
+                ).toBeGreaterThanOrEqual(firstMessageCount + sessionResetCount);
+                expect(
+                    onBobMessageReceived.mock.calls.length,
+                ).toBeLessThanOrEqual(
+                    2 * firstMessageCount + sessionResetCount,
+                );
+
+                // 4. Verify communication still works
+                const message2 = 'message after simultaneous reset';
+                await alice!.sendTextMessage(bobDID, message2, '0');
+                await delay(1000);
+
+                expect(onBobMessageReceived).toHaveBeenCalledWith(
+                    expect.objectContaining({ data: message2 }),
+                    expect.anything(),
+                );
+                expect(
+                    onBobMessageReceived.mock.calls.length,
+                ).toBeGreaterThanOrEqual(
+                    firstMessageCount + sessionResetCount + secondMessageCount,
+                );
+                expect(
+                    onBobMessageReceived.mock.calls.length,
+                ).toBeLessThanOrEqual(
+                    2 * firstMessageCount +
+                        sessionResetCount +
+                        secondMessageCount,
+                );
+            }, 10000);
+        });
     });
 
     describe('Alice sends multiple messages and they get delayed', () => {

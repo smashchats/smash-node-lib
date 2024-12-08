@@ -12,6 +12,7 @@ import {
     SmashEndpoint,
     SmashMessage,
 } from '@src/types/index.js';
+import AsyncLock from 'async-lock';
 
 export class SmashPeer {
     // TODO subscribe on changes like updates to DID, IK, EK, PK...
@@ -176,11 +177,33 @@ export class SmashPeer {
         // );
     }
 
+    private async resetSessions() {
+        await this.sessionManager.handleSessionReset(this);
+        await this.configureEndpoints(false);
+    }
+
     async triggerSessionReset(): Promise<EncapsulatedSmashMessage> {
         this.logger.debug(`Triggering session reset for ${this.did.ik}`);
-        await this.sessionManager.handleSessionReset(this);
+        await this.resetSessions();
         return this.sendMessage({
             type: 'session_reset',
         } as SessionResetSmashMessage);
+    }
+
+    private alreadyProcessedSessionReset: string[] = [];
+    private sessionResetMutex = new AsyncLock();
+
+    async incomingSessionReset(sha256: string) {
+        await this.sessionResetMutex.acquire('sessionReset', async () => {
+            if (this.alreadyProcessedSessionReset.includes(sha256)) {
+                this.logger.debug(
+                    `Already processed session reset ${sha256}, skipping`,
+                );
+                return;
+            }
+            this.logger.debug(`Processing session reset ${sha256}`);
+            await this.resetSessions();
+            this.alreadyProcessedSessionReset.push(sha256);
+        });
     }
 }

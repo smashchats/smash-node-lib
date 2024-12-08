@@ -267,27 +267,25 @@ export default class SmashMessaging extends EventEmitter {
         messages: EncapsulatedSmashMessage[],
     ) {
         const peer: SmashPeer | undefined = this.getPeerByIk(peerIk);
-        if (!peer) {
+        if (peer) {
+            const peerDid = peer.getDID();
+            this.notifyNewMessages(messages, peerDid);
+        } else {
             this.logger.debug(
                 `DLQd ${messages.length} messages from unknown peer (IK: ${peerIk})`,
             );
+            // Note: this means the first 'profile' message will always be notified twice
             this.pushToUnknownPeerIkDLQ(peerIk, messages);
-        } else {
-            const peerDid = peer.getDID();
-            this.notifyNewMessages(messages, peerDid);
         }
         await Promise.all(
             messages.map(async (message) => {
-                switch (message.type) {
-                    case 'profile':
-                        this.incomingProfileHandler(
-                            peerIk,
-                            message as ProfileSmashMessage,
-                        );
-                        break;
-                    case 'session_reset':
-                        this.sessionManager.handleSessionReset(peer);
-                        break;
+                if (message.type === 'profile') {
+                    this.incomingProfileHandler(
+                        peerIk,
+                        message as ProfileSmashMessage,
+                    );
+                } else if (peer && message.type === 'session_reset') {
+                    peer.incomingSessionReset(message.sha256);
                 }
             }),
         );
