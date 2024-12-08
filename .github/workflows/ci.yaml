@@ -214,3 +214,31 @@ jobs:
                   convert_markdown: true
                   to: 'ci@unstaticlabs.com'
                   from: 'Github Actions'
+
+    notify-publish-success:
+        needs: publish
+        if: success() # Only run if publish job succeeded
+        runs-on: ubuntu-24.04
+        steps:
+            - name: Setup Tailscale
+              uses: tailscale/github-action@v2
+              with:
+                  oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+                  oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+                  tags: tag:ci
+
+            - name: Wait for Tailscale
+              run: sleep 10
+
+            - name: Send Success Email
+              uses: dawidd6/action-send-mail@v3
+              with:
+                  server_address: '100.115.61.18'
+                  server_port: '2525'
+                  username: 'github-actions@unstaticlabs.com'
+                  password: 'not_required'
+                  subject: 'Smash-Node-Lib Successfully Published'
+                  body: 'Successfully published version for commit ${{ github.sha }}'
+                  convert_markdown: true
+                  to: 'ci@unstaticlabs.com'
+                  from: 'Github Actions'
