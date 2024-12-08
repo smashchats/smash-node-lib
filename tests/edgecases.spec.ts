@@ -185,6 +185,8 @@ describe('SmashMessaging: Edge cases', () => {
             ]);
             const newOnBobMessageReceived = jest.fn();
             bob.on('message', newOnBobMessageReceived);
+            const onAliceMessageReceived = jest.fn();
+            alice!.on('message', onAliceMessageReceived);
 
             // 3. Alice tries to send another message
             const message2 = 'are you there?';
@@ -199,6 +201,19 @@ describe('SmashMessaging: Edge cases', () => {
 
             expect(newOnBobMessageReceived).toHaveBeenCalledWith(
                 expect.objectContaining({ data: message2 }),
+                expect.anything(),
+            );
+
+            // 4. Bob tries to send another message to Alice
+            const message3 = 'I am here!';
+            const waitForThirdMessage = waitFor(alice!, 'message', 1);
+            await delay(500);
+
+            await bob!.sendTextMessage(aliceDID, message3, '0');
+            await waitForThirdMessage;
+
+            expect(onAliceMessageReceived).toHaveBeenCalledWith(
+                expect.objectContaining({ data: message3 }),
                 expect.anything(),
             );
         }, 10000);

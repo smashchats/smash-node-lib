@@ -177,8 +177,8 @@ export class SmashPeer {
         // );
     }
 
-    private async resetSessions() {
-        await this.sessionManager.handleSessionReset(this);
+    private async resetSessions(keepActive: boolean = false) {
+        await this.sessionManager.handleSessionReset(this, keepActive);
         await this.configureEndpoints(false);
     }
 
@@ -202,7 +202,7 @@ export class SmashPeer {
                 return;
             }
             this.logger.debug(`Processing session reset ${sha256}`);
-            await this.resetSessions();
+            await this.resetSessions(true);
             this.alreadyProcessedSessionReset.push(sha256);
         });
     }

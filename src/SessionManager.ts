@@ -6,6 +6,7 @@ import {
     SmashDID,
     SmashEndpoint,
 } from '@src/types/index.js';
+import AsyncLock from 'async-lock';
 
 import { SmashPeer } from './SmashPeer.js';
 
@@ -38,9 +39,8 @@ export class SessionManager {
             data,
             this.logger,
         );
-        this.logger.debug('persisted');
-
         this.persistSession(session);
+        this.logger.debug('persisted');
         return [session, decryptedMessages];
     }
 
@@ -84,24 +84,43 @@ export class SessionManager {
         return session;
     }
 
-    private removeAllPeerSessions(peer: SmashDID) {
-        delete this.sessionsByPeer[peer.ik];
+    private removeAllPeerSessions(
+        peer: SmashDID,
+        deleteActiveSession: boolean,
+    ) {
+        if (deleteActiveSession) {
+            delete this.sessionsByPeer[peer.ik];
+        }
+        const sessionToKeep: SignalSession | undefined =
+            this.sessionsByPeer[peer.ik];
         let removed = 0;
         this.sessions = this.sessions.filter((s) => {
-            if (s.peerIk === peer.ik) {
+            if (
+                s.peerIk === peer.ik &&
+                (deleteActiveSession || s.id !== sessionToKeep.id)
+            ) {
                 delete this.sessionsByID[s.id];
                 removed++;
                 return false;
             }
             return true;
         });
+        if (globalThis.gc) globalThis.gc();
         this.logger.debug(`Removed ${removed} sessions for peer ${peer.ik}`);
     }
 
-    // TODO deduplication of messages (received from different endpoints)
-    async handleSessionReset(peer: SmashPeer): Promise<void> {
-        const peerDID = peer.getDID();
-        this.logger.debug(`handleSessionReset for peer ${peerDID.id}`);
-        this.removeAllPeerSessions(peerDID);
+    private handleSessionResetMutex = new AsyncLock();
+    async handleSessionReset(
+        peer: SmashPeer,
+        keepActive: boolean = false,
+    ): Promise<void> {
+        await this.handleSessionResetMutex.acquire(
+            'handleSessionReset',
+            async () => {
+                const peerDID = peer.getDID();
+                this.logger.debug(`handleSessionReset for peer ${peerDID.id}`);
+                this.removeAllPeerSessions(peerDID, !keepActive);
+            },
+        );
     }
 }

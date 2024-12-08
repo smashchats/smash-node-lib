@@ -1,16 +1,15 @@
 import { Identity } from '2key-ratchet';
 import CryptoUtils from '@src/CryptoUtils.js';
 import { Logger } from '@src/Logger.js';
-import {
-    SMESocketWriteOnly,
-    onMessagesStatusFn,
-} from '@src/SMESocketWriteOnly.js';
+import { SMESocketWriteOnly } from '@src/SMESocketWriteOnly.js';
 import { SessionManager } from '@src/SessionManager.js';
 import { SignalSession } from '@src/SignalSession.js';
 import {
     EncapsulatedSmashMessage,
     SMEConfig,
     SmashEndpoint,
+    onMessagesFn,
+    onMessagesStatusFn,
 } from '@src/types/index.js';
 import { Socket } from 'socket.io-client';
 
@@ -71,11 +70,6 @@ const solveChallenge = async (
         throw err;
     }
 };
-
-export type onMessagesFn = (
-    peerIk: string,
-    messages: EncapsulatedSmashMessage[],
-) => void;
 
 export class SMESocketReadWrite extends SMESocketWriteOnly {
     // TODO: limit DLQs size and number

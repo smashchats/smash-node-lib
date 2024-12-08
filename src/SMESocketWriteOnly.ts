@@ -1,4 +1,5 @@
 import { Logger } from '@src/Logger.js';
+import { onMessagesStatusFn } from '@src/types/index.js';
 import { Socket, io } from 'socket.io-client';
 import { clearTimeout, setTimeout } from 'timers';
 
@@ -6,8 +7,6 @@ type SMEAuthParams = {
     key: string;
     keyAlgorithm: KeyAlgorithm;
 };
-
-export type onMessagesStatusFn = (ids: string[], status: string) => void;
 
 export class SMESocketWriteOnly {
     protected socket?: Socket;
