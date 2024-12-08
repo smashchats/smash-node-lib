@@ -102,6 +102,6 @@ export class SessionManager {
     async handleSessionReset(peer: SmashPeer): Promise<void> {
         this.logger.debug('handleSessionReset');
         this.removeAllPeerSessions(peer.getDID());
-        await peer.configureEndpoints(true);
+        await peer.configureEndpoints(false);
     }
 }

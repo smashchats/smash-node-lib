@@ -12,7 +12,6 @@ import {
     SmashEndpoint,
     SmashMessage,
 } from '@src/types/index.js';
-import { Buffer } from 'buffer';
 
 export class SmashPeer {
     // TODO subscribe on changes like updates to DID, IK, EK, PK...
@@ -52,9 +51,7 @@ export class SmashPeer {
         };
     }
 
-    async configureEndpoints(
-        dontSendSessionReset: boolean = false,
-    ): Promise<void> {
+    async configureEndpoints(sendSessionReset: boolean = true): Promise<void> {
         this.logger.debug(`configureEndpoints (${this.did.endpoints.length})`);
         let shouldSendSessionReset = false;
         this.endpoints = await Promise.all(
@@ -71,7 +68,7 @@ export class SmashPeer {
                 return this.createEndpoint(endpointConfig);
             }),
         );
-        if (shouldSendSessionReset && !dontSendSessionReset) {
+        if (shouldSendSessionReset && sendSessionReset) {
             await this.triggerSessionReset();
         }
         await this.flushQueue();
