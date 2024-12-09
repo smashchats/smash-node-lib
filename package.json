@@ -41,7 +41,7 @@
     },
     "devDependencies": {
         "@eslint/js": "^9.16.0",
-        "@trivago/prettier-plugin-sort-imports": "^4.3.0",
+        "@trivago/prettier-plugin-sort-imports": "^5.2.0",
         "@types/async-lock": "^1.4.2",
         "@types/jest": "^29.5.14",
         "@types/simple-peer": "^9.11.8",
