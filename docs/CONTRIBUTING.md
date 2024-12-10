@@ -55,14 +55,11 @@ For a complete guide, visit the [Radicle User Documentation](https://radicle.xyz
 
 ### Cloning the Repository
 
-The Smash-Node-Lib repository is **currently private**.
-You’ll need to request access from a maintainer by contacting [contribute@smashchats.com](mailto:contribute@smashchats.com).
-
 #### Using Radicle:
 
 1. Connect to Smash’s seeding node:
 
-    > Last updated: 2024-12-05.
+    > Last updated: 2024-12-10.
     > Find an up-to-date list of seeding nodes [here](https://dev.smashchats.com/radicle%20seeding%20node).
 
     ```bash
@@ -71,19 +68,19 @@ You’ll need to request access from a maintainer by contacting [contribute@smas
 
 2. Clone the repository:
 
-    > Last updated: 2024-12-05.
+    > Last updated: 2024-12-10.
     > Find an up-to-date list of repositories IDs [here](https://dev.smashchats.com/radicle%20repos).
 
     ```bash
-    rad clone rad:zZ6oTFp8JrVyhEQmrcfkQkQgmoQJ
+    rad clone rad:zZ6oTFp8JrVyhEQmrcfkQkQgmoQJ # Smash-Node-Lib
     ```
 
 #### Using GitHub (Mirror):
 
-Alternatively, you can request access to the [GitHub mirror](https://github.com/unstaticlabs/smash-node-lib) and clone it:
+Alternatively, you can request access to the [GitHub mirror](https://github.com/smashchats/smash-node-lib) and clone it:
 
 ```bash
-git clone https://github.com/unstaticlabs/smash-node-lib.git
+git clone https://github.com/smashchats/smash-node-lib.git
 ```
 
 ## **Making Changes**
