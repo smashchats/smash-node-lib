@@ -166,6 +166,8 @@ We welcome contributions from the community! Check out our [Contributing Guide](
 
 Contributions are managed through [Radicle](https://radicle.xyz/), a decentralized Git collaboration network. Learn more in our [CONTRIBUTING.md](./docs/CONTRIBUTING.md).
 
+[Browse open issues](https://app.radicle.xyz/nodes/seed.radicle.garden/rad:zZ6oTFp8JrVyhEQmrcfkQkQgmoQJ/issues).
+
 ## **License**
 
 This project is licensed under our own extended **AGPL-3.0**. See the [LICENSE](./LICENSE) file for details.
