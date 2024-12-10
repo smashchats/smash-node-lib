@@ -1,1 +1,1 @@
-npm run build:checks
+npm run lint-staged && npm run build:checks
