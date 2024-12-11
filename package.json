@@ -28,7 +28,7 @@
         "code:checks": "npm run eslint:check && npm run typecheck && npm run prettier:check",
         "build:checks": "npm run code:checks && npm run build && npm run eslint-dist:check && npm run circular-dependencies:check",
         "prepare": "[ -n \"$CI\" ] || npm run prepare:husky",
-        "prepare:husky": "cd .. && husky nab/.husky && cd -",
+        "prepare:husky": "husky",
         "postinstall": "patch-package",
         "publish-nexus": "node ./publish.cjs"
     },
