@@ -170,7 +170,12 @@ Contributions are managed through [Radicle](https://radicle.xyz/), a decentraliz
 
 ## **License**
 
-This project is licensed under our own extended **AGPL-3.0**. See the [LICENSE](./LICENSE) file for details.
+All contributions to Smash-Simple-Neighborhood are made under our extended [AGPL-3.0 License](./LICENSE).
+By contributing, you agree to license your work under these terms.
+
+**By using this repository, you agree to the terms of the [Smash License](./LICENSE).**
+
+**Any changes or derived projects MUST be open-sourced under a compatible license.**
 
 ## **Contact**
 
