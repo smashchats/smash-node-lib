@@ -11,7 +11,8 @@ export interface SmashDID {
 export interface SmashProfileMeta {
     title: string;
     description: string;
-    picture: string;
+    // temporary made optional to allow diff updates
+    picture?: string;
 }
 
 export interface SmashProfile {

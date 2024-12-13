@@ -257,9 +257,10 @@ export default class SmashMessaging extends EventEmitter {
             this.logger.error(err);
             throw new Error(err);
         }
-        // send all pending messages
+        // TODO: handle DID updates
         await this.getOrCreatePeer(peerDid);
-        await this.flushPeerIkDLQ(peerIk);
+        // send all pending messages
+        return this.flushPeerIkDLQ(peerIk);
     }
 
     private async incomingMessagesHandler(
@@ -269,25 +270,55 @@ export default class SmashMessaging extends EventEmitter {
         const peer: SmashPeer | undefined = this.getPeerByIk(peerIk);
         if (peer) {
             const peerDid = peer.getDID();
+            // firehose incoming events to the library user
             this.notifyNewMessages(messages, peerDid);
+            await this.incomingMessagesParser(peer, messages);
+            this.logger.info(
+                `processed ${messages?.length} messages from ${peerDid.id}`,
+            );
         } else {
+            this.pushToUnknownPeerIkDLQ(peerIk, messages);
+            // TODO: handle profile updates (for now only handles IK updates)
+            messages
+                .filter((m) => m.type === 'profile')
+                .map((m) =>
+                    this.incomingProfileHandler(
+                        peerIk,
+                        m as ProfileSmashMessage,
+                    ),
+                );
             this.logger.debug(
                 `DLQd ${messages.length} messages from unknown peer (IK: ${peerIk})`,
             );
-            // Note: this means the first 'profile' message will always be notified twice
-            this.pushToUnknownPeerIkDLQ(peerIk, messages);
         }
-        await Promise.all(
-            messages.map(async (message) => {
-                if (message.type === 'profile') {
-                    this.incomingProfileHandler(
-                        peerIk,
-                        message as ProfileSmashMessage,
-                    );
-                } else if (peer && message.type === 'session_reset') {
-                    peer.incomingSessionReset(message.sha256);
-                }
-            }),
+    }
+
+    private async incomingMessageParser(
+        peer: SmashPeer,
+        message: EncapsulatedSmashMessage,
+    ) {
+        if (message.type === 'profile') {
+            // TODO: handle profile updates (for now only handles new IK updates)
+            this.emit(
+                'profile',
+                peer.getDID().id,
+                message.data as SmashProfile,
+                message.sha256,
+                message.timestamp,
+            );
+        } else if (message.type === 'session_reset') {
+            await peer.incomingSessionReset(message.sha256);
+        }
+    }
+
+    private async incomingMessagesParser(
+        peer: SmashPeer,
+        messages: EncapsulatedSmashMessage[],
+    ) {
+        await Promise.allSettled(
+            messages.map((message) =>
+                this.incomingMessageParser(peer, message),
+            ),
         );
     }
 
@@ -313,7 +344,7 @@ export default class SmashMessaging extends EventEmitter {
         this.logger.debug(
             `> Flushing peer DLQ of size ${this.dlq[peerIk].length}`,
         );
-        this.incomingMessagesHandler(peerIk, this.dlq[peerIk]);
+        await this.incomingMessagesHandler(peerIk, this.dlq[peerIk]);
         delete this.dlq[peerIk];
     }
 
@@ -329,6 +360,7 @@ export default class SmashMessaging extends EventEmitter {
         peerDid: SmashDID,
         lastMessageTimestamp?: string,
     ): Promise<SmashPeer> {
+        // TODO: handle DID updates
         if (!this.peers[peerDid.id]) {
             this.logger.debug(`CreatePeer ${peerDid.id}`);
             const peer = new SmashPeer(
@@ -346,8 +378,9 @@ export default class SmashMessaging extends EventEmitter {
                 data: await this.getProfile(),
             } as ProfileSmashMessage);
             this.peers[peerDid.id] = peer;
-            this.peerIkMapping[peerDid.ik] = peerDid.id;
         }
+        // always map IK to ID (TODO handle profile/DID updates)
+        this.peerIkMapping[peerDid.ik] = peerDid.id;
         return this.peers[peerDid.id];
     }
 
