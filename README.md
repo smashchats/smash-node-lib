@@ -4,9 +4,11 @@ This ES Module library provides the core functionality for implementing and inte
 It powers the free and open digital neighborhoods of tomorrow, promoting decentralization, interoperability, and user ownership.
 
 ![Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/smashchatsdev/237cf77f566685841725f2001c1987f7/raw/jest-coverage-comment__main.json)
+![License](https://img.shields.io/badge/license-AGPL--3.0-blue)
+![Version](https://img.shields.io/badge/version-0.0.1-alpha)
 
-<!-- ![License](https://img.shields.io/github/license/unstaticlabs/smash-node-lib)
-![Version](https://img.shields.io/github/package-json/v/unstaticlabs/smash-node-lib) -->
+<!-- ![License](https://img.shields.io/github/license/smashchats/smash-node-lib)
+![Version](https://img.shields.io/github/package-json/v/smashchats/smash-node-lib) -->
 
 ---
 
