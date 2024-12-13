@@ -72,7 +72,7 @@ Using our GitHub mirror repository:
 > Read more in our [CONTRIBUTING.md](./docs/CONTRIBUTING.md).
 
 ```bash
-git clone https://github.com/unstaticlabs/smash-node-lib.git
+git clone https://github.com/smashchats/smash-node-lib.git
 ```
 
 2. **Install Dependencies**:

@@ -40,7 +40,7 @@ Are you new to Smash-Node-Lib? Start here:
 1. **Set Up Your Development Environment**:
 
     - [Create a Radicle Identity](https://radicle.xyz/guides/user#come-into-being-from-the-elliptic-aether).
-    - Clone the library repository using [Radicle](https://radicle.xyz/) or its [GitHub mirror](https://github.com/unstaticlabs/smash-node-lib).
+    - Clone the library repository using [Radicle](https://radicle.xyz/) or its [GitHub mirror](https://github.com/smashchats/smash-node-lib).
 
 2. **Follow the Tutorials**:
 
@@ -65,13 +65,13 @@ Learn more about how Smash works:
 Check out the Smash Simple Neighborhood project for a working example of how to use the `Smash-Node-Lib` library in its current state.
 
 ```bash
-rad clone rad:z3TrzMRLa6JXstNUb93AC524MjjoQ # RID for the "Smash Simple Neighborhood" project
+rad clone rad:zZ6oTFp8JrVyhEQmrcfkQkQgmoQJ # RID for the "Smash Simple Neighborhood" project
 ```
 
 or using our GitHub mirror repository:
 
 ```bash
-git clone https://github.com/unstaticlabs/smash-simple-neighborhood.git
+git clone https://github.com/smashchats/smash-node-lib.git
 ```
 
 ## **How-To Guides**
