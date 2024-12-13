@@ -55,7 +55,7 @@ export default class SmashUser extends SmashMessaging {
     }
 
     emit(event: string | symbol, ...args: unknown[]): boolean {
-        if (event === 'message') {
+        if (event === 'data') {
             const [message, sender] = args as [
                 EncapsulatedSmashMessage,
                 SmashDID,

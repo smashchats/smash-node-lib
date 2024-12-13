@@ -59,7 +59,7 @@ describe('SmashMessaging: Edge cases', () => {
         bobDID = await bob.getDID();
         aliceDID = await alice.getDID();
         onBobMessageReceived = jest.fn();
-        bob.on('message', onBobMessageReceived);
+        bob.on('data', onBobMessageReceived);
     });
 
     afterEach(async () => {
@@ -82,7 +82,7 @@ describe('SmashMessaging: Edge cases', () => {
             const message1 = 'initial message';
             const waitForFirstMessage = waitFor(
                 bob!,
-                'message',
+                'data',
                 1 + protocolOverheadSize,
             );
             await alice!.sendTextMessage(bobDID, message1, '0');
@@ -120,7 +120,7 @@ describe('SmashMessaging: Edge cases', () => {
                 },
             ]);
             const newOnBobMessageReceived = jest.fn();
-            bob.on('message', newOnBobMessageReceived);
+            bob.on('data', newOnBobMessageReceived);
 
             await delay(1000);
 
@@ -128,7 +128,7 @@ describe('SmashMessaging: Edge cases', () => {
             const message2 = 'message after session expiry';
             const waitForSecondMessage = waitFor(
                 bob!,
-                'message',
+                'data',
                 1 + protocolOverheadSize,
                 6000,
             );
@@ -150,7 +150,7 @@ describe('SmashMessaging: Edge cases', () => {
             const message1 = 'hello';
             const waitForFirstMessage = waitFor(
                 bob!,
-                'message',
+                'data',
                 1 + protocolOverheadSize,
             );
             await alice!.sendTextMessage(bobDID, message1, '0');
@@ -184,15 +184,15 @@ describe('SmashMessaging: Edge cases', () => {
                 },
             ]);
             const newOnBobMessageReceived = jest.fn();
-            bob.on('message', newOnBobMessageReceived);
+            bob.on('data', newOnBobMessageReceived);
             const onAliceMessageReceived = jest.fn();
-            alice!.on('message', onAliceMessageReceived);
+            alice!.on('data', onAliceMessageReceived);
 
             // 3. Alice tries to send another message
             const message2 = 'are you there?';
             const waitForSecondMessage = waitFor(
                 bob!,
-                'message',
+                'data',
                 1 + protocolOverheadSize,
             );
 
@@ -206,7 +206,7 @@ describe('SmashMessaging: Edge cases', () => {
 
             // 4. Bob tries to send another message to Alice
             const message3 = 'I am here!';
-            const waitForThirdMessage = waitFor(alice!, 'message', 1);
+            const waitForThirdMessage = waitFor(alice!, 'data', 1);
             await delay(500);
 
             await bob!.sendTextMessage(aliceDID, message3, '0');
@@ -224,7 +224,7 @@ describe('SmashMessaging: Edge cases', () => {
                 const message1 = 'initial message';
                 const waitForFirstMessage = waitFor(
                     bob!,
-                    'message',
+                    'data',
                     1 + protocolOverheadSize,
                 );
                 await alice!.sendTextMessage(bobDID, message1, '0');
@@ -267,7 +267,7 @@ describe('SmashMessaging: Edge cases', () => {
                     'DEBUG',
                     'bob',
                 );
-                bob.on('message', onBobMessageReceived);
+                bob.on('data', onBobMessageReceived);
                 alice = new SmashMessaging(
                     await SmashMessaging.deserializeIdentity(aliceIdentity),
                     undefined,
@@ -370,7 +370,7 @@ describe('SmashMessaging: Edge cases', () => {
             // const expectedReceivedOrder = ['1', '5', '4', '3', '2'];
             const waitForMessages = waitFor(
                 bob!,
-                'message',
+                'data',
                 messageCount + protocolOverheadSize,
                 10000,
             );

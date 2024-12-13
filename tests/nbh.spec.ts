@@ -192,7 +192,7 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
             },
         ];
         const sendDiscoveredProfiles = async () => {
-            const userReceivedMessage = waitFor(user, 'message');
+            const userReceivedMessage = waitFor(user, 'data');
             await nab.sendMessage(await user.getDID(), {
                 type: 'profiles',
                 data: discovered,

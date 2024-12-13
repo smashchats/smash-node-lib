@@ -49,7 +49,7 @@ export default class SmashNAB extends SmashMessaging {
 
     emit(event: string | symbol, ...args: unknown[]): boolean {
         const result = super.emit(event, ...args);
-        if (event === 'message') {
+        if (event === 'data') {
             const [message, sender] = args as [
                 EncapsulatedSmashMessage,
                 SmashDID,

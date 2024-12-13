@@ -62,7 +62,7 @@ class TestUtils {
         const onMessage = jest.fn();
         const onStatus = jest.fn();
 
-        messaging.on('message', onMessage);
+        messaging.on('data', onMessage);
         messaging.on('status', onStatus);
 
         return { messaging, did, onMessage, onStatus };
@@ -199,7 +199,7 @@ describe('[SmashMessaging] Between peers registered to a SME', () => {
             // Setup message receipt expectation
             bobReceivedMessage = waitFor(
                 bob.messaging,
-                'message',
+                'data',
                 1 + TEST_CONFIG.PROTOCOL_OVERHEAD_SIZE,
             );
 
@@ -313,7 +313,7 @@ describe('[SmashMessaging] Between peers registered to a SME', () => {
                 const receivedAliceDID = bob.onMessage.mock.lastCall[1];
 
                 jest.resetAllMocks();
-                const aliceReceivedReply = waitFor(alice.messaging, 'message');
+                const aliceReceivedReply = waitFor(alice.messaging, 'data');
 
                 await bob.messaging.sendTextMessage(
                     receivedAliceDID,
@@ -351,12 +351,12 @@ describe('[SmashMessaging] Between peers registered to a SME', () => {
             const messagePromises = {
                 bob: waitFor(
                     bob.messaging,
-                    'message',
+                    'data',
                     1 + TEST_CONFIG.PROTOCOL_OVERHEAD_SIZE,
                 ),
                 alice: waitFor(
                     alice.messaging,
-                    'message',
+                    'data',
                     1 + TEST_CONFIG.PROTOCOL_OVERHEAD_SIZE,
                 ),
             };
@@ -403,10 +403,10 @@ describe('[SmashMessaging] Between peers registered to a SME', () => {
             const messagePromises = {
                 all: waitFor(
                     bob.messaging,
-                    'message',
+                    'data',
                     2 + TEST_CONFIG.PROTOCOL_OVERHEAD_SIZE,
                 ),
-                first: waitFor(bob.messaging, 'message', 1),
+                first: waitFor(bob.messaging, 'data', 1),
             };
 
             const firstMessage = await alice.messaging.sendTextMessage(

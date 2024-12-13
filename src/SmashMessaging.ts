@@ -298,10 +298,11 @@ export default class SmashMessaging extends EventEmitter {
     ) {
         if (!messages?.length) return;
         this.logger.debug(
-            `notifyNewMessages: ${messages?.length}/${(this.totalMessages += messages?.length)}`,
-            JSON.stringify(messages, null, 2),
+            `notifyNewMessages (${messages?.length}) (total: ${(this.totalMessages += messages?.length)})`,
         );
-        messages.forEach((message) => this.emit('message', message, sender));
+        this.logger.debug(JSON.stringify(messages, null, 2));
+        // firehose incoming events to the library user
+        messages.forEach((message) => this.emit('data', message, sender));
     }
 
     private async flushPeerIkDLQ(peerIk: string) {
