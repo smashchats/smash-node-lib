@@ -131,17 +131,12 @@ jobs:
                       ~/.npm
                   key: ${{ needs.install.outputs.cache-key }}
 
-            - name: Configure npm for Nexus
+            - name: Configure npm
               run: |
-                  echo "//nexus.unstaticlabs.com/repository/npm-hosted/:username=${NEXUS_USERNAME}" > ~/.npmrc
-                  echo "//nexus.unstaticlabs.com/repository/npm-hosted/:_password=$(echo -n ${NEXUS_PASSWORD} | base64)" >> ~/.npmrc
-                  echo "registry=https://nexus.unstaticlabs.com/repository/npm-hosted/" >> ~/.npmrc
-              env:
-                  NEXUS_USERNAME: ${{ secrets.NEXUS_USERNAME }}
-                  NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
+                  echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_AUTH_TOKEN }}" > ~/.npmrc
 
             - name: Run Publish Script
-              run: npm run publish-nexus
+              run: npm run publish-package
 
     update-badges:
         needs: test # Run after test job

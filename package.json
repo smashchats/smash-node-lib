@@ -1,5 +1,5 @@
 {
-    "name": "smash-node-lib",
+    "name": "@smashchats/library",
     "version": "0.0.0-alpha",
     "description": "",
     "main": "dist/src/index.js",
@@ -8,9 +8,6 @@
         "dist/src/**/*"
     ],
     "type": "module",
-    "publishConfig": {
-        "registry": "https://nexus.unstaticlabs.com/repository/npm-hosted/"
-    },
     "scripts": {
         "dev": "nodemon",
         "test": "jest --config jest.config.cjs",
@@ -30,7 +27,7 @@
         "prepare": "[ -n \"$CI\" ] || npm run prepare:husky",
         "prepare:husky": "husky",
         "postinstall": "patch-package",
-        "publish-nexus": "node ./publish.cjs"
+        "publish-package": "node ./publish.cjs"
     },
     "lint-staged": {
         "*.ts": "npm run prettier:format"
