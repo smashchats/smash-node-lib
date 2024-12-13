@@ -2,9 +2,9 @@ name: CI/CD Pipeline
 
 on:
     push:
-        branches: ['v0.0.0-alpha'] # Trigger on push to the v0.0.0-alpha branch
+        branches: ['main'] # Trigger on push to the main branch
     pull_request:
-        branches: ['v0.0.0-alpha'] # Trigger on pull requests to the v0.0.0-alpha branch
+        branches: ['main'] # Trigger on pull requests to the main branch
 
 jobs:
     install:
@@ -110,7 +110,7 @@ jobs:
 
     publish:
         needs: [install, quality, test]
-        if: github.ref_name == 'v0.0.0-alpha' # Only run on the v0.0.0-alpha branch
+        if: github.ref_name == 'main' # Only run on the main branch
         runs-on: ubuntu-24.04
         steps:
             - uses: actions/checkout@v4
@@ -145,7 +145,7 @@ jobs:
 
     update-badges:
         needs: test # Run after test job
-        if: github.ref_name == 'v0.0.0-alpha' # Only run on the v0.0.0-alpha branch
+        if: github.ref_name == 'main' # Only run on the main branch
         runs-on: ubuntu-24.04
         steps:
             - name: Update Coverage Badge

@@ -36,7 +36,7 @@
         "editor.defaultFormatter": "esbenp.prettier-vscode"
     },
     "git.autofetch": "all",
-    "git.branchProtection": ["v0.0.0-alpha"],
+    "git.branchProtection": ["main"],
     "git.countBadge": "tracked",
     "git.detectSubmodules": true,
     "git.rebaseWhenSync": true,

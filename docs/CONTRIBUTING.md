@@ -123,7 +123,7 @@ A patch is a local-first, decentralized way to propose and review changes.
    Maintainers will review your patch.
    Approved patches are merged into the _default branch_ using Git.
 
-    > The current default branch is `v0.0.0-alpha` (updated: 2024-12-05).
+    > The current default branch is `main` (updated: 2024-12-13).
 
 ## **Issues**
 
