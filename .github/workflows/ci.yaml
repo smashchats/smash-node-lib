@@ -69,7 +69,7 @@ jobs:
             - run: npm install jest-junit
 
             - name: Run Tests
-              run: npm test -- --coverage --coverageReporters json-summary --reporters=default --reporters=jest-junit
+              run: npm test -- --coverage --coverageReporters=lcov --coverageReporters=json-summary --reporters=default --reporters=jest-junit
 
             - name: Process Coverage Report
               id: coverageComment
