@@ -84,6 +84,13 @@ jobs:
                   hide-comment: false
                   create-new-comment: false
 
+            - name: Analyze with SonarQube
+              uses: SonarSource/sonarqube-scan-action@v4.1.0
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+                  SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
     quality:
         needs: install # Run after install job
         runs-on: ubuntu-24.04
