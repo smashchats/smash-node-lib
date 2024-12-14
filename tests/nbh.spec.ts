@@ -1,14 +1,14 @@
 import { Identity } from '2key-ratchet';
 import {
+    DIDDocument,
+    IMProtoMessage,
     Logger,
-    ProfileListSmashMessage,
     Relationship,
     SMEConfigJSONWithoutDefaults,
     SmashActionJson,
-    SmashDID,
     SmashMessaging,
     SmashNAB,
-    SmashProfile,
+    SmashProfileList,
     SmashUser,
 } from 'smash-node-lib';
 
@@ -42,7 +42,7 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
     const waitForEventCancelFns: (() => void)[] = [];
     const waitFor = aliasWaitFor(waitForEventCancelFns, new Logger('nbh.spec'));
     let nab: SmashNAB;
-    let nabDid: SmashDID;
+    let nabDid: DIDDocument;
     const onNabJoin: jest.Mock = jest.fn();
     let nabSMEConfig: SMEConfigJSONWithoutDefaults[];
 
@@ -180,10 +180,10 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
             expect((await user.getDID()).endpoints.length).toBe(1);
         });
 
-        const discovered: SmashProfile[] = [
+        const discovered: SmashProfileList = [
             {
                 did: {
-                    id: 'any',
+                    id: 'did:key:any',
                     ik: 'any',
                     ek: 'any',
                     signature: 'any',
@@ -194,9 +194,10 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
         const sendDiscoveredProfiles = async () => {
             const userReceivedMessage = waitFor(user, 'data');
             await nab.sendMessage(await user.getDID(), {
-                type: 'profiles',
+                type: 'com.smashchats.profiles',
                 data: discovered,
-            } as ProfileListSmashMessage);
+                after: '',
+            } as IMProtoMessage);
             return userReceivedMessage;
         };
 
@@ -218,7 +219,6 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
                         ik: userDid.ik,
                         ek: userDid.ek,
                     }),
-                    expect.anything(),
                 );
             });
 
@@ -268,7 +268,7 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
             describe('User Actions', () => {
                 let targetUser: SmashUser;
                 let onNabAction: jest.Mock;
-                let targetDid: SmashDID;
+                let targetDid: DIDDocument;
                 let counter: number;
 
                 beforeEach(async () => {
@@ -303,10 +303,7 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
                                 ek: userDid.ek,
                             }),
                             expect.objectContaining({
-                                target: expect.objectContaining({
-                                    ik: targetDid.ik,
-                                    ek: targetDid.ek,
-                                }),
+                                target: targetDid.id,
                                 action: action,
                             }),
                             expect.anything(),

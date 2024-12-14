@@ -1,7 +1,7 @@
 import {
+    DIDDocument,
     Logger,
     SignalSession,
-    SmashDID,
     SmashMessaging,
     sortSmashMessages,
 } from 'smash-node-lib';
@@ -39,9 +39,9 @@ describe('SmashMessaging: Edge cases', () => {
     const waitFor = aliasWaitFor(waitForEventCancelFns, logger);
 
     let alice: SmashMessaging | undefined;
-    let aliceDID: SmashDID;
+    let aliceDID: DIDDocument;
     let bob: SmashMessaging | undefined;
-    let bobDID: SmashDID;
+    let bobDID: DIDDocument;
     let onBobMessageReceived: jest.Mock;
 
     const protocolOverheadSize = 1;
@@ -390,7 +390,7 @@ describe('SmashMessaging: Edge cases', () => {
                 ([message]) => message,
             );
             const textMessages = receivedMessages.filter(
-                (message) => message.type === 'text',
+                (message) => message.type === 'org.improto.chat.text',
             );
             expect(textMessages.length).toBe(messageCount);
             expect(textMessages.map((text) => text.data)).not.toEqual(

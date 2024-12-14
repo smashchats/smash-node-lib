@@ -1,13 +1,19 @@
-import SmashMessaging from '@src/SmashMessaging.js';
+import { SmashMessaging } from '@src/SmashMessaging.js';
 import { SmashPeer } from '@src/SmashPeer.js';
-import { SmashDID, SmashProfile } from '@src/types/did.types.js';
 import {
-    EncapsulatedSmashMessage,
+    SMASH_NBH_DISCOVER_MESSAGE,
+    SMASH_NBH_JOIN_MESSAGE,
+} from '@src/const.js';
+import { DIDResolver } from '@src/did/index.js';
+import {
+    DID,
+    EncapsulatedIMProtoMessage,
     JoinAction,
     Relationship,
+    SmashProfileList,
 } from '@src/types/index.js';
 
-export default class SmashUser extends SmashMessaging {
+export class SmashUser extends SmashMessaging {
     private neighborhoodAdminIDs: string[] = [];
     private neighborhoodAdmins: SmashPeer[] = [];
 
@@ -18,61 +24,57 @@ export default class SmashUser extends SmashMessaging {
         }
         // Create or get NAB peer and send join message
         const nabPeer = await this.getOrCreatePeer(joinAction.did);
-        await nabPeer.sendMessage({ type: 'join', data: {}, after: '0' });
+        await nabPeer.sendMessage(SMASH_NBH_JOIN_MESSAGE);
         // Add neighborhood admin (NAB) and emit user event
-        const nabDid = nabPeer.getDID();
+        const nabDid = await nabPeer.getDID();
         this.neighborhoodAdminIDs.push(nabDid.id);
         this.neighborhoodAdmins.push(nabPeer);
         this.emit('nbh_added', nabDid);
     }
 
-    private async setRelationship(userDid: SmashDID, action: Relationship) {
+    private async setRelationship(userDid: DID, action: Relationship) {
         (await this.getOrCreatePeer(userDid)).setRelationship(
             action,
             this.neighborhoodAdmins,
         );
     }
 
-    smash(userDid: SmashDID) {
+    smash(userDid: DID) {
         return this.setRelationship(userDid, 'smash');
     }
 
-    pass(userDid: SmashDID) {
+    pass(userDid: DID) {
         return this.setRelationship(userDid, 'pass');
     }
 
-    clear(userDid: SmashDID) {
+    clear(userDid: DID) {
         return this.setRelationship(userDid, 'clear');
     }
 
     // TODO: handle for multiple NABs
     discover() {
-        return this.neighborhoodAdmins[0].sendMessage({
-            type: 'discover',
-            data: {},
-            after: '0',
-        });
+        return this.neighborhoodAdmins[0].sendMessage(
+            SMASH_NBH_DISCOVER_MESSAGE,
+        );
     }
 
     emit(event: string | symbol, ...args: unknown[]): boolean {
         if (event === 'data') {
-            const [message, sender] = args as [
-                EncapsulatedSmashMessage,
-                SmashDID,
-            ];
+            const [message, sender] = args as [EncapsulatedIMProtoMessage, DID];
             this.handleMessage(sender, message);
         }
         return super.emit(event, ...args);
     }
 
-    handleMessage(sender: SmashDID, message: EncapsulatedSmashMessage) {
+    async handleMessage(sender: DID, message: EncapsulatedIMProtoMessage) {
+        const nabDid = await DIDResolver.resolve(sender);
         switch (message.type) {
-            case 'profiles':
-                if (this.neighborhoodAdminIDs.includes(sender.id)) {
+            case 'com.smashchats.profiles':
+                if (this.neighborhoodAdminIDs.includes(nabDid.id)) {
                     this.emit(
                         'nbh_profiles',
                         sender,
-                        message.data as SmashProfile[],
+                        message.data as SmashProfileList,
                     );
                 }
                 break;

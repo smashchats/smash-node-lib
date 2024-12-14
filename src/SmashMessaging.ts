@@ -1,27 +1,24 @@
+import { Curve, Identity, setEngine } from '2key-ratchet';
+import { SmashPeer } from '@src/SmashPeer.js';
+import { DIDResolver } from '@src/did/resolver.js';
+import { SessionManager } from '@src/signal/SessionManager.js';
+import { SMESocketManager } from '@src/sme/SMESocketManager.js';
 import {
-    Curve,
+    DID,
+    DIDDocument,
+    EncapsulatedIMProtoMessage,
     IECKeyPair,
     IJsonIdentity,
-    Identity,
-    setEngine,
-} from '2key-ratchet';
-import CryptoUtils from '@src/CryptoUtils.js';
-import { LogLevel, Logger } from '@src/Logger.js';
-import { SMESocketManager } from '@src/SMESocketManager.js';
-import { SessionManager } from '@src/SessionManager.js';
-import { SmashPeer } from '@src/SmashPeer.js';
-import {
-    EncapsulatedSmashMessage,
-    ProfileSmashMessage,
+    IMProfile,
+    IMProfileMessage,
+    IMProtoMessage,
+    IMTextMessage,
     SMEConfigJSONWithoutDefaults,
     SME_DEFAULT_CONFIG,
-    SmashChatMessage,
-    SmashDID,
     SmashEndpoint,
-    SmashMessage,
-    SmashProfile,
-    SmashProfileMeta,
 } from '@src/types/index.js';
+import { LogLevel, Logger } from '@src/utils/Logger.js';
+import { CryptoUtils } from '@src/utils/index.js';
 import { EventEmitter } from 'events';
 
 interface IJWKJson extends CryptoKey {
@@ -35,13 +32,15 @@ interface IJWKJsonKeyPair {
 }
 
 interface SmashChat {
-    with: SmashDID;
+    with: DID;
     lastMessageTimestamp: string;
 }
 
-// TODO: retry in case message does not successfully send??
+type ProfileMeta = Omit<IMProfile, 'did'>;
+
 // TODO: safeguard crypto operations against errors
-export default class SmashMessaging extends EventEmitter {
+// TODO: split beteen IMProto and Smash Messaging
+export class SmashMessaging extends EventEmitter {
     private logger: Logger;
     private static crypto: globalThis.Crypto;
 
@@ -169,7 +168,7 @@ export default class SmashMessaging extends EventEmitter {
         return SmashMessaging.serializeIdentity(this.identity);
     }
 
-    private dlq: Record<string, EncapsulatedSmashMessage[]>;
+    private dlq: Record<string, EncapsulatedIMProtoMessage[]>;
     private peers: Record<string, SmashPeer>;
     private endpoints: SmashEndpoint[];
     private sessionManager: SessionManager;
@@ -178,7 +177,7 @@ export default class SmashMessaging extends EventEmitter {
 
     constructor(
         protected identity: Identity,
-        private meta?: SmashProfileMeta,
+        private meta?: ProfileMeta,
         LOG_LEVEL: LogLevel = 'INFO',
         LOG_ID: string = 'SmashMessaging',
     ) {
@@ -204,12 +203,15 @@ export default class SmashMessaging extends EventEmitter {
     }
 
     async initChats(chats: SmashChat[]) {
-        chats.forEach(async (chat) => {
-            this.peers[chat.with.id] = await this.getOrCreatePeer(
-                chat.with,
-                chat.lastMessageTimestamp,
-            );
-        });
+        return Promise.all(
+            chats.map(async (chat) => {
+                const peerDid = await DIDResolver.resolve(chat.with);
+                this.peers[peerDid.id] = await this.getOrCreatePeer(
+                    peerDid,
+                    chat.lastMessageTimestamp,
+                );
+            }),
+        );
     }
 
     async initEndpoints(
@@ -247,10 +249,10 @@ export default class SmashMessaging extends EventEmitter {
     // TODO: handle updates from other peers IF signed (and with proper trusting level—ie. not from any peer & only ADDING not replacing/removing endpoints if not from the peer itself )
     private async incomingProfileHandler(
         peerIk: string,
-        message: ProfileSmashMessage,
+        message: IMProfileMessage,
     ) {
         this.logger.debug(`Received Profile for IK ${peerIk}`);
-        const peerDid = message.data.did;
+        const peerDid = await DIDResolver.resolve(message.data.did);
         if (peerIk !== peerDid.ik) {
             // TODO: handle IK upgrades
             const err = 'Received IK doesnt match Signal Session data.';
@@ -265,11 +267,11 @@ export default class SmashMessaging extends EventEmitter {
 
     private async incomingMessagesHandler(
         peerIk: string,
-        messages: EncapsulatedSmashMessage[],
+        messages: EncapsulatedIMProtoMessage[],
     ) {
         const peer: SmashPeer | undefined = this.getPeerByIk(peerIk);
         if (peer) {
-            const peerDid = peer.getDID();
+            const peerDid = await peer.getDID();
             // firehose incoming events to the library user
             this.notifyNewMessages(messages, peerDid);
             await this.incomingMessagesParser(peer, messages);
@@ -280,12 +282,9 @@ export default class SmashMessaging extends EventEmitter {
             this.pushToUnknownPeerIkDLQ(peerIk, messages);
             // TODO: handle profile updates (for now only handles IK updates)
             messages
-                .filter((m) => m.type === 'profile')
+                .filter((m) => m.type === 'org.improto.profile')
                 .map((m) =>
-                    this.incomingProfileHandler(
-                        peerIk,
-                        m as ProfileSmashMessage,
-                    ),
+                    this.incomingProfileHandler(peerIk, m as IMProfileMessage),
                 );
             this.logger.debug(
                 `DLQd ${messages.length} messages from unknown peer (IK: ${peerIk})`,
@@ -295,25 +294,26 @@ export default class SmashMessaging extends EventEmitter {
 
     private async incomingMessageParser(
         peer: SmashPeer,
-        message: EncapsulatedSmashMessage,
+        message: EncapsulatedIMProtoMessage,
     ) {
-        if (message.type === 'profile') {
+        if (message.type === 'org.improto.profile') {
             // TODO: handle profile updates (for now only handles new IK updates)
             this.emit(
+                // TODO: work on parsed events and their interpretation
                 'profile',
-                peer.getDID().id,
-                message.data as SmashProfile,
+                (await peer.getDID()).id,
+                message.data as IMProfile,
                 message.sha256,
                 message.timestamp,
             );
-        } else if (message.type === 'session_reset') {
+        } else if (message.type === 'org.improto.session.reset') {
             await peer.incomingSessionReset(message.sha256);
         }
     }
 
     private async incomingMessagesParser(
         peer: SmashPeer,
-        messages: EncapsulatedSmashMessage[],
+        messages: EncapsulatedIMProtoMessage[],
     ) {
         await Promise.allSettled(
             messages.map((message) =>
@@ -324,8 +324,8 @@ export default class SmashMessaging extends EventEmitter {
 
     totalMessages = 0;
     private notifyNewMessages(
-        messages: EncapsulatedSmashMessage[],
-        sender: SmashDID,
+        messages: EncapsulatedIMProtoMessage[],
+        sender: DIDDocument,
     ) {
         if (!messages?.length) return;
         this.logger.debug(
@@ -350,17 +350,18 @@ export default class SmashMessaging extends EventEmitter {
 
     private pushToUnknownPeerIkDLQ(
         peerIk: string,
-        messages: EncapsulatedSmashMessage[],
+        messages: EncapsulatedIMProtoMessage[],
     ) {
         if (!this.dlq[peerIk]) this.dlq[peerIk] = [];
         this.dlq[peerIk].push(...messages);
     }
 
     protected async getOrCreatePeer(
-        peerDid: SmashDID,
+        did: DID,
         lastMessageTimestamp?: string,
     ): Promise<SmashPeer> {
         // TODO: handle DID updates
+        const peerDid = await DIDResolver.resolve(did);
         if (!this.peers[peerDid.id]) {
             this.logger.debug(`CreatePeer ${peerDid.id}`);
             const peer = new SmashPeer(
@@ -374,9 +375,10 @@ export default class SmashMessaging extends EventEmitter {
             );
             await peer.configureEndpoints();
             await peer.queueMessage({
-                type: 'profile',
+                type: 'org.improto.profile',
                 data: await this.getProfile(),
-            } as ProfileSmashMessage);
+                after: '',
+            } as IMProfileMessage);
             this.peers[peerDid.id] = peer;
         }
         // always map IK to ID (TODO handle profile/DID updates)
@@ -385,42 +387,47 @@ export default class SmashMessaging extends EventEmitter {
     }
 
     sendTextMessage(
-        peerDid: SmashDID,
+        peerDid: DID,
         text: string,
         after: string,
-    ): Promise<EncapsulatedSmashMessage> {
+    ): Promise<EncapsulatedIMProtoMessage> {
         return this.sendMessage(peerDid, {
-            type: 'text',
+            type: 'org.improto.chat.text',
             data: text,
             after,
-        } as SmashChatMessage);
+        } as IMTextMessage);
     }
 
-    async sendMessage(peerDid: SmashDID, message: SmashMessage) {
+    async sendMessage(peerDid: DID, message: IMProtoMessage) {
         const peer = await this.getOrCreatePeer(peerDid);
         return await peer.sendMessage(message);
     }
 
-    async getProfile(): Promise<SmashProfile> {
+    async getProfile(): Promise<IMProfile> {
         return {
-            meta: this.meta,
+            ...{
+                title: '',
+                description: '',
+                avatar: '',
+            },
+            ...this.meta,
             did: await this.getDID(),
         };
     }
 
-    getDID(): Promise<SmashDID> {
+    getDID(): Promise<DIDDocument> {
         return SmashMessaging.getDID(this.identity, this.endpoints);
     }
 
-    async updateMeta(meta: SmashProfileMeta) {
+    async updateMeta(meta: ProfileMeta) {
         this.meta = meta;
         const profile = await this.getProfile();
         await Promise.all(
             Object.values(this.peers).map((peer) =>
                 peer.sendMessage({
-                    type: 'profile',
+                    type: 'org.improto.profile',
                     data: profile,
-                } as ProfileSmashMessage),
+                } as IMProfileMessage),
             ),
         );
     }
@@ -428,8 +435,9 @@ export default class SmashMessaging extends EventEmitter {
     private static async getDID(
         identity: Identity,
         endpoints: SmashEndpoint[],
-    ): Promise<SmashDID> {
+    ): Promise<DIDDocument> {
         return {
+            // @ts-expect-error TODO: implement DID:key
             id: await CryptoUtils.singleton.sha256(
                 identity.signingKey.publicKey.serialize(),
             ),

@@ -1,15 +1,15 @@
-import SmashMessaging from '@src/SmashMessaging.js';
+import { SmashMessaging } from '@src/SmashMessaging.js';
 import {
-    ActionData,
-    EncapsulatedSmashMessage,
+    DID,
+    EncapsulatedIMProtoMessage,
+    IMProfile,
     JoinAction,
     SMEConfigJSONWithoutDefaults,
     SME_DEFAULT_CONFIG,
-    SmashDID,
-    SmashProfile,
+    SmashChatRelationshipData,
 } from '@src/types/index.js';
 
-export default class SmashNAB extends SmashMessaging {
+export class SmashNAB extends SmashMessaging {
     async getJoinInfo(
         smeConfig?: SMEConfigJSONWithoutDefaults[],
     ): Promise<JoinAction> {
@@ -50,36 +50,33 @@ export default class SmashNAB extends SmashMessaging {
     emit(event: string | symbol, ...args: unknown[]): boolean {
         const result = super.emit(event, ...args);
         if (event === 'data') {
-            const [message, sender] = args as [
-                EncapsulatedSmashMessage,
-                SmashDID,
-            ];
+            const [message, sender] = args as [EncapsulatedIMProtoMessage, DID];
             this.handleMessage(sender, message);
         }
         return result;
     }
 
-    handleMessage(sender: SmashDID, message: EncapsulatedSmashMessage) {
+    handleMessage(sender: DID, message: EncapsulatedIMProtoMessage) {
         switch (message.type) {
-            case 'join':
+            case 'com.smashchats.nbh.join':
                 // TODO: join config specific to nab (totp, past relationships, etc)
-                this.emit('join', sender, message.data as JoinAction);
+                this.emit('join', sender);
                 break;
-            case 'discover':
+            case 'com.smashchats.nbh.discover':
                 this.emit('discover', sender);
                 break;
-            case 'action':
+            case 'com.smashchats.relationship':
                 // TODO: shall we pass the encapsulation info down the lib
                 // TODO: in other words, is there a reason for this middleware???
                 this.emit(
                     'action',
                     sender,
-                    message.data as ActionData,
+                    message.data as SmashChatRelationshipData,
                     new Date(message.timestamp),
                 );
                 break;
-            case 'profile':
-                this.emit('profile', sender, message.data as SmashProfile);
+            case 'org.improto.profile':
+                this.emit('profile', sender, message.data as IMProfile);
                 break;
         }
     }

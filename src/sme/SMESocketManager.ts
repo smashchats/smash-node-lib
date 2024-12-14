@@ -1,13 +1,13 @@
-import { Identity } from '2key-ratchet';
-import { Logger } from '@src/Logger.js';
-import { SMESocketReadWrite } from '@src/SMESocketReadWrite.js';
-import { SMESocketWriteOnly } from '@src/SMESocketWriteOnly.js';
-import { SessionManager } from '@src/SessionManager.js';
+import { SessionManager } from '@src/signal/index.js';
+import { SMESocketReadWrite } from '@src/sme/SMESocketReadWrite.js';
+import { SMESocketWriteOnly } from '@src/sme/SMESocketWriteOnly.js';
 import {
+    Identity,
     SMEConfig,
     onMessagesFn,
     onMessagesStatusFn,
 } from '@src/types/index.js';
+import { Logger } from '@src/utils/index.js';
 
 export class SMESocketManager {
     private smeSockets: Record<string, SMESocketWriteOnly>;

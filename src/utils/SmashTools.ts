@@ -1,11 +1,11 @@
-import { EncapsulatedSmashMessage } from '@src/types/index.js';
+import { EncapsulatedIMProtoMessage } from '@src/types/index.js';
 
 // TODO what if there are multiple unlinked chains? (eg, lost message)
 export const sortSmashMessages = (
-    messages: EncapsulatedSmashMessage[],
-): EncapsulatedSmashMessage[] => {
-    const orderedMessages: EncapsulatedSmashMessage[] = [];
-    const messageMap = new Map<string, EncapsulatedSmashMessage>();
+    messages: EncapsulatedIMProtoMessage[],
+): EncapsulatedIMProtoMessage[] => {
+    const orderedMessages: EncapsulatedIMProtoMessage[] = [];
+    const messageMap = new Map<string, EncapsulatedIMProtoMessage>();
     messages.forEach((message) => {
         messageMap.set(message.sha256, message);
     });
@@ -14,7 +14,7 @@ export const sortSmashMessages = (
     messages.forEach((message) => {
         if (usedMessages.has(message.sha256)) return;
         const currentChain = [];
-        let currentMessage: EncapsulatedSmashMessage | undefined = message;
+        let currentMessage: EncapsulatedIMProtoMessage | undefined = message;
         while (currentMessage && !usedMessages.has(currentMessage.sha256)) {
             currentChain.push(currentMessage);
             usedMessages.add(currentMessage.sha256);

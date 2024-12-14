@@ -1,4 +1,4 @@
-import { IECKeyPair } from '2key-ratchet';
+import { IECKeyPair } from '@src/types/index.js';
 
 export interface SmashEndpoint {
     url: string;
