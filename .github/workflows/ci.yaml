@@ -22,14 +22,25 @@ jobs:
               with:
                   node-version: '22.x'
 
-            - name: Install Dependencies
-              run: npm ci
-
             - name: Set Cache Key Output
               id: set-cache-key
               run: echo "cache-key=${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}" >> $GITHUB_OUTPUT
 
+            - name: Check Cache
+              id: cache-check
+              uses: actions/cache/restore@v4
+              with:
+                  path: |
+                      node_modules
+                      ~/.npm
+                  key: ${{ steps.set-cache-key.outputs.cache-key }}
+
+            - name: Install Dependencies
+              if: steps.cache-check.outputs.cache-hit != 'true'
+              run: npm ci
+
             - name: Cache Dependencies
+              if: steps.cache-check.outputs.cache-hit != 'true'
               uses: actions/cache/save@v4
               with:
                   path: |
