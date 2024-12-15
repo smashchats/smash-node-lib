@@ -14,13 +14,12 @@ export interface BaseIMProtoMessage {
     after: sha256;
 }
 
-export interface TimedIMProtoMessage extends BaseIMProtoMessage {
+interface TimedIMProtoMessage extends BaseIMProtoMessage {
     timestamp: ISO8601;
 }
 
 export interface EncapsulatedIMProtoMessage extends TimedIMProtoMessage {
     sha256: sha256;
-    after: sha256;
 }
 
 export type IMProtoMessage = Partial<EncapsulatedIMProtoMessage> &

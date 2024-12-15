@@ -1,1 +1,1 @@
-export * from '@src/did/resolver.js';
+export * from '@src/did/DIDResolver.js';

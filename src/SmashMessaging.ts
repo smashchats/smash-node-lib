@@ -1,8 +1,9 @@
 import { Curve, Identity, setEngine } from '2key-ratchet';
 import { SmashPeer } from '@src/SmashPeer.js';
-import { DIDResolver } from '@src/did/resolver.js';
-import { SessionManager } from '@src/signal/SessionManager.js';
-import { SMESocketManager } from '@src/sme/SMESocketManager.js';
+import { BaseResolver, DataForwardingResolver } from '@src/callbacks/index.js';
+import { DIDResolver } from '@src/did/index.js';
+import { SessionManager } from '@src/signal/index.js';
+import { SMESocketManager } from '@src/sme/index.js';
 import {
     DID,
     DIDDocument,
@@ -38,6 +39,16 @@ interface SmashChat {
 
 type ProfileMeta = Omit<IMProfile, 'did'>;
 
+class SessionResetHandler extends BaseResolver<IMProtoMessage, void> {
+    resolve(
+        peer: SmashPeer,
+        message: EncapsulatedIMProtoMessage,
+    ): Promise<void> {
+        return peer.incomingSessionReset(message.sha256);
+    }
+}
+
+// TODO: refactor
 // TODO: safeguard crypto operations against errors
 // TODO: split beteen IMProto and Smash Messaging
 export class SmashMessaging extends EventEmitter {
@@ -173,7 +184,6 @@ export class SmashMessaging extends EventEmitter {
     private endpoints: SmashEndpoint[];
     private sessionManager: SessionManager;
     private smeSocketManager: SMESocketManager;
-    // private processingDlq: boolean;
 
     constructor(
         protected identity: Identity,
@@ -192,7 +202,14 @@ export class SmashMessaging extends EventEmitter {
             this.messagesStatusHandler.bind(this),
             this.logger,
         );
-
+        this.superRegister(
+            'org.improto.profile',
+            new DataForwardingResolver('org.improto.profile'),
+        );
+        this.superRegister(
+            'org.improto.session.reset',
+            new SessionResetHandler('org.improto.session.reset'),
+        );
         this.logger.info(`Loaded Smash lib (log level: ${LOG_LEVEL})`);
     }
 
@@ -282,7 +299,7 @@ export class SmashMessaging extends EventEmitter {
             this.pushToUnknownPeerIkDLQ(peerIk, messages);
             // TODO: handle profile updates (for now only handles IK updates)
             messages
-                .filter((m) => m.type === 'org.improto.profile')
+                .filter((m) => m.type === 'org.improto.profile') // TODO: split DID
                 .map((m) =>
                     this.incomingProfileHandler(peerIk, m as IMProfileMessage),
                 );
@@ -296,19 +313,23 @@ export class SmashMessaging extends EventEmitter {
         peer: SmashPeer,
         message: EncapsulatedIMProtoMessage,
     ) {
-        if (message.type === 'org.improto.profile') {
-            // TODO: handle profile updates (for now only handles new IK updates)
-            this.emit(
-                // TODO: work on parsed events and their interpretation
-                'profile',
-                (await peer.getDID()).id,
-                message.data as IMProfile,
-                message.sha256,
-                message.timestamp,
-            );
-        } else if (message.type === 'org.improto.session.reset') {
-            await peer.incomingSessionReset(message.sha256);
-        }
+        const handlers = this.messageHandlers.get(message.type);
+        if (!handlers?.length) return;
+        await Promise.allSettled(
+            handlers.map(({ eventName, resolver }) =>
+                resolver
+                    .resolve(peer, message)
+                    .then((result) =>
+                        this.emit(
+                            eventName,
+                            peer.id,
+                            result,
+                            message.sha256,
+                            message.timestamp,
+                        ),
+                    ),
+            ),
+        );
     }
 
     private async incomingMessagesParser(
@@ -482,6 +503,61 @@ export class SmashMessaging extends EventEmitter {
                 'reason:',
                 reason,
             );
+        }
+    }
+
+    private messageHandlers: Map<
+        string,
+        {
+            eventName: string;
+            resolver: BaseResolver<IMProtoMessage, unknown>;
+        }[]
+    > = new Map();
+
+    /**
+     * Register a resolver for a specific message type
+     * @param eventName Event name triggered by the library
+     * @param resolver Resolver instance that extends BaseResolver
+     * @typeparam T Type of messages to resolve
+     */
+    public register(
+        eventName: `data.${string}`,
+        resolver: BaseResolver<IMProtoMessage, unknown>,
+    ): void {
+        this.superRegister(eventName, resolver);
+    }
+    protected superRegister(
+        eventName: string,
+        resolver: BaseResolver<IMProtoMessage, unknown>,
+    ): void {
+        const messageType = resolver.getMessageType();
+        if (!this.messageHandlers.has(messageType)) {
+            this.messageHandlers.set(messageType, []);
+        }
+        this.messageHandlers.get(messageType)!.push({ eventName, resolver });
+    }
+
+    /**
+     * Unregister a specific resolver for a message type
+     * @param eventName Event name to unregister
+     * @param resolver Resolver instance to unregister
+     */
+    public unregister(
+        eventName: string,
+        resolver: BaseResolver<IMProtoMessage, unknown>,
+    ): void {
+        const messageType = resolver.getMessageType();
+        const handlers = this.messageHandlers.get(messageType);
+        if (!handlers) return;
+        const filteredHandlers = handlers.filter(
+            (handler) =>
+                handler.eventName !== eventName ||
+                handler.resolver !== resolver,
+        );
+        if (filteredHandlers.length === 0) {
+            this.messageHandlers.delete(messageType);
+        } else {
+            this.messageHandlers.set(messageType, filteredHandlers);
         }
     }
 }

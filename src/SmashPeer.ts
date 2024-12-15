@@ -5,6 +5,7 @@ import { SMESocketManager, SMESocketWriteOnly } from '@src/sme/index.js';
 import {
     DID,
     DIDDocument,
+    DIDString,
     EncapsulatedIMProtoMessage,
     IMProtoMessage,
     ISO8601,
@@ -31,13 +32,18 @@ export class SmashPeer {
     private relationship: Relationship = 'clear';
     private lastRelationshipSha256: string = '0';
 
+    // TODO: default to use 'id' everywhere document is not needed
+    public readonly id: DIDString;
+
     constructor(
         private did: DID,
         private lastMessageTime: number,
         private sessionManager: SessionManager,
         private smeSocketManager: SMESocketManager,
         private logger: Logger,
-    ) {}
+    ) {
+        this.id = typeof did === 'string' ? did : did.id;
+    }
 
     // TODO: should validate endpointConfig.preKey signature!!!
     private async createEndpoint(endpointConfig: SmashEndpoint) {
