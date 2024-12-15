@@ -7,6 +7,7 @@ import {
 import {
     DIDDocument,
     DIDString,
+    ISO8601,
     SMASH_NBH_DISCOVER,
     SMASH_NBH_JOIN,
     SMASH_NBH_RELATIONSHIP,
@@ -15,6 +16,7 @@ import {
     SmashActionJson,
     SmashChatRelationshipData,
     SmashChatRelationshipMessage,
+    sha256,
 } from '@src/types/index.js';
 
 export abstract class SmashNAB extends SmashMessaging {
@@ -56,19 +58,33 @@ export abstract class SmashNAB extends SmashMessaging {
     }
 
     public abstract onJoin(
-        sender: DIDString,
+        from: DIDString,
         did: DIDDocument,
+        sha256?: sha256,
+        timeString?: ISO8601,
     ): Promise<unknown>;
-    public abstract onDiscover(sender: DIDString): Promise<unknown>;
+    public abstract onDiscover(
+        from: DIDString,
+        sha256?: sha256,
+        timeString?: ISO8601,
+    ): Promise<unknown>;
     public abstract onRelationship(
-        sender: DIDString,
+        from: DIDString,
         { target, action }: SmashChatRelationshipData,
+        sha256?: sha256,
+        timeString?: ISO8601,
     ): Promise<unknown>;
 
     constructor(...args: ConstructorParameters<typeof SmashMessaging>) {
         super(...args);
     }
 
+    /**
+     * Register all hooks for the NAB
+     * - Join: Handle join event
+     * - Discover: Handle discover event
+     * - Relationship: Handle relationship event
+     */
     public registerHooks() {
         this.registerJoin();
         this.registerDiscover();

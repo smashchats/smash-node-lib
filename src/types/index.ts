@@ -1,10 +1,6 @@
 // Re-exports specific types from the '2key-ratchet' library
-export type {
-    ECPublicKey,
-    Identity,
-    IECKeyPair,
-    IJsonIdentity,
-} from '2key-ratchet';
+export { ECPublicKey } from '2key-ratchet';
+export type { IECKeyPair, IJsonIdentity, Identity } from '2key-ratchet';
 
 export * from '@src/types/action.types.js';
 export * from '@src/types/callbacks.types.js';

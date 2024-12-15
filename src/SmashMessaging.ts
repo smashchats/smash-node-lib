@@ -56,7 +56,7 @@ class SessionResetHandler extends BaseResolver<IMProtoMessage, void> {
 // TODO: safeguard crypto operations against errors
 // TODO: split beteen IMProto and Smash Messaging
 export class SmashMessaging extends EventEmitter {
-    private logger: Logger;
+    protected logger: Logger;
     private static crypto: globalThis.Crypto;
 
     static setCrypto(c: globalThis.Crypto) {
