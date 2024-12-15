@@ -1,19 +1,18 @@
 import {
     AsymmetricRatchet,
     ECPublicKey,
-    Identity,
     MessageSignedProtocol,
     PreKeyBundleProtocol,
     PreKeyMessageProtocol,
 } from '2key-ratchet';
-import CryptoUtils from '@src/CryptoUtils.js';
-import { Logger } from '@src/Logger.js';
 import { EXPIRATION_TIME_MS } from '@src/const.js';
 import {
-    EncapsulatedSmashMessage,
-    SmashDID,
+    DIDDocument,
+    EncapsulatedIMProtoMessage,
+    Identity,
     SmashEndpoint,
 } from '@src/types/index.js';
+import { CryptoUtils, Logger } from '@src/utils/index.js';
 
 export class SignalSession {
     public readonly createdAtTime: number;
@@ -33,7 +32,7 @@ export class SignalSession {
     }
 
     static async create(
-        peer: SmashDID,
+        peerDidDocument: DIDDocument,
         identity: Identity,
         sme: SmashEndpoint,
         logger: Logger,
@@ -42,13 +41,13 @@ export class SignalSession {
             const bundle = new PreKeyBundleProtocol();
             bundle.registrationId = 0; // warning: using fixed value, unsure about usage!
             bundle.identity.signingKey = await ECPublicKey.create(
-                await CryptoUtils.singleton.importKey(peer.ik),
+                await CryptoUtils.singleton.importKey(peerDidDocument.ik),
             );
             bundle.identity.exchangeKey = await ECPublicKey.create(
-                await CryptoUtils.singleton.importKey(peer.ek),
+                await CryptoUtils.singleton.importKey(peerDidDocument.ek),
             );
             bundle.identity.signature = CryptoUtils.singleton.stringToBuffer(
-                peer.signature,
+                peerDidDocument.signature,
             );
 
             bundle.preKeySigned.id = 0; // warning: using fixed value, unsure about usage!
@@ -64,7 +63,12 @@ export class SignalSession {
             const sessionId = await CryptoUtils.singleton.keySha256(
                 cipher.currentRatchetKey.publicKey.key,
             );
-            return new SignalSession(sessionId, cipher, peer.ik, logger);
+            return new SignalSession(
+                sessionId,
+                cipher,
+                peerDidDocument.ik,
+                logger,
+            );
         } catch (err) {
             logger.warn('Cannot create session.');
             throw err;
@@ -76,7 +80,7 @@ export class SignalSession {
         sessionId: string,
         data: ArrayBuffer,
         logger: Logger,
-    ): Promise<[SignalSession, EncapsulatedSmashMessage[]]> {
+    ): Promise<[SignalSession, EncapsulatedIMProtoMessage[]]> {
         logger.debug('SignalSession::parseSession');
         try {
             const preKeyMessageProtocol =
@@ -110,7 +114,7 @@ export class SignalSession {
         }
     }
 
-    async encryptMessages(message: EncapsulatedSmashMessage[]) {
+    async encryptMessages(message: EncapsulatedIMProtoMessage[]) {
         try {
             const data = CryptoUtils.singleton.objectToBuffer(message);
             return (await this.cipher.encrypt(data)).exportProto();
@@ -133,12 +137,12 @@ export class SignalSession {
 
     private async decryptMessages(
         message: MessageSignedProtocol,
-    ): Promise<EncapsulatedSmashMessage[]> {
+    ): Promise<EncapsulatedIMProtoMessage[]> {
         try {
             const decryptedData = CryptoUtils.singleton.bufferToObject(
                 await this.cipher.decrypt(message),
             );
-            return decryptedData as EncapsulatedSmashMessage[];
+            return decryptedData as EncapsulatedIMProtoMessage[];
         } catch (err) {
             this.logger.warn('Cannot decrypt messages.');
             throw err;

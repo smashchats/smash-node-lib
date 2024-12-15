@@ -1,6 +1,6 @@
-import { Logger } from '@src/Logger.js';
 import { onMessagesStatusFn } from '@src/types/index.js';
-import { Socket, io } from 'socket.io-client';
+import { Logger } from '@src/utils/index.js';
+import { type Socket, io } from 'socket.io-client';
 import { clearTimeout, setTimeout } from 'timers';
 
 type SMEAuthParams = {
@@ -45,7 +45,7 @@ export class SMESocketWriteOnly {
         if (!this.socket) {
             this.socket = SMESocketWriteOnly.initSocket(this.logger, this.url);
         }
-        this.socket.emit('data', preKey, sessionId, buffer, () => {
+        this.socket?.emit('data', preKey, sessionId, buffer, () => {
             this.logger.debug(`${messageIds} "delivered"`);
             this.onMessagesStatusCallback(messageIds, 'delivered');
         });

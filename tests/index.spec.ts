@@ -1,7 +1,8 @@
 import {
-    EncapsulatedSmashMessage,
+    DIDDocument,
+    EncapsulatedIMProtoMessage,
+    IMProfile,
     Logger,
-    SmashDID,
     SmashMessaging,
 } from 'smash-node-lib';
 
@@ -36,7 +37,7 @@ interface TestMessage {
 
 interface TestPeer {
     messaging: SmashMessaging;
-    did: SmashDID;
+    did: DIDDocument;
     onMessage: jest.Mock;
     onStatus: jest.Mock;
 }
@@ -127,6 +128,8 @@ describe('[SmashMessaging] Between peers registered to a SME', () => {
     let alice: TestPeer;
     let bob: TestPeer;
 
+    let updatedAliceMeta: IMProfile;
+
     beforeAll(async () => {
         RealDate = Date;
         mockedNow = new RealDate(TEST_CONFIG.INITIAL_DATE);
@@ -147,6 +150,12 @@ describe('[SmashMessaging] Between peers registered to a SME', () => {
 
         // Create test peers
         alice = await TestUtils.createPeer('alice', socketServerUrl);
+        updatedAliceMeta = {
+            did: alice.did.id,
+            title: 'Alice',
+            description: 'Alice is a cool person',
+            avatar: 'https://alice.com/picture.png',
+        };
         bob = await TestUtils.createPeer('bob', socketServerUrl);
     });
 
@@ -165,12 +174,7 @@ describe('[SmashMessaging] Between peers registered to a SME', () => {
 
     describe('Alice updates their profile metadata BEFORE chatting with Bob', () => {
         it('Bob doesnt receive the update', async () => {
-            const updatedMeta = {
-                title: 'Alice',
-                description: 'Alice is a cool person',
-                picture: 'https://alice.com/picture.png',
-            };
-            await alice.messaging.updateMeta(updatedMeta);
+            await alice.messaging.updateMeta(updatedAliceMeta);
             await delay(TEST_CONFIG.DEFAULT_POLL_INTERVAL);
             expect(bob.onMessage).not.toHaveBeenCalled();
         });
@@ -179,10 +183,10 @@ describe('[SmashMessaging] Between peers registered to a SME', () => {
     describe('Alice sends one message to Bob', () => {
         const TEST_MESSAGE: TestMessage = {
             text: 'hello world 1',
-            sha256: 'i1M92vd0lSfaQxVb3V018uMwghFYNd6xyWujvdUA+/Y=',
+            sha256: 'kPay1AyS9MkvDMfXSKhaSeNev02sUpA7k4oauLahq8w=',
         };
 
-        let aliceSentMessage: EncapsulatedSmashMessage;
+        let aliceSentMessage: EncapsulatedIMProtoMessage;
         let bobReceivedMessage: Promise<void>;
 
         beforeEach(async () => {
@@ -239,7 +243,7 @@ describe('[SmashMessaging] Between peers registered to a SME', () => {
         it('contains a content-addressable ID', async () => {
             expect(aliceSentMessage).toMatchObject({
                 sha256: TEST_MESSAGE.sha256,
-            } as EncapsulatedSmashMessage);
+            } as EncapsulatedIMProtoMessage);
         });
 
         it('contains a valid timestamp', async () => {
@@ -248,7 +252,7 @@ describe('[SmashMessaging] Between peers registered to a SME', () => {
 
             expect(aliceSentMessage).toMatchObject({
                 timestamp: expect.stringMatching(ISO8601_TIMESTAMP_REGEX),
-            } as EncapsulatedSmashMessage);
+            } as EncapsulatedIMProtoMessage);
 
             const messageTime =
                 new Date(aliceSentMessage.timestamp).getTime() /
@@ -258,20 +262,19 @@ describe('[SmashMessaging] Between peers registered to a SME', () => {
 
         describe('Alice updates their profile metadata AFTER chatting with Bob', () => {
             it('Bob receives the update', async () => {
-                const updatedMeta = {
-                    title: 'Alice',
-                    description: 'Alice is a cool person',
-                    picture: 'https://alice.com/picture.png',
-                };
-
-                await alice.messaging.updateMeta(updatedMeta);
+                await alice.messaging.updateMeta(updatedAliceMeta);
                 await delay(TEST_CONFIG.DEFAULT_POLL_INTERVAL);
 
                 expect(bob.onMessage).toHaveBeenCalledWith(
+                    expect.any(String),
                     expect.objectContaining({
-                        data: expect.objectContaining({ meta: updatedMeta }),
+                        data: expect.objectContaining({
+                            ...updatedAliceMeta,
+                            did: expect.objectContaining({
+                                id: alice.did.id,
+                            }),
+                        }),
                     }),
-                    expect.anything(),
                 );
             });
         });
@@ -289,42 +292,40 @@ describe('[SmashMessaging] Between peers registered to a SME', () => {
 
             it('can decrypt the message content', async () => {
                 expect(bob.onMessage).toHaveBeenCalledWith(
+                    expect.any(String),
                     expect.objectContaining({
                         data: aliceSentMessage.data,
-                    } as EncapsulatedSmashMessage),
-                    expect.anything(),
+                    } as EncapsulatedIMProtoMessage),
                 );
             });
 
             it('knows Alice identity (DID)', async () => {
                 expect(bob.onMessage).toHaveBeenCalledWith(
+                    expect.stringMatching(alice.did.id),
                     expect.anything(),
-                    expect.objectContaining({
-                        ik: alice.did.ik,
-                        ek: alice.did.ek,
-                        endpoints: alice.did.endpoints,
-                    } as SmashDID),
                 );
             });
 
             it('successfully replies to Alice', async () => {
                 const REPLY_MESSAGE = 'hello back';
-                const lastMessage = bob.onMessage.mock.lastCall[0];
-                const receivedAliceDID = bob.onMessage.mock.lastCall[1];
+                const lastMessage = bob.onMessage.mock.lastCall[1];
+                const receivedAliceDID = bob.onMessage.mock.lastCall[0];
+
+                expect(receivedAliceDID).toBe(alice.did.id);
 
                 jest.resetAllMocks();
                 const aliceReceivedReply = waitFor(alice.messaging, 'data');
 
                 await bob.messaging.sendTextMessage(
-                    receivedAliceDID,
+                    alice.did,
                     REPLY_MESSAGE,
                     lastMessage.sha256,
                 );
                 await aliceReceivedReply;
 
                 expect(alice.onMessage).toHaveBeenCalledWith(
+                    expect.any(String),
                     expect.objectContaining({ data: REPLY_MESSAGE }),
-                    expect.anything(),
                 );
             });
         });
@@ -378,12 +379,12 @@ describe('[SmashMessaging] Between peers registered to a SME', () => {
 
             // Verify message delivery
             expect(bob.onMessage).toHaveBeenCalledWith(
+                expect.any(String),
                 expect.objectContaining({ data: TEST_MESSAGES.aliceToBob }),
-                expect.anything(),
             );
             expect(alice.onMessage).toHaveBeenCalledWith(
+                expect.any(String),
                 expect.objectContaining({ data: TEST_MESSAGES.bobToAlice }),
-                expect.anything(),
             );
             expect(charlie.onMessage).not.toHaveBeenCalled();
         });
@@ -429,10 +430,10 @@ describe('[SmashMessaging] Between peers registered to a SME', () => {
 
             [0, 1].forEach((index) => {
                 expect(bob.onMessage).toHaveBeenCalledWith(
+                    expect.any(String),
                     expect.objectContaining({
                         data: `${index}`,
-                    } as EncapsulatedSmashMessage),
-                    expect.anything(),
+                    } as EncapsulatedIMProtoMessage),
                 );
             });
         });

@@ -1,27 +1,29 @@
+import { Curve, Identity, setEngine } from '2key-ratchet';
+import { SmashPeer } from '@src/SmashPeer.js';
+import { BaseResolver, DataForwardingResolver } from '@src/callbacks/index.js';
+import { DIDResolver } from '@src/did/index.js';
+import { SessionManager } from '@src/signal/index.js';
+import { SMESocketManager } from '@src/sme/index.js';
 import {
-    Curve,
+    DID,
+    DIDDocument,
+    DIDString,
+    EncapsulatedIMProtoMessage,
     IECKeyPair,
     IJsonIdentity,
-    Identity,
-    setEngine,
-} from '2key-ratchet';
-import CryptoUtils from '@src/CryptoUtils.js';
-import { LogLevel, Logger } from '@src/Logger.js';
-import { SMESocketManager } from '@src/SMESocketManager.js';
-import { SessionManager } from '@src/SessionManager.js';
-import { SmashPeer } from '@src/SmashPeer.js';
-import {
-    EncapsulatedSmashMessage,
-    ProfileSmashMessage,
+    IMProfile,
+    IMProfileMessage,
+    IMProtoMessage,
+    IMTextMessage,
+    IM_CHAT_TEXT,
+    IM_PROFILE,
+    IM_SESSION_RESET,
     SMEConfigJSONWithoutDefaults,
     SME_DEFAULT_CONFIG,
-    SmashChatMessage,
-    SmashDID,
     SmashEndpoint,
-    SmashMessage,
-    SmashProfile,
-    SmashProfileMeta,
 } from '@src/types/index.js';
+import { LogLevel, Logger } from '@src/utils/Logger.js';
+import { CryptoUtils } from '@src/utils/index.js';
 import { EventEmitter } from 'events';
 
 interface IJWKJson extends CryptoKey {
@@ -35,14 +37,26 @@ interface IJWKJsonKeyPair {
 }
 
 interface SmashChat {
-    with: SmashDID;
+    with: DID;
     lastMessageTimestamp: string;
 }
 
-// TODO: retry in case message does not successfully send??
+type ProfileMeta = Omit<IMProfile, 'did'>;
+
+class SessionResetHandler extends BaseResolver<IMProtoMessage, void> {
+    resolve(
+        peer: SmashPeer,
+        message: EncapsulatedIMProtoMessage,
+    ): Promise<void> {
+        return peer.incomingSessionReset(message.sha256);
+    }
+}
+
+// TODO: refactor
 // TODO: safeguard crypto operations against errors
-export default class SmashMessaging extends EventEmitter {
-    private logger: Logger;
+// TODO: split beteen IMProto and Smash Messaging
+export class SmashMessaging extends EventEmitter {
+    protected logger: Logger;
     private static crypto: globalThis.Crypto;
 
     static setCrypto(c: globalThis.Crypto) {
@@ -169,16 +183,15 @@ export default class SmashMessaging extends EventEmitter {
         return SmashMessaging.serializeIdentity(this.identity);
     }
 
-    private dlq: Record<string, EncapsulatedSmashMessage[]>;
+    private dlq: Record<string, EncapsulatedIMProtoMessage[]>;
     private peers: Record<string, SmashPeer>;
     private endpoints: SmashEndpoint[];
     private sessionManager: SessionManager;
     private smeSocketManager: SMESocketManager;
-    // private processingDlq: boolean;
 
     constructor(
         protected identity: Identity,
-        private meta?: SmashProfileMeta,
+        private meta?: ProfileMeta,
         LOG_LEVEL: LogLevel = 'INFO',
         LOG_ID: string = 'SmashMessaging',
     ) {
@@ -193,7 +206,11 @@ export default class SmashMessaging extends EventEmitter {
             this.messagesStatusHandler.bind(this),
             this.logger,
         );
-
+        this.superRegister(IM_PROFILE, new DataForwardingResolver(IM_PROFILE));
+        this.superRegister(
+            IM_SESSION_RESET,
+            new SessionResetHandler(IM_SESSION_RESET),
+        );
         this.logger.info(`Loaded Smash lib (log level: ${LOG_LEVEL})`);
     }
 
@@ -204,12 +221,15 @@ export default class SmashMessaging extends EventEmitter {
     }
 
     async initChats(chats: SmashChat[]) {
-        chats.forEach(async (chat) => {
-            this.peers[chat.with.id] = await this.getOrCreatePeer(
-                chat.with,
-                chat.lastMessageTimestamp,
-            );
-        });
+        return Promise.all(
+            chats.map(async (chat) => {
+                const peerDid = await DIDResolver.resolve(chat.with);
+                this.peers[peerDid.id] = await this.getOrCreatePeer(
+                    peerDid,
+                    chat.lastMessageTimestamp,
+                );
+            }),
+        );
     }
 
     async initEndpoints(
@@ -247,10 +267,10 @@ export default class SmashMessaging extends EventEmitter {
     // TODO: handle updates from other peers IF signed (and with proper trusting level—ie. not from any peer & only ADDING not replacing/removing endpoints if not from the peer itself )
     private async incomingProfileHandler(
         peerIk: string,
-        message: ProfileSmashMessage,
+        message: IMProfileMessage,
     ) {
         this.logger.debug(`Received Profile for IK ${peerIk}`);
-        const peerDid = message.data.did;
+        const peerDid = await DIDResolver.resolve(message.data.did);
         if (peerIk !== peerDid.ik) {
             // TODO: handle IK upgrades
             const err = 'Received IK doesnt match Signal Session data.';
@@ -265,27 +285,24 @@ export default class SmashMessaging extends EventEmitter {
 
     private async incomingMessagesHandler(
         peerIk: string,
-        messages: EncapsulatedSmashMessage[],
+        messages: EncapsulatedIMProtoMessage[],
     ) {
         const peer: SmashPeer | undefined = this.getPeerByIk(peerIk);
         if (peer) {
-            const peerDid = peer.getDID();
             // firehose incoming events to the library user
-            this.notifyNewMessages(messages, peerDid);
+            this.notifyNewMessages(peer.id, messages);
+            // registered message handlers execute resolvers
             await this.incomingMessagesParser(peer, messages);
             this.logger.info(
-                `processed ${messages?.length} messages from ${peerDid.id}`,
+                `processed ${messages?.length} messages from ${peer.id}`,
             );
         } else {
             this.pushToUnknownPeerIkDLQ(peerIk, messages);
             // TODO: handle profile updates (for now only handles IK updates)
             messages
-                .filter((m) => m.type === 'profile')
+                .filter((m) => m.type === IM_PROFILE) // TODO: split DID
                 .map((m) =>
-                    this.incomingProfileHandler(
-                        peerIk,
-                        m as ProfileSmashMessage,
-                    ),
+                    this.incomingProfileHandler(peerIk, m as IMProfileMessage),
                 );
             this.logger.debug(
                 `DLQd ${messages.length} messages from unknown peer (IK: ${peerIk})`,
@@ -295,25 +312,30 @@ export default class SmashMessaging extends EventEmitter {
 
     private async incomingMessageParser(
         peer: SmashPeer,
-        message: EncapsulatedSmashMessage,
+        message: EncapsulatedIMProtoMessage,
     ) {
-        if (message.type === 'profile') {
-            // TODO: handle profile updates (for now only handles new IK updates)
-            this.emit(
-                'profile',
-                peer.getDID().id,
-                message.data as SmashProfile,
-                message.sha256,
-                message.timestamp,
-            );
-        } else if (message.type === 'session_reset') {
-            await peer.incomingSessionReset(message.sha256);
-        }
+        const handlers = this.messageHandlers.get(message.type);
+        if (!handlers?.length) return;
+        await Promise.allSettled(
+            handlers.map(({ eventName, resolver }) =>
+                resolver
+                    .resolve(peer, message)
+                    .then((result) =>
+                        this.emit(
+                            eventName,
+                            peer.id,
+                            result,
+                            message.sha256,
+                            message.timestamp,
+                        ),
+                    ),
+            ),
+        );
     }
 
     private async incomingMessagesParser(
         peer: SmashPeer,
-        messages: EncapsulatedSmashMessage[],
+        messages: EncapsulatedIMProtoMessage[],
     ) {
         await Promise.allSettled(
             messages.map((message) =>
@@ -322,18 +344,17 @@ export default class SmashMessaging extends EventEmitter {
         );
     }
 
-    totalMessages = 0;
+    /**
+     * Firehose incoming events to the library user
+     */
     private notifyNewMessages(
-        messages: EncapsulatedSmashMessage[],
-        sender: SmashDID,
+        sender: DIDString,
+        messages: EncapsulatedIMProtoMessage[],
     ) {
         if (!messages?.length) return;
-        this.logger.debug(
-            `notifyNewMessages (${messages?.length}) (total: ${(this.totalMessages += messages?.length)})`,
-        );
+        this.logger.debug(`notifyNewMessages (${messages?.length})`);
         this.logger.debug(JSON.stringify(messages, null, 2));
-        // firehose incoming events to the library user
-        messages.forEach((message) => this.emit('data', message, sender));
+        messages.forEach((message) => this.emit('data', sender, message));
     }
 
     private async flushPeerIkDLQ(peerIk: string) {
@@ -350,17 +371,18 @@ export default class SmashMessaging extends EventEmitter {
 
     private pushToUnknownPeerIkDLQ(
         peerIk: string,
-        messages: EncapsulatedSmashMessage[],
+        messages: EncapsulatedIMProtoMessage[],
     ) {
         if (!this.dlq[peerIk]) this.dlq[peerIk] = [];
         this.dlq[peerIk].push(...messages);
     }
 
     protected async getOrCreatePeer(
-        peerDid: SmashDID,
+        did: DID,
         lastMessageTimestamp?: string,
     ): Promise<SmashPeer> {
         // TODO: handle DID updates
+        const peerDid = await DIDResolver.resolve(did);
         if (!this.peers[peerDid.id]) {
             this.logger.debug(`CreatePeer ${peerDid.id}`);
             const peer = new SmashPeer(
@@ -374,53 +396,59 @@ export default class SmashMessaging extends EventEmitter {
             );
             await peer.configureEndpoints();
             await peer.queueMessage({
-                type: 'profile',
+                type: IM_PROFILE,
                 data: await this.getProfile(),
-            } as ProfileSmashMessage);
-            this.peers[peerDid.id] = peer;
+                after: '',
+            } as IMProfileMessage);
+            this.peers[peer.id] = peer;
         }
-        // always map IK to ID (TODO handle profile/DID updates)
+        // always remap IK to ID (TODO handle profile/DID updates)
         this.peerIkMapping[peerDid.ik] = peerDid.id;
         return this.peers[peerDid.id];
     }
 
     sendTextMessage(
-        peerDid: SmashDID,
+        peerDid: DID,
         text: string,
         after: string,
-    ): Promise<EncapsulatedSmashMessage> {
+    ): Promise<EncapsulatedIMProtoMessage> {
         return this.sendMessage(peerDid, {
-            type: 'text',
+            type: IM_CHAT_TEXT,
             data: text,
             after,
-        } as SmashChatMessage);
+        } as IMTextMessage);
     }
 
-    async sendMessage(peerDid: SmashDID, message: SmashMessage) {
+    async sendMessage(peerDid: DID, message: IMProtoMessage) {
         const peer = await this.getOrCreatePeer(peerDid);
         return await peer.sendMessage(message);
     }
 
-    async getProfile(): Promise<SmashProfile> {
+    async getProfile(): Promise<IMProfile> {
         return {
-            meta: this.meta,
+            ...{
+                title: '',
+                description: '',
+                avatar: '',
+            },
+            ...this.meta,
             did: await this.getDID(),
         };
     }
 
-    getDID(): Promise<SmashDID> {
+    getDID(): Promise<DIDDocument> {
         return SmashMessaging.getDID(this.identity, this.endpoints);
     }
 
-    async updateMeta(meta: SmashProfileMeta) {
+    async updateMeta(meta: ProfileMeta) {
         this.meta = meta;
         const profile = await this.getProfile();
         await Promise.all(
             Object.values(this.peers).map((peer) =>
                 peer.sendMessage({
-                    type: 'profile',
+                    type: IM_PROFILE,
                     data: profile,
-                } as ProfileSmashMessage),
+                } as IMProfileMessage),
             ),
         );
     }
@@ -428,8 +456,9 @@ export default class SmashMessaging extends EventEmitter {
     private static async getDID(
         identity: Identity,
         endpoints: SmashEndpoint[],
-    ): Promise<SmashDID> {
+    ): Promise<DIDDocument> {
         return {
+            // @ts-expect-error TODO: implement DID:key
             id: await CryptoUtils.singleton.sha256(
                 identity.signingKey.publicKey.serialize(),
             ),
@@ -474,6 +503,61 @@ export default class SmashMessaging extends EventEmitter {
                 'reason:',
                 reason,
             );
+        }
+    }
+
+    private messageHandlers: Map<
+        string,
+        {
+            eventName: string;
+            resolver: BaseResolver<IMProtoMessage, unknown>;
+        }[]
+    > = new Map();
+
+    /**
+     * Register a resolver for a specific message type
+     * @param eventName Event name triggered by the library
+     * @param resolver Resolver instance that extends BaseResolver
+     * @typeparam T Type of messages to resolve
+     */
+    public register(
+        eventName: `data.${string}`,
+        resolver: BaseResolver<IMProtoMessage, unknown>,
+    ): void {
+        this.superRegister(eventName, resolver);
+    }
+    protected superRegister(
+        eventName: string,
+        resolver: BaseResolver<IMProtoMessage, unknown>,
+    ): void {
+        const messageType = resolver.getMessageType();
+        if (!this.messageHandlers.has(messageType)) {
+            this.messageHandlers.set(messageType, []);
+        }
+        this.messageHandlers.get(messageType)!.push({ eventName, resolver });
+    }
+
+    /**
+     * Unregister a specific resolver for a message type
+     * @param eventName Event name to unregister
+     * @param resolver Resolver instance to unregister
+     */
+    public unregister(
+        eventName: string,
+        resolver: BaseResolver<IMProtoMessage, unknown>,
+    ): void {
+        const messageType = resolver.getMessageType();
+        const handlers = this.messageHandlers.get(messageType);
+        if (!handlers) return;
+        const filteredHandlers = handlers.filter(
+            (handler) =>
+                handler.eventName !== eventName ||
+                handler.resolver !== resolver,
+        );
+        if (filteredHandlers.length === 0) {
+            this.messageHandlers.delete(messageType);
+        } else {
+            this.messageHandlers.set(messageType, filteredHandlers);
         }
     }
 }

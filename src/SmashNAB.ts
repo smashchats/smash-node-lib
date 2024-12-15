@@ -1,33 +1,25 @@
-import SmashMessaging from '@src/SmashMessaging.js';
+import { SmashMessaging } from '@src/SmashMessaging.js';
 import {
-    ActionData,
-    EncapsulatedSmashMessage,
-    JoinAction,
+    DataForwardingResolver,
+    NeverResolver,
+    SenderDIDDocumentResolver,
+} from '@src/callbacks/index.js';
+import {
+    DIDDocument,
+    DIDString,
+    ISO8601,
+    SMASH_NBH_DISCOVER,
+    SMASH_NBH_JOIN,
+    SMASH_NBH_RELATIONSHIP,
     SMEConfigJSONWithoutDefaults,
     SME_DEFAULT_CONFIG,
-    SmashDID,
-    SmashProfile,
+    SmashActionJson,
+    SmashChatRelationshipData,
+    SmashChatRelationshipMessage,
+    sha256,
 } from '@src/types/index.js';
 
-export default class SmashNAB extends SmashMessaging {
-    async getJoinInfo(
-        smeConfig?: SMEConfigJSONWithoutDefaults[],
-    ): Promise<JoinAction> {
-        const did = await this.getDID();
-        const joinInfo = {
-            action: 'join',
-            did,
-        } as JoinAction;
-        if (smeConfig?.length) {
-            joinInfo.config = {
-                sme: smeConfig.map((config) =>
-                    SmashNAB.getDiffFromDefault(config),
-                ),
-            };
-        }
-        return joinInfo;
-    }
-
+export abstract class SmashNAB extends SmashMessaging {
     private static getDiffFromDefault(config: SMEConfigJSONWithoutDefaults) {
         // Copy mandatory keys
         const diff: SMEConfigJSONWithoutDefaults = {
@@ -47,40 +39,82 @@ export default class SmashNAB extends SmashMessaging {
         return diff as SMEConfigJSONWithoutDefaults;
     }
 
-    emit(event: string | symbol, ...args: unknown[]): boolean {
-        const result = super.emit(event, ...args);
-        if (event === 'data') {
-            const [message, sender] = args as [
-                EncapsulatedSmashMessage,
-                SmashDID,
-            ];
-            this.handleMessage(sender, message);
+    public async getJoinInfo(
+        smeConfig?: SMEConfigJSONWithoutDefaults[],
+    ): Promise<SmashActionJson> {
+        const did = await this.getDID();
+        const joinInfo = {
+            action: SMASH_NBH_JOIN,
+            did,
+        } as SmashActionJson;
+        if (smeConfig?.length) {
+            joinInfo.config = {
+                sme: smeConfig.map((config) =>
+                    SmashNAB.getDiffFromDefault(config),
+                ),
+            };
         }
-        return result;
+        return joinInfo;
     }
 
-    handleMessage(sender: SmashDID, message: EncapsulatedSmashMessage) {
-        switch (message.type) {
-            case 'join':
-                // TODO: join config specific to nab (totp, past relationships, etc)
-                this.emit('join', sender, message.data as JoinAction);
-                break;
-            case 'discover':
-                this.emit('discover', sender);
-                break;
-            case 'action':
-                // TODO: shall we pass the encapsulation info down the lib
-                // TODO: in other words, is there a reason for this middleware???
-                this.emit(
-                    'action',
-                    sender,
-                    message.data as ActionData,
-                    new Date(message.timestamp),
-                );
-                break;
-            case 'profile':
-                this.emit('profile', sender, message.data as SmashProfile);
-                break;
-        }
+    public abstract onJoin(
+        from: DIDString,
+        did: DIDDocument,
+        sha256?: sha256,
+        timeString?: ISO8601,
+    ): Promise<unknown>;
+    public abstract onDiscover(
+        from: DIDString,
+        sha256?: sha256,
+        timeString?: ISO8601,
+    ): Promise<unknown>;
+    public abstract onRelationship(
+        from: DIDString,
+        { target, action }: SmashChatRelationshipData,
+        sha256?: sha256,
+        timeString?: ISO8601,
+    ): Promise<unknown>;
+
+    constructor(...args: ConstructorParameters<typeof SmashMessaging>) {
+        super(...args);
+    }
+
+    /**
+     * Register all hooks for the NAB
+     * - Join: Handle join event
+     * - Discover: Handle discover event
+     * - Relationship: Handle relationship event
+     */
+    public registerHooks() {
+        this.registerJoin();
+        this.registerDiscover();
+        this.registerRelationship();
+    }
+
+    private registerRelationship() {
+        this.superRegister(
+            SMASH_NBH_RELATIONSHIP,
+            new DataForwardingResolver<SmashChatRelationshipMessage>(
+                SMASH_NBH_RELATIONSHIP,
+            ),
+        );
+        this.on(SMASH_NBH_RELATIONSHIP, this.onRelationship.bind(this));
+    }
+
+    private registerJoin() {
+        this.superRegister(
+            SMASH_NBH_JOIN,
+            new SenderDIDDocumentResolver(SMASH_NBH_JOIN),
+        );
+        this.on(SMASH_NBH_JOIN, this.onJoin.bind(this));
+    }
+
+    private registerDiscover() {
+        // TODO: Never
+        this.superRegister(
+            SMASH_NBH_DISCOVER,
+            new NeverResolver(SMASH_NBH_DISCOVER),
+        );
+        this.on(SMASH_NBH_DISCOVER, this.onDiscover.bind(this));
     }
 }

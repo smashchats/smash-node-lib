@@ -1,17 +1,15 @@
-import { Identity } from '2key-ratchet';
-import CryptoUtils from '@src/CryptoUtils.js';
-import { Logger } from '@src/Logger.js';
-import { SMESocketWriteOnly } from '@src/SMESocketWriteOnly.js';
-import { SessionManager } from '@src/SessionManager.js';
-import { SignalSession } from '@src/SignalSession.js';
+import { SessionManager, SignalSession } from '@src/signal/index.js';
+import { SMESocketWriteOnly } from '@src/sme/SMESocketWriteOnly.js';
 import {
-    EncapsulatedSmashMessage,
+    EncapsulatedIMProtoMessage,
+    Identity,
     SMEConfig,
     SmashEndpoint,
     onMessagesFn,
     onMessagesStatusFn,
 } from '@src/types/index.js';
-import { Socket } from 'socket.io-client';
+import { CryptoUtils, Logger } from '@src/utils/index.js';
+import type { Socket } from 'socket.io-client';
 
 const solveChallenge = async (
     data: { iv: string; challenge: string },
@@ -207,7 +205,7 @@ export class SMESocketReadWrite extends SMESocketWriteOnly {
     }
 
     private emitReceivedMessages(
-        messages: EncapsulatedSmashMessage[],
+        messages: EncapsulatedIMProtoMessage[],
         peerIk: string,
     ) {
         this.logger.debug('SMESocketReadWrite::emitReceivedMessages');

@@ -1,16 +1,14 @@
-import { SmashDID } from '@src/types/did.types.js';
-import { SMEConfigJSONWithoutDefaults } from '@src/types/sme.types.js';
+import {
+    DID,
+    SMASH_NBH_JOIN,
+    SMEConfigJSONWithoutDefaults,
+} from '@src/types/index.js';
 
 export interface SmashActionJson {
-    // TODO: using full DID until we have a DID resolver
-    did: SmashDID;
-    action: 'join';
+    did: DID;
+    action: typeof SMASH_NBH_JOIN;
     config?: {
         // TODO SME credentials/usage restrictions/auth
         sme?: SMEConfigJSONWithoutDefaults[];
     };
-}
-
-export interface JoinAction extends SmashActionJson {
-    action: 'join';
 }
