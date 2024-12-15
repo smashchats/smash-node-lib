@@ -16,6 +16,7 @@ export interface IMTextMessage extends IMProtoMessage {
 
 export interface IMProfile {
     version?: 1;
+    // TODO: is it useful to have a DID here?
     did: DID;
     title: string;
     description: string;
