@@ -71,12 +71,12 @@ const solveChallenge = async (
 
 export class SMESocketReadWrite extends SMESocketWriteOnly {
     // TODO: limit DLQs size and number
-    private dlq: Record<string, ArrayBuffer[]> = {};
+    private readonly dlq: Record<string, ArrayBuffer[]> = {};
 
     constructor(
         url: string,
-        private sessionManager: SessionManager,
-        private onMessagesCallback: onMessagesFn,
+        private readonly sessionManager: SessionManager,
+        private readonly onMessagesCallback: onMessagesFn,
         onMessagesStatusCallback: onMessagesStatusFn,
         logger: Logger,
     ) {

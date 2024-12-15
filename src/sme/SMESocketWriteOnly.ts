@@ -13,8 +13,8 @@ export class SMESocketWriteOnly {
 
     constructor(
         public readonly url: string,
-        private onMessagesStatusCallback: onMessagesStatusFn,
-        protected logger: Logger,
+        private readonly onMessagesStatusCallback: onMessagesStatusFn,
+        protected readonly logger: Logger,
     ) {}
 
     async close(TIMEOUT_MS = 3000): Promise<void> {

@@ -1,5 +1,5 @@
 import { Curve } from '2key-ratchet';
-import { ENCODING } from '@src/types/index.js';
+import { ENCODING, sha256 } from '@src/types/index.js';
 import { Logger } from '@src/utils/Logger.js';
 import { Buffer } from 'buffer';
 
@@ -63,20 +63,22 @@ export class CryptoUtils {
         return this.bufferToString(await this.subtle?.exportKey(EXPORT, key));
     }
 
-    async keySha256(key: CryptoKey): Promise<string> {
+    async keySha256(key: CryptoKey): Promise<sha256> {
         return this.sha256(await this.subtle.exportKey(EXPORT, key));
     }
 
-    async sha256fromObject(object: unknown): Promise<string> {
+    async sha256fromObject(object: unknown): Promise<sha256> {
         return this.sha256(this.objectToBuffer(object));
     }
 
-    async sha256fromString(string: string): Promise<string> {
+    async sha256fromString(string: string): Promise<sha256> {
         return this.sha256(this.stringToBuffer(string));
     }
 
-    async sha256(buffer: ArrayBuffer): Promise<string> {
-        return this.bufferToString(await this.subtle.digest('SHA-256', buffer));
+    async sha256(buffer: ArrayBuffer): Promise<sha256> {
+        return this.bufferToString(
+            await this.subtle.digest('SHA-256', buffer),
+        ) as unknown as sha256;
     }
 
     bufferToString(

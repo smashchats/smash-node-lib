@@ -56,7 +56,7 @@ class SessionResetHandler extends BaseResolver<IMProtoMessage, void> {
 // TODO: safeguard crypto operations against errors
 // TODO: split beteen IMProto and Smash Messaging
 export class SmashMessaging extends EventEmitter {
-    protected logger: Logger;
+    protected readonly logger: Logger;
     private static crypto: globalThis.Crypto;
 
     static setCrypto(c: globalThis.Crypto) {
@@ -183,14 +183,14 @@ export class SmashMessaging extends EventEmitter {
         return SmashMessaging.serializeIdentity(this.identity);
     }
 
-    private dlq: Record<string, EncapsulatedIMProtoMessage[]>;
-    private peers: Record<string, SmashPeer>;
+    private readonly dlq: Record<string, EncapsulatedIMProtoMessage[]>;
+    private readonly peers: Record<string, SmashPeer>;
     private endpoints: SmashEndpoint[];
-    private sessionManager: SessionManager;
-    private smeSocketManager: SMESocketManager;
+    private readonly sessionManager: SessionManager;
+    private readonly smeSocketManager: SMESocketManager;
 
     constructor(
-        protected identity: Identity,
+        protected readonly identity: Identity,
         private meta?: ProfileMeta,
         LOG_LEVEL: LogLevel = 'INFO',
         LOG_ID: string = 'SmashMessaging',
@@ -511,7 +511,7 @@ export class SmashMessaging extends EventEmitter {
         }
     }
 
-    private messageHandlers: Map<
+    private readonly messageHandlers: Map<
         string,
         {
             eventName: string;

@@ -43,8 +43,8 @@ export class SmashUser extends SmashMessaging {
         );
     }
 
-    private neighborhoodAdminIDs: string[] = [];
-    private neighborhoodAdmins: SmashPeer[] = [];
+    private readonly neighborhoodAdminIDs: string[] = [];
+    private readonly neighborhoodAdmins: SmashPeer[] = [];
 
     public async join(joinAction: SmashActionJson) {
         // Initialize endpoints if SME config is provided

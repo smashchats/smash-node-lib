@@ -11,8 +11,8 @@ import AsyncLock from 'async-lock';
 export class SessionManager {
     private sessions: SignalSession[] = [];
     // TODO handle dangling sessions
-    private sessionsByPeer: Record<string, SignalSession> = {};
-    private sessionsByID: Record<string, SignalSession> = {};
+    private readonly sessionsByPeer: Record<string, SignalSession> = {};
+    private readonly sessionsByID: Record<string, SignalSession> = {};
 
     constructor(
         private identity: Identity,
@@ -107,7 +107,7 @@ export class SessionManager {
         this.logger.debug(`Removed ${removed} sessions for peer ${peerIK}`);
     }
 
-    private handleSessionResetMutex = new AsyncLock();
+    private readonly handleSessionResetMutex = new AsyncLock();
     async handleSessionReset(
         peerIK: string,
         keepActive: boolean = false,

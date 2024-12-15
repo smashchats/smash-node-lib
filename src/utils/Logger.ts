@@ -4,8 +4,8 @@ export type LogLevel = 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
 
 export class Logger extends EventEmitter {
     constructor(
-        private logID: string = 'Logger',
-        private logLevel: LogLevel = 'INFO',
+        private readonly logID: string = 'Logger',
+        private readonly logLevel: LogLevel = 'INFO',
     ) {
         super();
     }

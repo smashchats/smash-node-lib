@@ -20,9 +20,9 @@ export class SignalSession {
 
     constructor(
         public readonly id: string,
-        private cipher: AsymmetricRatchet,
+        private readonly cipher: AsymmetricRatchet,
         public readonly peerIk: string,
-        private logger: Logger,
+        private readonly logger: Logger,
     ) {
         this.createdAtTime = Date.now();
     }

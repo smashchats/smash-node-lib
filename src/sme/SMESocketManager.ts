@@ -10,12 +10,12 @@ import {
 import { Logger } from '@src/utils/index.js';
 
 export class SMESocketManager {
-    private smeSockets: Record<string, SMESocketWriteOnly>;
+    private readonly smeSockets: Record<string, SMESocketWriteOnly>;
 
     constructor(
-        private onMessagesCallback: onMessagesFn,
-        private onMessagesStatusCallback: onMessagesStatusFn,
-        private logger: Logger,
+        private readonly onMessagesCallback: onMessagesFn,
+        private readonly onMessagesStatusCallback: onMessagesStatusFn,
+        private readonly logger: Logger,
     ) {
         this.smeSockets = {};
     }

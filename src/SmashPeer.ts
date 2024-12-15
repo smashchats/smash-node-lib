@@ -12,6 +12,7 @@ import {
     Relationship,
     SMASH_NBH_RELATIONSHIP,
     SmashEndpoint,
+    sha256,
 } from '@src/types/index.js';
 import { Logger } from '@src/utils/Logger.js';
 import { CryptoUtils } from '@src/utils/index.js';
@@ -27,21 +28,21 @@ export class SmashPeer {
         messageQueue: Set<EncapsulatedIMProtoMessage>;
     }[] = [];
 
-    private messageQueue: Set<EncapsulatedIMProtoMessage> = new Set();
+    private readonly messageQueue: Set<EncapsulatedIMProtoMessage> = new Set();
 
     // TODO allow loading relationship at lib initialization time
     private relationship: Relationship = 'clear';
-    private lastRelationshipSha256: string = '0';
+    private lastRelationshipSha256: sha256 = '0';
 
     // TODO: default to use 'id' everywhere document is not needed
     public readonly id: DIDString;
 
     constructor(
-        private did: DID,
-        private lastMessageTime: number,
-        private sessionManager: SessionManager,
-        private smeSocketManager: SMESocketManager,
-        private logger: Logger,
+        private readonly did: DID,
+        private readonly lastMessageTime: number,
+        private readonly sessionManager: SessionManager,
+        private readonly smeSocketManager: SMESocketManager,
+        private readonly logger: Logger,
     ) {
         this.id = typeof did === 'string' ? did : did.id;
     }
@@ -187,8 +188,8 @@ export class SmashPeer {
         return this.sendMessage(IM_RESET_SESSION_MESSAGE);
     }
 
-    private alreadyProcessedSessionReset: string[] = [];
-    private sessionResetMutex = new AsyncLock();
+    private readonly alreadyProcessedSessionReset: string[] = [];
+    private readonly sessionResetMutex = new AsyncLock();
 
     async incomingSessionReset(sha256: string) {
         await this.sessionResetMutex.acquire('sessionReset', async () => {
