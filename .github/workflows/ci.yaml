@@ -177,7 +177,7 @@ jobs:
 
     notify-failure:
         needs: test # Run after test job
-        if: failure() and github.ref_name == 'main' # Only run if previous jobs failed
+        if: failure() && github.ref_name == 'main' # Only run if previous jobs failed
         runs-on: ubuntu-24.04
         steps:
             - name: Setup Tailscale
@@ -205,7 +205,7 @@ jobs:
 
     notify-publish-failure:
         needs: publish
-        if: failure() and github.ref_name == 'main' # Only run if previous jobs failed
+        if: failure() && github.ref_name == 'main' # Only run if previous jobs failed
         runs-on: ubuntu-24.04
         steps:
             - name: Setup Tailscale
@@ -233,7 +233,7 @@ jobs:
 
     notify-publish-success:
         needs: publish
-        if: success() and github.ref_name == 'main' # Only run if publish job succeeded
+        if: success() && github.ref_name == 'main' # Only run if publish job succeeded
         runs-on: ubuntu-24.04
         steps:
             - name: Setup Tailscale
