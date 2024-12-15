@@ -15,8 +15,8 @@ export class SessionManager {
     private readonly sessionsByID: Record<string, SignalSession> = {};
 
     constructor(
-        private identity: Identity,
-        private logger: Logger,
+        private readonly identity: Identity,
+        private readonly logger: Logger,
     ) {}
 
     getSessionByPeerIk(peerIk: string): SignalSession | undefined {

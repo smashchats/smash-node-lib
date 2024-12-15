@@ -18,8 +18,8 @@ export class CryptoUtils {
     }
 
     constructor(
-        private subtle: globalThis.SubtleCrypto,
-        private logger: Logger = new Logger('CryptoUtils'),
+        private readonly subtle: globalThis.SubtleCrypto,
+        private readonly logger: Logger = new Logger('CryptoUtils'),
     ) {}
 
     get decrypt() {
