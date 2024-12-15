@@ -3,12 +3,16 @@
 This ES Module library provides the core functionality for implementing and interacting with the **Smash Protocol**—a modular, **1:N social messaging** and **curated content-sharing** protocol.
 It powers the free and open digital neighborhoods of tomorrow, promoting decentralization, interoperability, and user ownership.
 
-![Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/smashchatsdev/237cf77f566685841725f2001c1987f7/raw/jest-coverage-comment__main.json)
 ![License](https://img.shields.io/badge/license-AGPL--3.0-blue)
 ![Version](https://img.shields.io/badge/version-0.0.1-alpha)
 
 <!-- ![License](https://img.shields.io/github/license/smashchats/smash-node-lib)
 ![Version](https://img.shields.io/github/package-json/v/smashchats/smash-node-lib) -->
+
+![Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/smashchatsdev/237cf77f566685841725f2001c1987f7/raw/jest-coverage-comment__main.json)
+![Security Rating](https://sonar.smashchats.com/api/project_badges/measure?project=smashchats_smash-node-lib_95e1cd27-ea3b-492e-9c3a-ebf35949ed3f&metric=software_quality_security_rating&token=sqb_4c16baf0e3f3ff02d308510f50b8b5e8d80f2eb8)
+![Maintainability Rating](https://sonar.smashchats.com/api/project_badges/measure?project=smashchats_smash-node-lib_95e1cd27-ea3b-492e-9c3a-ebf35949ed3f&metric=software_quality_maintainability_rating&token=sqb_4c16baf0e3f3ff02d308510f50b8b5e8d80f2eb8)
+![Lines of Code](https://sonar.smashchats.com/api/project_badges/measure?project=smashchats_smash-node-lib_95e1cd27-ea3b-492e-9c3a-ebf35949ed3f&metric=ncloc&token=sqb_4c16baf0e3f3ff02d308510f50b8b5e8d80f2eb8)
 
 ---
 
