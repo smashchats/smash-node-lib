@@ -13,11 +13,3 @@ export abstract class BaseResolver<T extends IMProtoMessage, R> {
         return this.messageType;
     }
 }
-
-export class DataForwardingResolver<
-    T extends IMProtoMessage,
-> extends BaseResolver<T, T['data']> {
-    resolve(_: SmashPeer, message: T): Promise<T['data']> {
-        return Promise.resolve(message.data);
-    }
-}

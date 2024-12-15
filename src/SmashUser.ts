@@ -1,23 +1,52 @@
 import { SmashMessaging } from '@src/SmashMessaging.js';
 import { SmashPeer } from '@src/SmashPeer.js';
+import { BaseResolver } from '@src/callbacks/BaseResolver.js';
 import {
     SMASH_NBH_DISCOVER_MESSAGE,
     SMASH_NBH_JOIN_MESSAGE,
 } from '@src/const.js';
-import { DIDResolver } from '@src/did/index.js';
 import {
     DID,
-    EncapsulatedIMProtoMessage,
-    JoinAction,
     Relationship,
+    SMASH_NBH_ADDED,
+    SMASH_NBH_PROFILE_LIST,
+    SMASH_PROFILE_LIST,
+    SmashActionJson,
+    SmashChatProfileListMessage,
     SmashProfileList,
 } from '@src/types/index.js';
 
+class ProfileListHandler extends BaseResolver<
+    SmashChatProfileListMessage,
+    SmashProfileList
+> {
+    constructor(private readonly neighborhoodAdminIDs: string[]) {
+        super(SMASH_PROFILE_LIST);
+    }
+    resolve(
+        peer: SmashPeer,
+        message: SmashChatProfileListMessage,
+    ): Promise<SmashProfileList> {
+        if (this.neighborhoodAdminIDs.includes(peer.id)) {
+            return Promise.resolve(message.data as SmashProfileList);
+        }
+        return Promise.reject(new Error('Not a neighborhood admin'));
+    }
+}
+
 export class SmashUser extends SmashMessaging {
+    constructor(...args: ConstructorParameters<typeof SmashMessaging>) {
+        super(...args);
+        this.superRegister(
+            SMASH_NBH_PROFILE_LIST,
+            new ProfileListHandler(this.neighborhoodAdminIDs),
+        );
+    }
+
     private neighborhoodAdminIDs: string[] = [];
     private neighborhoodAdmins: SmashPeer[] = [];
 
-    async join(joinAction: JoinAction) {
+    public async join(joinAction: SmashActionJson) {
         // Initialize endpoints if SME config is provided
         if (joinAction.config?.sme) {
             await this.initEndpoints(joinAction.config.sme);
@@ -26,10 +55,9 @@ export class SmashUser extends SmashMessaging {
         const nabPeer = await this.getOrCreatePeer(joinAction.did);
         await nabPeer.sendMessage(SMASH_NBH_JOIN_MESSAGE);
         // Add neighborhood admin (NAB) and emit user event
-        const nabDid = await nabPeer.getDID();
-        this.neighborhoodAdminIDs.push(nabDid.id);
+        this.neighborhoodAdminIDs.push(nabPeer.id);
         this.neighborhoodAdmins.push(nabPeer);
-        this.emit('nbh_added', nabDid);
+        this.emit(SMASH_NBH_ADDED, nabPeer.id);
     }
 
     private async setRelationship(userDid: DID, action: Relationship) {
@@ -39,45 +67,22 @@ export class SmashUser extends SmashMessaging {
         );
     }
 
-    smash(userDid: DID) {
+    public smash(userDid: DID) {
         return this.setRelationship(userDid, 'smash');
     }
 
-    pass(userDid: DID) {
+    public pass(userDid: DID) {
         return this.setRelationship(userDid, 'pass');
     }
 
-    clear(userDid: DID) {
+    public clear(userDid: DID) {
         return this.setRelationship(userDid, 'clear');
     }
 
-    // TODO: handle for multiple NABs
-    discover() {
+    public discover() {
+        // TODO: handle for multiple NABs
         return this.neighborhoodAdmins[0].sendMessage(
             SMASH_NBH_DISCOVER_MESSAGE,
         );
-    }
-
-    emit(event: string | symbol, ...args: unknown[]): boolean {
-        if (event === 'data') {
-            const [message, sender] = args as [EncapsulatedIMProtoMessage, DID];
-            this.handleMessage(sender, message);
-        }
-        return super.emit(event, ...args);
-    }
-
-    async handleMessage(sender: DID, message: EncapsulatedIMProtoMessage) {
-        const nabDid = await DIDResolver.resolve(sender);
-        switch (message.type) {
-            case 'com.smashchats.profiles':
-                if (this.neighborhoodAdminIDs.includes(nabDid.id)) {
-                    this.emit(
-                        'nbh_profiles',
-                        sender,
-                        message.data as SmashProfileList,
-                    );
-                }
-                break;
-        }
     }
 }

@@ -2,6 +2,7 @@ export { Curve } from '2key-ratchet';
 
 export * from '@src/types/index.js';
 
+export * from '@src/callbacks/index.js';
 export * from '@src/did/index.js';
 export * from '@src/signal/index.js';
 export * from '@src/sme/index.js';

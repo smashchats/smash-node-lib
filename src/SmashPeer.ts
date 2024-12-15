@@ -10,6 +10,7 @@ import {
     IMProtoMessage,
     ISO8601,
     Relationship,
+    SMASH_NBH_RELATIONSHIP,
     SmashEndpoint,
 } from '@src/types/index.js';
 import { Logger } from '@src/utils/Logger.js';
@@ -160,31 +161,18 @@ export class SmashPeer {
             return;
         }
         // TODO: suppport multiple NABs
-        // WARN: assume we only have one NAB to update
+        // WARN: for now, we assume we only have one NAB to update
         const nab = nabs[0];
-        const did = await this.getDID();
         const updateNabMessage = await nab.sendMessage({
-            type: 'com.smashchats.relationship',
-            data: { target: did.id, action: relationship },
+            type: SMASH_NBH_RELATIONSHIP,
+            data: { target: this.id, action: relationship },
             after: this.lastRelationshipSha256,
         });
         this.lastRelationshipSha256 = updateNabMessage.sha256;
         this.relationship = relationship;
         this.logger.info(
-            `> setRelationship with ${did.id} to ${relationship} (${updateNabMessage.sha256})`,
+            `> setRelationship with ${this.id} to ${relationship} (${updateNabMessage.sha256})`,
         );
-        // const updateNabPromises = nabs.map((nab) =>
-        //     nab.sendMessage({
-        //         type: 'action',
-        //         data: { target: this.did, action: relationship },
-        //         after: '0',
-        //     }),
-        // );
-        // const results = await Promise.allSettled(updateNabPromises);
-        // this.logger.info(
-        //     `> setRelationship with ${this.did.id} to ${relationship}`,
-        //     JSON.stringify(results),
-        // );
     }
 
     private async resetSessions(keepActive: boolean = false) {
@@ -194,11 +182,7 @@ export class SmashPeer {
     }
 
     async triggerSessionReset(): Promise<EncapsulatedIMProtoMessage> {
-        this.logger.debug(
-            `Triggering session reset for ${
-                typeof this.did === 'string' ? this.did : this.did.id
-            }`,
-        );
+        this.logger.debug(`Triggering session reset for ${this.id}`);
         await this.resetSessions();
         return this.sendMessage(IM_RESET_SESSION_MESSAGE);
     }

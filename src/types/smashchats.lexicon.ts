@@ -1,4 +1,15 @@
-import { DID, IMProtoMessage, SmashProfileList } from '@src/types/index.js';
+import {
+    DIDString,
+    IMProtoMessage,
+    SmashProfileList,
+} from '@src/types/index.js';
+
+export const SMASH_NBH_JOIN = 'com.smashchats.nbh.join';
+export const SMASH_NBH_ADDED = 'com.smashchats.nbh.added';
+export const SMASH_NBH_DISCOVER = 'com.smashchats.nbh.discover';
+export const SMASH_NBH_RELATIONSHIP = 'com.smashchats.relationship';
+export const SMASH_NBH_PROFILE_LIST = 'com.smashchats.nbh.profiles';
+export const SMASH_PROFILE_LIST = 'com.smashchats.profiles';
 
 /**
  * Join message
@@ -7,7 +18,7 @@ import { DID, IMProtoMessage, SmashProfileList } from '@src/types/index.js';
  * Must be sent to a Neighborhood's NAB.
  */
 export interface SmashChatJoinMessage extends IMProtoMessage {
-    type: 'com.smashchats.nbh.join';
+    type: typeof SMASH_NBH_JOIN;
     data: never;
 }
 
@@ -18,7 +29,7 @@ export interface SmashChatJoinMessage extends IMProtoMessage {
  * Must be sent to a Neighborhood's NAB.
  */
 export interface SmashChatDiscoverMessage extends IMProtoMessage {
-    type: 'com.smashchats.nbh.discover';
+    type: typeof SMASH_NBH_DISCOVER;
     data: never;
 }
 
@@ -29,12 +40,12 @@ export interface SmashChatDiscoverMessage extends IMProtoMessage {
  * Usually sent to a peer's NAB to build a graph of relationships.
  */
 export interface SmashChatRelationshipMessage extends IMProtoMessage {
-    type: 'com.smashchats.relationship';
+    type: typeof SMASH_NBH_RELATIONSHIP;
     data: SmashChatRelationshipData;
 }
 export type Relationship = 'smash' | 'pass' | 'clear' | 'block';
 export interface SmashChatRelationshipData {
-    target: DID;
+    target: DIDString;
     action: Relationship;
 }
 
@@ -44,6 +55,6 @@ export interface SmashChatRelationshipData {
  * Used to share an arbitrary Profile list with a peer.
  */
 export interface SmashChatProfileListMessage extends IMProtoMessage {
-    type: 'com.smashchats.profiles';
+    type: typeof SMASH_PROFILE_LIST;
     data: SmashProfileList;
 }

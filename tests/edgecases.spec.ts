@@ -1,5 +1,6 @@
 import {
     DIDDocument,
+    IM_CHAT_TEXT,
     Logger,
     SignalSession,
     SmashMessaging,
@@ -89,8 +90,8 @@ describe('SmashMessaging: Edge cases', () => {
             await waitForFirstMessage;
 
             expect(onBobMessageReceived).toHaveBeenCalledWith(
+                expect.any(String),
                 expect.objectContaining({ data: message1 }),
-                expect.anything(),
             );
 
             // 2. Mock Date to simulate time passing beyond TTL
@@ -138,8 +139,8 @@ describe('SmashMessaging: Edge cases', () => {
 
             // 5. Verify message received
             expect(newOnBobMessageReceived).toHaveBeenCalledWith(
+                expect.any(String),
                 expect.objectContaining({ data: message2 }),
-                expect.anything(),
             );
 
             await delay(1000);
@@ -158,8 +159,8 @@ describe('SmashMessaging: Edge cases', () => {
 
             // Verify first message received
             expect(onBobMessageReceived).toHaveBeenCalledWith(
+                expect.any(String),
                 expect.objectContaining({ data: message1 }),
-                expect.anything(),
             );
 
             // 2. Simulate Bob restart - create new instance with same identity
@@ -200,8 +201,8 @@ describe('SmashMessaging: Edge cases', () => {
             await waitForSecondMessage;
 
             expect(newOnBobMessageReceived).toHaveBeenCalledWith(
+                expect.any(String),
                 expect.objectContaining({ data: message2 }),
-                expect.anything(),
             );
 
             // 4. Bob tries to send another message to Alice
@@ -213,8 +214,8 @@ describe('SmashMessaging: Edge cases', () => {
             await waitForThirdMessage;
 
             expect(onAliceMessageReceived).toHaveBeenCalledWith(
+                bobDID.id,
                 expect.objectContaining({ data: message3 }),
-                expect.anything(),
             );
         }, 10000);
 
@@ -237,8 +238,8 @@ describe('SmashMessaging: Edge cases', () => {
                     firstMessageCount,
                 );
                 expect(onBobMessageReceived).toHaveBeenCalledWith(
+                    expect.any(String),
                     expect.objectContaining({ data: message1 }),
-                    expect.anything(),
                 );
 
                 // 2. Mock Date to simulate time near TTL for both peers
@@ -324,8 +325,8 @@ describe('SmashMessaging: Edge cases', () => {
                 await delay(1000);
 
                 expect(onBobMessageReceived).toHaveBeenCalledWith(
+                    expect.any(String),
                     expect.objectContaining({ data: message2 }),
-                    expect.anything(),
                 );
                 expect(
                     onBobMessageReceived.mock.calls.length,
@@ -387,10 +388,10 @@ describe('SmashMessaging: Edge cases', () => {
             }
             await waitForMessages;
             const receivedMessages = onBobMessageReceived.mock.calls.map(
-                ([message]) => message,
+                (args) => args[1],
             );
             const textMessages = receivedMessages.filter(
-                (message) => message.type === 'org.improto.chat.text',
+                (message) => message.type === IM_CHAT_TEXT,
             );
             expect(textMessages.length).toBe(messageCount);
             expect(textMessages.map((text) => text.data)).not.toEqual(

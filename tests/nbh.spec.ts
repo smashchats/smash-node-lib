@@ -4,6 +4,11 @@ import {
     IMProtoMessage,
     Logger,
     Relationship,
+    SMASH_NBH_ADDED,
+    SMASH_NBH_JOIN,
+    SMASH_NBH_PROFILE_LIST,
+    SMASH_NBH_RELATIONSHIP,
+    SMASH_PROFILE_LIST,
     SMEConfigJSONWithoutDefaults,
     SmashActionJson,
     SmashMessaging,
@@ -31,6 +36,17 @@ import { peerArgs } from './user.utils';
  * **************************************************************
  */
 
+class TestNAB extends SmashNAB {
+    constructor(...args: ConstructorParameters<typeof SmashNAB>) {
+        super(...args);
+        this.registerHooks();
+    }
+
+    public onJoin = jest.fn();
+    public onDiscover = jest.fn();
+    public onRelationship = jest.fn();
+}
+
 describe('SmashMessaging: Neighborhood-related actions', () => {
     // TODO (note) small-hash did when trusting and loop over verifies
     // --> note this adds no security whatsoever; albeit being a useful optimization
@@ -43,17 +59,15 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
     const waitFor = aliasWaitFor(waitForEventCancelFns, new Logger('nbh.spec'));
     let nab: SmashNAB;
     let nabDid: DIDDocument;
-    const onNabJoin: jest.Mock = jest.fn();
     let nabSMEConfig: SMEConfigJSONWithoutDefaults[];
 
     beforeEach(async () => {
         const [identity, config] = await peerArgs(socketServerUrl);
         nabSMEConfig = config;
-        nab = new SmashNAB(identity);
+        nab = new TestNAB(identity);
         await nab.initEndpoints(config);
         await delay(100);
         nabDid = await nab.getDID();
-        nab.on('join', onNabJoin);
     });
 
     afterEach(async () => {
@@ -66,7 +80,7 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
     it('can export their NBH JOIN config', async () => {
         const joinInfo = await nab.getJoinInfo();
         expect(joinInfo).toMatchObject({
-            action: 'join',
+            action: SMASH_NBH_JOIN,
             did: expect.objectContaining({
                 ik: nabDid.ik,
                 ek: nabDid.ek,
@@ -78,7 +92,7 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
 
     it('can export their NBH JOIN config including SME', async () => {
         expect(await nab.getJoinInfo(nabSMEConfig)).toMatchObject({
-            action: 'join',
+            action: SMASH_NBH_JOIN,
             did: expect.objectContaining({
                 ik: nabDid.ik,
                 ek: nabDid.ek,
@@ -160,8 +174,8 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
             userIdentity = identity;
             userSMEConfig = config;
             user = new SmashUser(userIdentity);
-            user.on('nbh_added', onUserNBHAdded);
-            user.on('nbh_profiles', onUserDiscover);
+            user.on(SMASH_NBH_ADDED, onUserNBHAdded);
+            user.on(SMASH_NBH_PROFILE_LIST, onUserDiscover);
         });
 
         afterEach(async () => {
@@ -194,7 +208,7 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
         const sendDiscoveredProfiles = async () => {
             const userReceivedMessage = waitFor(user, 'data');
             await nab.sendMessage(await user.getDID(), {
-                type: 'com.smashchats.profiles',
+                type: SMASH_PROFILE_LIST,
                 data: discovered,
                 after: '',
             } as IMProtoMessage);
@@ -206,7 +220,7 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
 
             beforeEach(async () => {
                 await user.initEndpoints(userSMEConfig);
-                nabReceivedJoin = waitFor(nab, 'join');
+                nabReceivedJoin = waitFor(nab, SMASH_NBH_JOIN);
                 await user.join(await nab.getJoinInfo());
             });
 
@@ -214,11 +228,15 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
             it('sends a JOIN message to the NAB', async () => {
                 const userDid = await user.getDID();
                 await nabReceivedJoin;
-                expect(onNabJoin).toHaveBeenCalledWith(
+                expect(nab.onJoin).toHaveBeenCalledWith(
+                    userDid.id,
                     expect.objectContaining({
+                        id: userDid.id,
                         ik: userDid.ik,
                         ek: userDid.ek,
                     }),
+                    expect.anything(),
+                    expect.anything(),
                 );
             });
 
@@ -226,12 +244,7 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
                 // TODO useless if there's no kind of confirmation
                 // TODO trigger on NAB profile receive?
                 expect(onUserNBHAdded).toHaveBeenCalledTimes(1);
-                expect(onUserNBHAdded).toHaveBeenCalledWith(
-                    expect.objectContaining({
-                        ik: nabDid.ik,
-                        ek: nabDid.ek,
-                    }),
-                );
+                expect(onUserNBHAdded).toHaveBeenCalledWith(nabDid.id);
             });
 
             describe('on NABs discover profiles', () => {
@@ -245,39 +258,36 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
                     // TODO duplicate test with auto refresh
                     expect(onUserDiscover).toHaveBeenCalledTimes(1);
                     expect(onUserDiscover).toHaveBeenCalledWith(
-                        expect.anything(),
+                        nabDid.id,
                         discovered,
+                        expect.anything(),
+                        expect.anything(),
                     );
                 });
             });
 
             describe('on User discover profiles', () => {
-                const onNabDiscover = jest.fn();
-
                 beforeEach(async () => {
-                    nab.on('discover', onNabDiscover);
                     await user.discover();
                     await delay(500);
                 });
 
                 it('triggers a discover event on the NAB side', async () => {
-                    expect(onNabDiscover).toHaveBeenCalledTimes(1);
+                    expect(nab.onDiscover).toHaveBeenCalledTimes(1);
                 });
             });
 
             describe('User Actions', () => {
                 let targetUser: SmashUser;
-                let onNabAction: jest.Mock;
                 let targetDid: DIDDocument;
                 let counter: number;
 
                 beforeEach(async () => {
                     const [identity] = await peerArgs();
                     targetUser = new SmashUser(identity);
-                    onNabAction = jest.fn();
-                    nab.on('action', onNabAction);
                     targetDid = await targetUser.getDID();
                     counter = 0;
+                    (nab.onRelationship as jest.Mock).mockClear();
                 });
 
                 afterEach(async () => {
@@ -288,24 +298,25 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
                     action: Relationship,
                     inverted: boolean = false,
                 ) => {
-                    const nabReceivedAction = waitFor(nab, 'action');
+                    const nabReceivedAction = waitFor(
+                        nab,
+                        SMASH_NBH_RELATIONSHIP,
+                    );
                     await user[action as 'smash' | 'pass' | 'clear'](targetDid);
                     await nabReceivedAction;
                     const userDid = await user.getDID();
-                    expect(onNabAction).toHaveBeenCalledTimes(
+                    expect(nab.onRelationship).toHaveBeenCalledTimes(
                         inverted ? counter : counter + 1,
                     );
                     if (!inverted) {
                         counter++;
-                        expect(onNabAction).toHaveBeenCalledWith(
-                            expect.objectContaining({
-                                ik: userDid.ik,
-                                ek: userDid.ek,
-                            }),
+                        expect(nab.onRelationship).toHaveBeenCalledWith(
+                            userDid.id,
                             expect.objectContaining({
                                 target: targetDid.id,
                                 action: action,
                             }),
+                            expect.anything(),
                             expect.anything(),
                         );
                     }

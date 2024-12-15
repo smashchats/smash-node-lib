@@ -7,6 +7,7 @@ import { SMESocketManager } from '@src/sme/index.js';
 import {
     DID,
     DIDDocument,
+    DIDString,
     EncapsulatedIMProtoMessage,
     IECKeyPair,
     IJsonIdentity,
@@ -14,6 +15,9 @@ import {
     IMProfileMessage,
     IMProtoMessage,
     IMTextMessage,
+    IM_CHAT_TEXT,
+    IM_PROFILE,
+    IM_SESSION_RESET,
     SMEConfigJSONWithoutDefaults,
     SME_DEFAULT_CONFIG,
     SmashEndpoint,
@@ -202,13 +206,10 @@ export class SmashMessaging extends EventEmitter {
             this.messagesStatusHandler.bind(this),
             this.logger,
         );
+        this.superRegister(IM_PROFILE, new DataForwardingResolver(IM_PROFILE));
         this.superRegister(
-            'org.improto.profile',
-            new DataForwardingResolver('org.improto.profile'),
-        );
-        this.superRegister(
-            'org.improto.session.reset',
-            new SessionResetHandler('org.improto.session.reset'),
+            IM_SESSION_RESET,
+            new SessionResetHandler(IM_SESSION_RESET),
         );
         this.logger.info(`Loaded Smash lib (log level: ${LOG_LEVEL})`);
     }
@@ -288,18 +289,18 @@ export class SmashMessaging extends EventEmitter {
     ) {
         const peer: SmashPeer | undefined = this.getPeerByIk(peerIk);
         if (peer) {
-            const peerDid = await peer.getDID();
             // firehose incoming events to the library user
-            this.notifyNewMessages(messages, peerDid);
+            this.notifyNewMessages(peer.id, messages);
+            // registered message handlers execute resolvers
             await this.incomingMessagesParser(peer, messages);
             this.logger.info(
-                `processed ${messages?.length} messages from ${peerDid.id}`,
+                `processed ${messages?.length} messages from ${peer.id}`,
             );
         } else {
             this.pushToUnknownPeerIkDLQ(peerIk, messages);
             // TODO: handle profile updates (for now only handles IK updates)
             messages
-                .filter((m) => m.type === 'org.improto.profile') // TODO: split DID
+                .filter((m) => m.type === IM_PROFILE) // TODO: split DID
                 .map((m) =>
                     this.incomingProfileHandler(peerIk, m as IMProfileMessage),
                 );
@@ -343,18 +344,17 @@ export class SmashMessaging extends EventEmitter {
         );
     }
 
-    totalMessages = 0;
+    /**
+     * Firehose incoming events to the library user
+     */
     private notifyNewMessages(
+        sender: DIDString,
         messages: EncapsulatedIMProtoMessage[],
-        sender: DIDDocument,
     ) {
         if (!messages?.length) return;
-        this.logger.debug(
-            `notifyNewMessages (${messages?.length}) (total: ${(this.totalMessages += messages?.length)})`,
-        );
+        this.logger.debug(`notifyNewMessages (${messages?.length})`);
         this.logger.debug(JSON.stringify(messages, null, 2));
-        // firehose incoming events to the library user
-        messages.forEach((message) => this.emit('data', message, sender));
+        messages.forEach((message) => this.emit('data', sender, message));
     }
 
     private async flushPeerIkDLQ(peerIk: string) {
@@ -396,13 +396,13 @@ export class SmashMessaging extends EventEmitter {
             );
             await peer.configureEndpoints();
             await peer.queueMessage({
-                type: 'org.improto.profile',
+                type: IM_PROFILE,
                 data: await this.getProfile(),
                 after: '',
             } as IMProfileMessage);
-            this.peers[peerDid.id] = peer;
+            this.peers[peer.id] = peer;
         }
-        // always map IK to ID (TODO handle profile/DID updates)
+        // always remap IK to ID (TODO handle profile/DID updates)
         this.peerIkMapping[peerDid.ik] = peerDid.id;
         return this.peers[peerDid.id];
     }
@@ -413,7 +413,7 @@ export class SmashMessaging extends EventEmitter {
         after: string,
     ): Promise<EncapsulatedIMProtoMessage> {
         return this.sendMessage(peerDid, {
-            type: 'org.improto.chat.text',
+            type: IM_CHAT_TEXT,
             data: text,
             after,
         } as IMTextMessage);
@@ -446,7 +446,7 @@ export class SmashMessaging extends EventEmitter {
         await Promise.all(
             Object.values(this.peers).map((peer) =>
                 peer.sendMessage({
-                    type: 'org.improto.profile',
+                    type: IM_PROFILE,
                     data: profile,
                 } as IMProfileMessage),
             ),
