@@ -299,11 +299,16 @@ export class SmashMessaging extends EventEmitter {
         } else {
             this.pushToUnknownPeerIkDLQ(peerIk, messages);
             // TODO: handle profile updates (for now only handles IK updates)
-            await Promise.allSettled(messages
-                .filter((m) => m.type === IM_PROFILE) // TODO: split DID
-                .map((m) =>
-                    this.incomingProfileHandler(peerIk, m as IMProfileMessage),
-                ));
+            await Promise.allSettled(
+                messages
+                    .filter((m) => m.type === IM_PROFILE) // TODO: split DID
+                    .map((m) =>
+                        this.incomingProfileHandler(
+                            peerIk,
+                            m as IMProfileMessage,
+                        ),
+                    ),
+            );
             this.logger.debug(
                 `DLQd ${messages.length} messages from unknown peer (IK: ${peerIk})`,
             );
@@ -494,7 +499,7 @@ export class SmashMessaging extends EventEmitter {
             logger.debug(
                 'Detailed cause:',
                 (reason as { cause?: string }).cause ||
-                'No additional error cause found',
+                    'No additional error cause found',
             );
         } else {
             logger.error(
