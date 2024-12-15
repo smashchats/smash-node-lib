@@ -301,7 +301,7 @@ describe('[SmashMessaging] Between peers registered to a SME', () => {
 
             it('knows Alice identity (DID)', async () => {
                 expect(bob.onMessage).toHaveBeenCalledWith(
-                    expect.stringMatching(alice.did.id),
+                    alice.did.id,
                     expect.anything(),
                 );
             });
