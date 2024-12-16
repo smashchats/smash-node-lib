@@ -173,7 +173,7 @@ jobs:
                   label: Coverage
                   message: ${{ needs.test.outputs.coverage }}% # Coverage percentage
                   color: ${{ needs.test.outputs.coverage-color }} # Badge color
-                  namedLogo: javascript # Badge logo
+                  namedLogo: typescript # Badge logo
 
     notify-failure:
         needs: test # Run after test job
