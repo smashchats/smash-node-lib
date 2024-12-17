@@ -2,10 +2,10 @@ import { Logger, SmashMessaging } from 'smash-node-lib';
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
-import { TIMEOUT_MS, delay } from './time.utils';
+import { TEST_CONFIG, delay } from './time.utils';
 
 const logger = new Logger('jest', 'INFO');
-jest.setTimeout(TIMEOUT_MS);
+jest.setTimeout(TEST_CONFIG.TEST_TIMEOUT_MS);
 (process as Process).actual.setMaxListeners(100);
 
 type Process = NodeJS.Process & { actual: NodeJS.Process };
@@ -26,5 +26,5 @@ beforeEach(() => {
 });
 
 afterAll(async () => {
-    await delay(1500);
+    await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
 });

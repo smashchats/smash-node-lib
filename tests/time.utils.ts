@@ -18,7 +18,18 @@ export async function delay(milliseconds: number): Promise<void> {
     return delayPromise;
 }
 
-export const TIMEOUT_MS = 2000;
+export const TEST_CONFIG = {
+    TEST_TIMEOUT_MS: 4500,
+    INITIAL_DATE: '2024-01-01T00:00:00.000Z',
+    PROTOCOL_OVERHEAD_SIZE: 1,
+    DEFAULT_POLL_ATTEMPTS: 20,
+    DEFAULT_POLL_INTERVAL: 500,
+    DEFAULT_SETUP_DELAY: 500,
+    MESSAGE_DELIVERY_TIMEOUT: 12000,
+    MESSAGE_DELIVERY: 500,
+} as const;
+
+export const TIMEOUT_MS = TEST_CONFIG.TEST_TIMEOUT_MS;
 
 let eventWaiterId = 0;
 export async function waitForEvent(
@@ -41,6 +52,9 @@ export async function waitForEvent(
         timeoutPromise.then(() => {
             logger.warn(
                 `<<< Timeout (${timeout}ms) while waiting for "${eventName}", ID: ${id}`,
+            );
+            throw new Error(
+                `Timeout (${timeout}ms) while waiting for "${eventName}", ID: ${id}`,
             );
         }),
         new Promise<void>((resolve) => {

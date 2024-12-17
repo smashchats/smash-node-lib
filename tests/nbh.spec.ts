@@ -22,7 +22,7 @@ import {
 import { socketServerUrl } from './jest.global.cjs';
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
-import { aliasWaitFor, delay } from './time.utils';
+import { TEST_CONFIG, aliasWaitFor, delay } from './time.utils';
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
 import { peerArgs } from './user.utils';
@@ -206,13 +206,12 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
             },
         ];
         const sendDiscoveredProfiles = async () => {
-            const userReceivedMessage = waitFor(user, 'data');
             await nab.sendMessage(await user.getDID(), {
                 type: SMASH_PROFILE_LIST,
                 data: discovered,
                 after: '',
             } as IMProtoMessage);
-            return userReceivedMessage;
+            return await delay(TEST_CONFIG.MESSAGE_DELIVERY);
         };
 
         describe('joining the NBH', () => {
@@ -296,19 +295,22 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
 
                 const testAction = async (
                     action: Relationship,
-                    inverted: boolean = false,
+                    expectFailure: boolean = false,
                 ) => {
                     const nabReceivedAction = waitFor(
                         nab,
                         SMASH_NBH_RELATIONSHIP,
+                        1,
+                        TEST_CONFIG.TEST_TIMEOUT_MS / 2,
                     );
                     await user[action as 'smash' | 'pass' | 'clear'](targetDid);
-                    await nabReceivedAction;
+                    if (expectFailure) {
+                        await expect(nabReceivedAction).rejects.toThrow();
+                    } else {
+                        await nabReceivedAction;
+                    }
                     const userDid = await user.getDID();
-                    expect(nab.onRelationship).toHaveBeenCalledTimes(
-                        inverted ? counter : counter + 1,
-                    );
-                    if (!inverted) {
+                    if (!expectFailure) {
                         counter++;
                         expect(nab.onRelationship).toHaveBeenCalledWith(
                             userDid.id,
@@ -320,6 +322,7 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
                             expect.anything(),
                         );
                     }
+                    expect(nab.onRelationship).toHaveBeenCalledTimes(counter);
                 };
 
                 it('should perform Smash action and notify NAB', async () => {
