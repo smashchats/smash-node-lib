@@ -9,15 +9,14 @@
             "extensions": [
                 "dbaeumer.vscode-eslint",
                 "rvest.vs-code-prettier-eslint",
-                "esbenp.prettier-vscode",
-                "Orta.vscode-jest"
+                "esbenp.prettier-vscode"
             ]
         }
     },
     "mounts": [
         "source=${localEnv:HOME}${localEnv:USERPROFILE}/.radicle,target=/home/node/.radicle,type=bind",
-        "source=${localWorkspaceFolderBasename}-radicle,target=/home/node/.radicle/bin,type=volume",
+        "source=1-22-bookworm-radicle,target=/home/node/.radicle/bin,type=volume",
         "source=${localWorkspaceFolderBasename}-node_modules,target=${containerWorkspaceFolder}/node_modules,type=volume"
     ],
-    "postCreateCommand": "echo 'source <(npm completion)' >> /home/node/.bashrc && sudo chown -R node node_modules /home/node/.radicle/bin && npm i && curl -sSf https://radicle.xyz/install | sh && echo 'export PATH=$PATH:/home/node/.radicle/bin' >> /home/node/.bashrc"
+    "postCreateCommand": "bash .devcontainer/postCreateCommand.sh"
 }
