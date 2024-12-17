@@ -1,7 +1,8 @@
 export type ISO8601 =
     `${number}-${string}-${string}T${string}:${string}:${string}${string}${string}`;
 export type reverseDNS = `${string}.${string}.${string}`;
-export type sha256 = `${string & { length: 64 }}` | '0' | '';
+export type sha256 = `${string & { length: 64 }}`;
+export type undefinedString = '' | '0' | undefined;
 
 /**
  * Base message interface
@@ -11,7 +12,7 @@ export type sha256 = `${string & { length: 64 }}` | '0' | '';
 export interface BaseIMProtoMessage {
     type: reverseDNS;
     data: unknown;
-    after: sha256;
+    after: sha256 | undefinedString;
 }
 
 interface TimedIMProtoMessage extends BaseIMProtoMessage {

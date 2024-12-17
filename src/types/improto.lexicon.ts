@@ -1,8 +1,14 @@
-import { DID, IMProtoMessage } from '@src/types/index.js';
+import {
+    BaseIMProtoMessage,
+    DID,
+    IMProtoMessage,
+    sha256,
+} from '@src/types/index.js';
 
 export const IM_CHAT_TEXT = 'org.improto.chat.text';
 export const IM_PROFILE = 'org.improto.profile';
 export const IM_SESSION_RESET = 'org.improto.session.reset';
+export const IM_ACK_RECEIVED = 'org.improto.ack.received';
 
 /**
  * Chat message
@@ -42,3 +48,16 @@ export interface IMSessionResetMessage extends IMProtoMessage {
     type: typeof IM_SESSION_RESET;
     data: never;
 }
+
+/**
+ * Received ACK message
+ *
+ * Used to acknowledge the receipt of a message.
+ */
+export interface IMReceivedACKMessage extends BaseIMProtoMessage {
+    type: typeof IM_ACK_RECEIVED;
+    data: sha256[];
+    after: undefined;
+}
+
+export type MessageStatus = '' | 'delivered' | 'received';

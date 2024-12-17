@@ -32,7 +32,7 @@ export class SmashPeer {
 
     // TODO allow loading relationship at lib initialization time
     private relationship: Relationship = 'clear';
-    private lastRelationshipSha256: sha256 = '0';
+    private lastRelationshipSha256: sha256 | undefined;
 
     // TODO: default to use 'id' everywhere document is not needed
     public readonly id: DIDString;
@@ -125,6 +125,12 @@ export class SmashPeer {
         await Promise.allSettled(
             this.endpoints.map(async (endpoint) => {
                 const undeliveredMessages = Array.from(endpoint.messageQueue);
+                if (!undeliveredMessages.length) {
+                    this.logger.debug(
+                        `> no undelivered messages for ${endpoint.socket.url}`,
+                    );
+                    return;
+                }
                 endpoint.socket.sendData(
                     endpoint.peerId,
                     endpoint.session.id,
@@ -144,7 +150,21 @@ export class SmashPeer {
         message: IMProtoMessage,
     ): Promise<EncapsulatedIMProtoMessage> {
         const sentMessage = await this.queueMessage(message);
+
+        // // Initialize retry mechanism
+        // const queuedMessage: QueuedMessage = {
+        //     message: sentMessage,
+        //     status: 'pending',
+        //     retryCount: 0,
+        //     acknowledgedEndpoints: new Set(),
+        // };
+
+        // this.messageQueue.set(sentMessage.sha256, queuedMessage);
         await this.flushQueue();
+
+        // // Start retry timer if not already running
+        // this.ensureRetryTimer();
+
         this.logger.debug(`> sent `, JSON.stringify(sentMessage));
         return sentMessage;
     }
@@ -152,10 +172,6 @@ export class SmashPeer {
     getDID(): Promise<DIDDocument> {
         return DIDResolver.resolve(this.did);
     }
-
-    // getRelationship() {
-    //     return this.relationship;
-    // }
 
     async setRelationship(relationship: Relationship, nabs: SmashPeer[]) {
         if (this.relationship === relationship) {

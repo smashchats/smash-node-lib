@@ -42,6 +42,10 @@ export class SMESocketWriteOnly {
         buffer: ArrayBuffer,
         messageIds: string[],
     ) {
+        if (!messageIds.length) {
+            this.logger.warn(`called sendData with no messageIds`);
+            return;
+        }
         if (!this.socket) {
             this.socket = SMESocketWriteOnly.initSocket(this.logger, this.url);
         }

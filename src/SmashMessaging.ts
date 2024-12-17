@@ -4,7 +4,7 @@ import { BaseResolver, DataForwardingResolver } from '@src/callbacks/index.js';
 import { DIDResolver } from '@src/did/index.js';
 import { SessionManager } from '@src/signal/index.js';
 import { SMESocketManager } from '@src/sme/index.js';
-import {
+import type {
     DID,
     DIDDocument,
     DIDString,
@@ -14,15 +14,21 @@ import {
     IMProfile,
     IMProfileMessage,
     IMProtoMessage,
+    IMReceivedACKMessage,
     IMTextMessage,
+    SMEConfigJSONWithoutDefaults,
+    SmashEndpoint,
+    sha256,
+} from '@src/types/index.js';
+import {
+    IM_ACK_RECEIVED,
     IM_CHAT_TEXT,
     IM_PROFILE,
     IM_SESSION_RESET,
-    SMEConfigJSONWithoutDefaults,
     SME_DEFAULT_CONFIG,
-    SmashEndpoint,
 } from '@src/types/index.js';
-import { LogLevel, Logger } from '@src/utils/Logger.js';
+import type { LogLevel } from '@src/utils/Logger.js';
+import { Logger } from '@src/utils/Logger.js';
 import { CryptoUtils } from '@src/utils/index.js';
 import { EventEmitter } from 'events';
 
@@ -211,6 +217,14 @@ export class SmashMessaging extends EventEmitter {
             IM_SESSION_RESET,
             new SessionResetHandler(IM_SESSION_RESET),
         );
+        this.superRegister(
+            IM_ACK_RECEIVED,
+            new DataForwardingResolver(IM_ACK_RECEIVED),
+        );
+        this.on(IM_ACK_RECEIVED, (_, messageIds: sha256[]) => {
+            this.logger.debug(`Received ACK for ${messageIds}`);
+            this.emit('status', 'received', messageIds);
+        });
         this.logger.info(`Loaded Smash lib (log level: ${LOG_LEVEL})`);
     }
 
@@ -254,7 +268,7 @@ export class SmashMessaging extends EventEmitter {
 
     private async messagesStatusHandler(messageIds: string[], status: string) {
         this.logger.debug(`messagesStatusHandler ${status} ${messageIds}`);
-        messageIds.forEach((id) => this.emit('status', id, status));
+        this.emit('status', status, messageIds);
     }
 
     private peerIkMapping: Record<string, string> = {};
@@ -283,16 +297,33 @@ export class SmashMessaging extends EventEmitter {
         return this.flushPeerIkDLQ(peerIk);
     }
 
+    private sendReceivedAcks(
+        peer: SmashPeer,
+        messages: EncapsulatedIMProtoMessage[],
+    ) {
+        const acks = messages.filter((m) => m.type !== IM_ACK_RECEIVED);
+        if (!acks.length) return;
+        this.logger.debug(`sendReceivedAcks: ${acks.length}`);
+        return peer.sendMessage({
+            type: 'org.improto.ack.received',
+            data: acks.map((m) => m.sha256),
+        } as IMReceivedACKMessage);
+    }
+
     private async incomingMessagesHandler(
         peerIk: string,
         messages: EncapsulatedIMProtoMessage[],
     ) {
         const peer: SmashPeer | undefined = this.getPeerByIk(peerIk);
         if (peer) {
-            // firehose incoming events to the library user
-            this.notifyNewMessages(peer.id, messages);
-            // registered message handlers execute resolvers
-            await this.incomingMessagesParser(peer, messages);
+            await Promise.allSettled([
+                // firehose incoming events to the library user
+                this.notifyNewMessages(peer.id, messages),
+                // registered message handlers execute resolvers
+                this.incomingMessagesParser(peer, messages),
+                // send received ACKs to the sending peer
+                this.sendReceivedAcks(peer, messages),
+            ]);
             this.logger.info(
                 `processed ${messages?.length} messages from ${peer.id}`,
             );
