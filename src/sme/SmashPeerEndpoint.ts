@@ -60,6 +60,7 @@ export class SmashPeerEndpoint {
                 this.peer.logger.info(
                     `> resetting session: ${this.session?.id}`,
                 );
+                // TODO: is reset session really needed everytime here?
                 this.session = undefined;
                 throw error;
             }

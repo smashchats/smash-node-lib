@@ -49,6 +49,7 @@ export class SmashUser extends SmashMessaging {
     public async join(joinAction: SmashActionJson) {
         // Initialize endpoints if SME config is provided
         if (joinAction.config?.sme) {
+            // WARNING!! DESTRUCTIVE ACTION (set != add)
             await this.setEndpoints(joinAction.config.sme);
         }
         // Create or get NAB peer and send join message

@@ -35,9 +35,9 @@ export class SmashPeer {
     // TODO: default to use 'id' everywhere document is not needed
     public readonly id: DIDString;
 
-    private readonly MAX_RETRY_ATTEMPTS = 5;
+    private readonly MAX_RETRY_ATTEMPTS = 10;
     private readonly INITIAL_RETRY_DELAY_MS = 1000;
-    private readonly MAX_RETRY_DELAY_MS = 120000; // 2 minutes
+    private readonly MAX_RETRY_DELAY_MS = 600000; // 10 minutes
 
     constructor(
         private readonly did: DID,
