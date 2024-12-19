@@ -96,18 +96,24 @@ export class SMESocketReadWrite extends SMESocketWriteOnly {
                 identity.signingKey.privateKey,
                 auth.preKeyPair.publicKey.serialize(),
             );
+            // if a socket is already configured for this url,
+            if (this.socket) {
+                // we close it
+                this.logger.debug('closing old socket');
+                this.socket.close();
+            }
+            // we initialize a new socket with given auth params
             this.socket = SMESocketWriteOnly.initSocket(this.logger, auth.url, {
                 key: preKey,
                 keyAlgorithm: auth.keyAlgorithm,
             });
-            this.logger.debug('auth:= ', JSON.stringify(auth, null, 2));
+            // TODO: ack challenge
+            // on auth failure the socket will be disconnected without throwing an error!!
             this.socket.on('challenge', async (data) => {
                 this.logger.debug(
                     'SMESocketReadWrite::challenge',
                     this.socket?.id,
                 );
-                this.logger.debug('auth:= ', JSON.stringify(auth, null, 2));
-                this.logger.debug('data:= ', JSON.stringify(data, null, 2));
                 await solveChallenge(data, auth, this.socket!, this.logger);
             });
             this.socket.on('data', this.processMessages.bind(this));

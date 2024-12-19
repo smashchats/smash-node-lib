@@ -36,22 +36,43 @@ export class SMESocketWriteOnly {
         else return Promise.resolve();
     }
 
+    // TODO: do we want to use simpler ID than preKey? (eg, sha256 of the prekey?)
+    /**
+     * @param preKey - The recipient's prekey to use as their ID on the SME.
+     * @param sessionId - The session ID to use to deliver the message.
+     * @param buffer - The data to send.
+     * @param messageIds - The corresponding sent message IDs to track.
+     */
     public sendData(
         preKey: string,
         sessionId: string,
         buffer: ArrayBuffer,
         messageIds: string[],
-    ) {
-        if (!messageIds.length) {
-            this.logger.warn(`called sendData with no messageIds`);
-            return;
-        }
-        if (!this.socket) {
-            this.socket = SMESocketWriteOnly.initSocket(this.logger, this.url);
-        }
-        this.socket?.emit('data', preKey, sessionId, buffer, () => {
-            this.logger.debug(`${messageIds} "delivered"`);
-            this.onMessagesStatusCallback(messageIds, 'delivered');
+    ): Promise<void> {
+        return new Promise<void>((resolve, reject) => {
+            if (!messageIds.length) {
+                this.logger.warn(`called sendData with no messageIds`);
+                return resolve();
+            }
+            if (!this.socket || this.socket.disconnected) {
+                this.logger.info('connecting write-only socket');
+                this.socket = SMESocketWriteOnly.initSocket(
+                    this.logger,
+                    this.url,
+                );
+            }
+            const timeout = setTimeout(() => {
+                reject(
+                    new Error(
+                        `Timeout exceeded while sending data to ${this.url}`,
+                    ),
+                );
+            }, 3000);
+            this.socket.emit('data', preKey, sessionId, buffer, () => {
+                this.onMessagesStatusCallback(messageIds, 'delivered');
+                clearTimeout(timeout);
+                resolve();
+            });
         });
     }
 
@@ -60,7 +81,9 @@ export class SMESocketWriteOnly {
         url: string,
         auth?: SMEAuthParams,
     ) {
-        logger.debug(`SMESocketWriteOnly::initSocket ${url} with auth`);
+        logger.debug(
+            `SMESocketWriteOnly::initSocket ${url} ${auth ? 'with auth' : 'without auth'}`,
+        );
         const socket = io(url, { auth });
         socket.on('ping', () => {
             logger.debug(`> Ping from SME ${url}`);

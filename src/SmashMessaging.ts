@@ -72,6 +72,13 @@ export class SmashMessaging extends EventEmitter {
     }
 
     private static patchedGenerateKey: boolean = false;
+    /**
+     * Generates a cryptographic identity with the given number of prekeys and onetime keys.
+     * @param nbPreKeys Number of prekeys to generate (used for endpoints).
+     * @param nbOnetimeKeys Number of onetime keys to generate (used for new sessions).
+     * @param extractable Whether the keys should be extractable (default to false).
+     * @returns The generated identity.
+     */
     static generateIdentity(
         nbPreKeys: number = 1,
         nbOnetimeKeys: number = 0,
@@ -229,6 +236,9 @@ export class SmashMessaging extends EventEmitter {
     }
 
     async close() {
+        await Promise.allSettled(
+            Object.values(this.peers).map((p) => p.cancelRetry()),
+        );
         await this.smeSocketManager.closeAllSockets();
         this.endpoints = [];
         return;
@@ -246,11 +256,20 @@ export class SmashMessaging extends EventEmitter {
         );
     }
 
-    async initEndpoints(
-        endpoints: SMEConfigJSONWithoutDefaults[],
+    async setEndpoints(
+        newEndpoints: SMEConfigJSONWithoutDefaults[],
     ): Promise<void> {
-        const newEndpoints = await Promise.all(
-            endpoints.map((smeConfig) => {
+        // ASSUMPTION#3: Endpoints can be uniquely identified by their URL.
+        const existingEndpointURLs = this.endpoints.map((e) => e.url);
+        // disconnecting old endpoints
+        await Promise.allSettled(
+            existingEndpointURLs
+                .filter((url) => !newEndpoints.some((e) => e.url === url))
+                .map((url) => this.smeSocketManager.close(url)),
+        );
+        // initializing new endpoints or renewed endpoints
+        this.endpoints = await Promise.all(
+            newEndpoints.map((smeConfig) => {
                 return this.smeSocketManager.initWithAuth(
                     this.identity,
                     {
@@ -263,11 +282,10 @@ export class SmashMessaging extends EventEmitter {
                 );
             }),
         );
-        this.endpoints = this.endpoints.concat(newEndpoints);
     }
 
     private async messagesStatusHandler(messageIds: string[], status: string) {
-        this.logger.debug(`messagesStatusHandler ${status} ${messageIds}`);
+        this.logger.debug(`messagesStatusHandler "${status}" : ${messageIds}`);
         this.emit('status', status, messageIds);
     }
 
@@ -430,12 +448,8 @@ export class SmashMessaging extends EventEmitter {
                 this.smeSocketManager,
                 this.logger,
             );
+            peer.setUserProfile(await this.getProfile());
             await peer.configureEndpoints();
-            await peer.queueMessage({
-                type: IM_PROFILE,
-                data: await this.getProfile(),
-                after: '',
-            } as IMProfileMessage);
             this.peers[peer.id] = peer;
         }
         // always remap IK to ID (TODO handle profile/DID updates)
@@ -479,12 +493,9 @@ export class SmashMessaging extends EventEmitter {
     async updateMeta(meta: ProfileMeta) {
         this.meta = meta;
         const profile = await this.getProfile();
-        await Promise.all(
+        await Promise.allSettled(
             Object.values(this.peers).map((peer) =>
-                peer.sendMessage({
-                    type: IM_PROFILE,
-                    data: profile,
-                } as IMProfileMessage),
+                peer.sendUserProfile(profile),
             ),
         );
     }

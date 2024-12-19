@@ -65,7 +65,7 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
         const [identity, config] = await peerArgs(socketServerUrl);
         nabSMEConfig = config;
         nab = new TestNAB(identity);
-        await nab.initEndpoints(config);
+        await nab.setEndpoints(config);
         await delay(100);
         nabDid = await nab.getDID();
     });
@@ -218,7 +218,7 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
             let nabReceivedJoin: Promise<void>;
 
             beforeEach(async () => {
-                await user.initEndpoints(userSMEConfig);
+                await user.setEndpoints(userSMEConfig);
                 nabReceivedJoin = waitFor(nab, SMASH_NBH_JOIN);
                 await user.join(await nab.getJoinInfo());
             });

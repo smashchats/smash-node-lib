@@ -38,7 +38,7 @@ export class SessionManager {
             this.logger,
         );
         this.persistSession(session);
-        this.logger.debug('persisted');
+        this.logger.debug(`persisted session ${session.id}`);
         return [session, decryptedMessages];
     }
 

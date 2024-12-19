@@ -32,9 +32,12 @@ export const createPeer = async (
     name: string,
     serverUrl?: string,
     loadIdentity?: Identity,
+    nbPreKeys: number = 1,
+    nbOnetimeKeys: number = 0,
 ): Promise<TestPeer> => {
     const identity =
-        loadIdentity ?? (await SmashMessaging.generateIdentity(1, 0, true));
+        loadIdentity ??
+        (await SmashMessaging.generateIdentity(nbPreKeys, nbOnetimeKeys, true));
     const config = serverUrl
         ? [
               {
@@ -44,7 +47,7 @@ export const createPeer = async (
           ]
         : [];
     const messaging = new SmashMessaging(identity, undefined, 'DEBUG', name);
-    await messaging.initEndpoints(config);
+    await messaging.setEndpoints(config);
 
     const did = await messaging.getDID();
     const onData = jest.fn();

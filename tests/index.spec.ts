@@ -24,7 +24,7 @@ interface TestMessage {
 }
 
 class TestUtils {
-    private static logger = new Logger('TestUtils');
+    private static logger = new Logger('TestUtils', 'DEBUG');
 
     static async getDataEvents(
         serverUrl: string,
@@ -74,7 +74,7 @@ class TestUtils {
 // describe('Only Bob is registered to an SME.', () => {
 
 describe('[SmashMessaging] Between peers registered to a SME', () => {
-    const logger = new Logger('SmashMessaging');
+    const logger = new Logger('SmashMessaging', 'DEBUG');
 
     let RealDate: DateConstructor;
     let mockedNow: Date;

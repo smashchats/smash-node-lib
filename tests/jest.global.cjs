@@ -137,31 +137,18 @@ module.exports = async function () {
                 : 'ANONYMOUS';
             activeSockets[clientKeyId] = client;
             client.on('data', async (peerId, sessionId, data, acknowledge) => {
-                // console.log(
-                //     `Received data for peerId ${peerId}, sessionId: ${sessionId} (${messagesToDelay[peerId]} messages to delay)`,
-                // );
+                if (!activeSockets[peerId]) {
+                    return;
+                }
                 let delayMs = 0;
                 if (messagesToDelay[peerId]) {
                     delayMs = messagesToDelay[peerId] * 250;
                     messagesToDelay[peerId] = messagesToDelay[peerId] - 1;
-                    // console.log(
-                    //     `Delaying SME message for ${delayMs}ms (peerId: ${peerId})`,
-                    // );
                 }
                 dataEvents.push({ peerId, sessionId, data });
-                Object.keys(activeSockets)
-                    .filter((key) => peerId === key)
-                    .forEach((key) =>
-                        setTimeout(() => {
-                            if (activeSockets[key]) {
-                                activeSockets[key].emit(
-                                    'data',
-                                    sessionId,
-                                    data,
-                                );
-                            }
-                        }, delayMs),
-                    );
+                setTimeout(() => {
+                    activeSockets[peerId].emit('data', sessionId, data);
+                }, delayMs);
                 acknowledge();
             });
             client.on('disconnect', async () => {

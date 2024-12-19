@@ -40,16 +40,19 @@ export class SignalSession {
         try {
             const bundle = new PreKeyBundleProtocol();
             bundle.registrationId = 0; // warning: using fixed value, unsure about usage!
+
+            // IK
             bundle.identity.signingKey = await ECPublicKey.create(
                 await CryptoUtils.singleton.importKey(peerDidDocument.ik),
             );
+            // EK + signature
             bundle.identity.exchangeKey = await ECPublicKey.create(
                 await CryptoUtils.singleton.importKey(peerDidDocument.ek),
             );
             bundle.identity.signature = CryptoUtils.singleton.stringToBuffer(
                 peerDidDocument.signature,
             );
-
+            // PreKey + signature
             bundle.preKeySigned.id = 0; // warning: using fixed value, unsure about usage!
             bundle.preKeySigned.key = await ECPublicKey.create(
                 await CryptoUtils.singleton.importKey(sme.preKey),

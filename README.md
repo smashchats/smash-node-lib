@@ -3,6 +3,13 @@
 This ES Module library provides the core functionality for implementing and interacting with the **Smash Protocol**—a modular, **1:N social messaging** and **curated content-sharing** protocol.
 It powers the free and open digital neighborhoods of tomorrow, promoting decentralization, interoperability, and user ownership.
 
+> **WARNING**.
+> This is a work in progress.
+> We are currently working on the alpha version of the Smash Protocol
+> under a (non-exhaustive) list of [assumptions](./docs/ASSUMPTIONS.md).
+> **BREAKING CHANGES WITHOUT NOTICE** ARE TO BE EXPECTED.
+> And, in general, documentation is deemed **not yet available**.
+
 ![License](https://img.shields.io/badge/license-AGPL--3.0-blue)
 ![Version](https://img.shields.io/badge/version-0.0.1-alpha)
 
