@@ -24,49 +24,70 @@ export class SMESocketReadWrite extends SMESocketWriteOnly {
         super(url, onMessagesStatusCallback, logger);
     }
 
+    // TODO refactor
     public async initSocketWithAuth(
         identity: Identity,
         auth: SMEConfig,
     ): Promise<SmashEndpoint> {
         this.logger.debug('SMESocketReadWrite::initSocketWithAuth');
-        try {
-            const preKey = await CryptoUtils.singleton.exportKey(
-                auth.preKeyPair.publicKey.key,
-            );
-            const signature = await CryptoUtils.singleton.signAsString(
-                identity.signingKey.privateKey,
-                auth.preKeyPair.publicKey.serialize(),
-            );
-            // if a socket is already configured for this url,
-            if (this.socket) {
-                // we close it
-                this.logger.debug('>>> closing old socket');
-                await this.close();
-            }
-            // we initialize a new socket with given auth params
-            this.initSocket({
-                key: preKey,
-                keyAlgorithm: auth.keyAlgorithm,
+        return new Promise<SmashEndpoint>((resolve, reject) => {
+            Promise.all([
+                CryptoUtils.singleton.exportKey(auth.preKeyPair.publicKey.key),
+                CryptoUtils.singleton.signAsString(
+                    identity.signingKey.privateKey,
+                    auth.preKeyPair.publicKey.serialize(),
+                ),
+            ]).then(([preKey, signature]) => {
+                // we initialize a new socket with given auth params
+                this.initSocket({
+                    key: preKey,
+                    keyAlgorithm: auth.keyAlgorithm,
+                });
+                if (!this.socket) {
+                    this.logger.error('> SME socket not initialized');
+                    throw new Error('> SME socket not initialized');
+                }
+                // TODO timeout
+                this.socket.on('challenge', async (data) => {
+                    this.logger.debug('SMESocketReadWrite::challenge');
+                    try {
+                        const solvedChallenge =
+                            await CryptoUtils.singleton.solveChallenge(
+                                data,
+                                auth,
+                            );
+
+                        this.logger.debug(`> SME Challenge IV (${data.iv})`);
+                        this.logger.debug(
+                            `> SME Challenge (${data.challenge}) -> (${solvedChallenge})`,
+                        );
+                        if (
+                            !this.socket ||
+                            this.socket.disconnected ||
+                            !this.socket.connected
+                        ) {
+                            this.logger.error('> SME socket not connected');
+                            throw new Error('> SME socket not connected');
+                        }
+                        this.socket.emit('register', solvedChallenge, () => {
+                            this.logger.debug('> SME Challenge SOLVED');
+                            resolve({
+                                url: auth.url,
+                                preKey,
+                                signature,
+                            });
+                        });
+                    } catch (err) {
+                        this.logger.error(
+                            'Cannot solve challenge.',
+                            err instanceof Error ? err.message : err,
+                        );
+                        reject(err);
+                    }
+                });
+                this.socket.on('data', this.processMessages.bind(this));
             });
-            // TODO: ack challenge
-            // on auth failure the socket will be disconnected without throwing an error!!
-            this.socket!.on('challenge', async (data) => {
-                this.logger.debug(
-                    'SMESocketReadWrite::challenge',
-                    this.socket?.id,
-                );
-                await this.solveChallenge(data, auth);
-            });
-            this.socket!.on('data', this.processMessages.bind(this));
-            return {
-                url: auth.url,
-                preKey,
-                signature,
-            };
-        } catch (err) {
-            this.logger.error('Cannot init socket with auth.');
-            throw err;
-        }
+        });
     }
 
     private async processMessages(sessionId: string, data: ArrayBuffer) {
@@ -157,27 +178,5 @@ export class SMESocketReadWrite extends SMESocketWriteOnly {
     ) {
         this.logger.debug('SMESocketReadWrite::emitReceivedMessages');
         this.onMessagesCallback(peerIk, messages);
-    }
-
-    private async solveChallenge(
-        data: { iv: string; challenge: string },
-        auth: SMEConfig,
-    ) {
-        try {
-            const solvedChallenge = await CryptoUtils.singleton.solveChallenge(
-                data,
-                auth,
-            );
-            this.logger.debug(
-                `> SME Challenge (${data.challenge}) -> (${solvedChallenge})`,
-            );
-            this.socket!.emit('register', solvedChallenge);
-        } catch (err) {
-            this.logger.warn(
-                'Cannot solve challenge.',
-                err instanceof Error ? err.message : err,
-            );
-            throw err;
-        }
     }
 }

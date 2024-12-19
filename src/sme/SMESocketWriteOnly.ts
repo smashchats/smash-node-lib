@@ -49,16 +49,17 @@ export class SMESocketWriteOnly {
     }
 
     private forceCleanup() {
-        if (this.socket) {
-            this.logger.debug(`> socket cleanup (${this.url})...`);
-            this.socket.removeAllListeners();
-            this.socket.disconnect();
-            this.socket.close();
-            if (this.socket.io?.engine) {
-                this.socket.io.engine.removeAllListeners();
-                this.socket.io.engine.close();
-                this.socket.io.engine.transport?.close();
-            }
+        if (!this.socket) {
+            return;
+        }
+        this.logger.debug(`> socket cleanup (${this.url})...`);
+        this.socket.removeAllListeners();
+        this.socket.disconnect();
+        this.socket.close();
+        if (this.socket.io?.engine) {
+            this.socket.io.engine.removeAllListeners();
+            this.socket.io.engine.close();
+            this.socket.io.engine.transport?.close();
         }
         this.socket = undefined;
     }
@@ -116,12 +117,6 @@ export class SMESocketWriteOnly {
             transports: ['websocket', 'polling', 'webtransport'],
         });
 
-        // Listen to low-level engine events
-        socket.io?.engine?.once('error', (err: Error | string) => {
-            this.logger.error(`Engine error for ${this.url}: ${err}`);
-            this.forceCleanup();
-        });
-
         socket.on('connect', () => {
             const transport = socket.io.engine.transport.name; // in most cases, "polling"
             this.logger.info(`> Connected to SME ${this.url} (${transport})`);
@@ -135,7 +130,6 @@ export class SMESocketWriteOnly {
 
         socket.on('connect_error', (error: Error) => {
             this.logger.warn(`> Connect error to SME ${this.url}: ${error}`);
-            this.forceCleanup();
         });
 
         socket.on('ping', () => {

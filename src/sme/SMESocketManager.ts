@@ -21,7 +21,7 @@ export class SMESocketManager {
         this.smeSockets = {};
     }
 
-    getOrCreate(url: string) {
+    getOrCreate(url: string): SMESocketWriteOnly {
         if (!this.smeSockets[url]) {
             this.logger.debug(`Creating new SMESocketWriteOnly for ${url}`);
             this.smeSockets[url] = new SMESocketWriteOnly(
@@ -57,15 +57,6 @@ export class SMESocketManager {
             this.onMessagesStatusCallback,
             this.logger,
         );
-        // ASSUMPTION#3: Endpoints can be uniquely identified by their URL.
-        // if a socket is already configured for this url,
-        if (this.smeSockets[smeConfig.url]) {
-            // we copy its state to the new socket attempt
-            this.logger.debug(
-                `Copying state from existing socket for ${smeConfig.url}`,
-            );
-            Object.assign(this.smeSockets[smeConfig.url], smeSocket);
-        }
         // we attempt to initialize the socket with auth
         // in case of failure, this will throw an error
         const endpoint = await smeSocket.initSocketWithAuth(
@@ -74,7 +65,9 @@ export class SMESocketManager {
         );
         // if no error has been thrown, we can safely store the new socket
         // replacing the old one.
+        const oldSocket = this.smeSockets[smeConfig.url];
         this.smeSockets[smeConfig.url] = smeSocket;
+        await oldSocket?.close();
         // and return the configured endpoint
         return endpoint;
     }

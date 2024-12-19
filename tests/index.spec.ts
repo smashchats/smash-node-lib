@@ -7,7 +7,7 @@ import {
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
-import { socketServerUrl } from './jest.global.cjs';
+import { apiServerUrl, socketServerUrl } from './jest.global.cjs';
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
 import { TEST_CONFIG, delay } from './time.utils';
@@ -31,7 +31,7 @@ class TestUtils {
         peerId: string,
         method: string = 'GET',
     ): Promise<unknown[]> {
-        const url = `${serverUrl}/data-events?peerId=${encodeURIComponent(peerId)}`;
+        const url = `${apiServerUrl}/data-events?peerId=${encodeURIComponent(peerId)}`;
         try {
             const response = await fetch(url, { method });
             if (!response.ok) {

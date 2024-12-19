@@ -289,7 +289,7 @@ export class SmashMessaging extends EventEmitter {
                 .map((url) => this.smeSocketManager.close(url)),
         );
         // initializing new endpoints or renewed endpoints
-        this.endpoints = await Promise.all(
+        const initEndpoints = await Promise.allSettled(
             newEndpoints.map((smeConfig) => {
                 return this.smeSocketManager.initWithAuth(
                     this.identity,
@@ -303,6 +303,17 @@ export class SmashMessaging extends EventEmitter {
                 );
             }),
         );
+        this.endpoints = initEndpoints
+            .filter((r) => r.status === 'fulfilled')
+            .map((r) => r.value);
+        if (initEndpoints.some((r) => r.status === 'rejected')) {
+            this.logger.warn(
+                `Failed to initialize some endpoints: ${initEndpoints
+                    .filter((r) => r.status === 'rejected')
+                    .map((r) => r.reason)
+                    .join(', ')}`,
+            );
+        }
     }
 
     private async messagesStatusHandler(messageIds: string[], status: string) {

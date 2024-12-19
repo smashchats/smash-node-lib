@@ -11,7 +11,7 @@ import {
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
-import { socketServerUrl } from './jest.global.cjs';
+import { apiServerUrl, socketServerUrl } from './jest.global.cjs';
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
 import { TEST_CONFIG, aliasWaitFor, delay } from './time.utils';
@@ -386,7 +386,7 @@ describe('SmashMessaging: Edge cases', () => {
             const activateDelay = async () => {
                 logger.info('>> Activating delay on the mocked SME');
                 if (!bob) throw new Error('Bob not found');
-                const url = `${socketServerUrl}/delay-next-messages?peerId=${encodeURIComponent(bob.did.endpoints[0].preKey)}`;
+                const url = `${apiServerUrl}/delay-next-messages?peerId=${encodeURIComponent(bob.did.endpoints[0].preKey)}`;
                 try {
                     const response = await fetch(url);
                     if (!response.ok) {

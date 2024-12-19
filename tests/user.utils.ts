@@ -5,6 +5,10 @@ import {
     SmashMessaging,
 } from 'smash-node-lib';
 
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore
+import { SME_PUBLIC_KEY } from './jest.global.cjs';
+
 // @deprecated
 export async function peerArgs(
     socketServerUrl?: string,
@@ -14,7 +18,7 @@ export async function peerArgs(
         ? [
               {
                   url: socketServerUrl,
-                  smePublicKey: 'smePublicKey==',
+                  smePublicKey: SME_PUBLIC_KEY,
               },
           ]
         : [];
@@ -42,7 +46,7 @@ export const createPeer = async (
         ? [
               {
                   url: serverUrl,
-                  smePublicKey: 'smePublicKey==',
+                  smePublicKey: SME_PUBLIC_KEY,
               },
           ]
         : [];

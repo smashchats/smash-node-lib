@@ -9,7 +9,10 @@ import {
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
-import { socketServerUrl } from './jest.global.cjs';
+import { emptySocketServerUrl, socketServerUrl } from './jest.global.cjs';
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore
+import { SME_PUBLIC_KEY } from './jest.global.cjs';
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
 import { TEST_CONFIG, aliasWaitFor, delay } from './time.utils';
@@ -116,7 +119,14 @@ describe('[Message Delivery] Message delivery and acknowledgment', () => {
 
         describe('sends a message to Bob on a not valid SME', () => {
             beforeEach(async () => {
-                bob = await createPeer('bob', 'http://1.2.3.4:1234');
+                bob = await createPeer('bob');
+                bob.messaging.setEndpoints([
+                    {
+                        url: emptySocketServerUrl,
+                        smePublicKey: SME_PUBLIC_KEY,
+                    },
+                ]);
+                await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
                 await delay(TEST_CONFIG.MESSAGE_DELIVERY);
             });
 
@@ -132,7 +142,7 @@ describe('[Message Delivery] Message delivery and acknowledgment', () => {
 
             beforeEach(async () => {
                 logger.debug('>> Creating Bob with invalid SME');
-                bob = await createPeer('bob', 'http://1.2.3.4:1234');
+                bob = await createPeer('bob', emptySocketServerUrl);
                 await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
                 logger.debug(
                     '>> Alice sends a message to Bob (with SME url mocked)',
@@ -167,7 +177,7 @@ describe('[Message Delivery] Message delivery and acknowledgment', () => {
                         bob.messaging.setEndpoints([
                             {
                                 url: socketServerUrl,
-                                smePublicKey: 'smePublicKey==',
+                                smePublicKey: SME_PUBLIC_KEY,
                             } as SMEConfigJSONWithoutDefaults,
                         ]);
                         await delay(2 * TEST_CONFIG.TEST_TIMEOUT_MS);
