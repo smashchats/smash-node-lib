@@ -1,5 +1,5 @@
 import { Curve } from '2key-ratchet';
-import { ENCODING, sha256 } from '@src/types/index.js';
+import { ENCODING, SMEConfig, sha256 } from '@src/types/index.js';
 import { Logger } from '@src/utils/Logger.js';
 import { Buffer } from 'buffer';
 
@@ -98,5 +98,42 @@ export class CryptoUtils {
 
     objectToBuffer(object: unknown) {
         return this.stringToBuffer(JSON.stringify(object), 'utf8');
+    }
+
+    async solveChallenge(
+        data: { iv: string; challenge: string },
+        auth: SMEConfig,
+    ) {
+        const ivBuffer = this.stringToBuffer(data.iv, auth.challengeEncoding);
+        const challengeBuffer = this.stringToBuffer(
+            data.challenge,
+            auth.challengeEncoding,
+        );
+        const smePublicKey = await this.importKey(
+            auth.smePublicKey,
+            auth.keyAlgorithm,
+        );
+        const symmetricKey = await this.deriveKey(
+            {
+                ...auth.keyAlgorithm,
+                public: smePublicKey,
+            } as KeyAlgorithm,
+            auth.preKeyPair.privateKey,
+            auth.encryptionAlgorithm,
+            false,
+            ['encrypt', 'decrypt'],
+        );
+        const unencryptedChallenge = await this.decrypt(
+            {
+                ...auth.encryptionAlgorithm,
+                iv: ivBuffer,
+            } as KeyAlgorithm,
+            symmetricKey,
+            challengeBuffer,
+        );
+        return this.bufferToString(
+            unencryptedChallenge,
+            auth.challengeEncoding,
+        );
     }
 }

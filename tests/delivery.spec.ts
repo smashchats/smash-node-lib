@@ -33,8 +33,10 @@ describe('[Message Delivery] Message delivery and acknowledgment', () => {
     });
 
     afterEach(async () => {
-        waitForEventCancelFns.forEach((cancel) => cancel());
+        logger.debug('>> canceling all waiters');
+        await Promise.all(waitForEventCancelFns.map((cancel) => cancel()));
         waitForEventCancelFns.length = 0;
+        logger.debug('>> resetting mocks');
         jest.resetAllMocks();
         await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
     });
@@ -47,8 +49,8 @@ describe('[Message Delivery] Message delivery and acknowledgment', () => {
         let alice: TestPeer;
         let bob: TestPeer;
 
-        const sendMsgToBob = (message: string = 'test message') =>
-            alice.messaging.sendTextMessage(
+        const sendMsgToBob = async (message: string = 'test message') =>
+            alice?.messaging.sendTextMessage(
                 bob.did,
                 message,
                 '',
@@ -59,9 +61,7 @@ describe('[Message Delivery] Message delivery and acknowledgment', () => {
         });
 
         afterEach(async () => {
-            alice?.messaging.removeAllListeners();
             await alice?.messaging.close();
-            bob?.messaging.removeAllListeners();
             await bob?.messaging.close();
             await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
         }, 20000);
@@ -74,7 +74,7 @@ describe('[Message Delivery] Message delivery and acknowledgment', () => {
 
             it('should receive a DELIVERED ack on SME delivery', async () => {
                 const waitForStatus = waitFor(
-                    alice.messaging,
+                    alice?.messaging,
                     'status',
                     1,
                     TEST_CONFIG.TEST_TIMEOUT_MS / 2,
@@ -82,7 +82,7 @@ describe('[Message Delivery] Message delivery and acknowledgment', () => {
                 const sent = await sendMsgToBob();
                 await waitForStatus;
                 await delay(TEST_CONFIG.MESSAGE_DELIVERY);
-                expect(alice.onStatus).toHaveBeenCalledWith(
+                expect(alice?.onStatus).toHaveBeenCalledWith(
                     'delivered',
                     expect.arrayContaining([sent.sha256]),
                 );
@@ -94,7 +94,7 @@ describe('[Message Delivery] Message delivery and acknowledgment', () => {
                     const sent = await sendMsgToBob();
                     await waitForBobToReceive;
                     await delay(TEST_CONFIG.MESSAGE_DELIVERY);
-                    expect(alice.onStatus).toHaveBeenCalledWith(
+                    expect(alice?.onStatus).toHaveBeenCalledWith(
                         'received',
                         expect.arrayContaining([sent.sha256]),
                     );
@@ -108,35 +108,27 @@ describe('[Message Delivery] Message delivery and acknowledgment', () => {
                 await delay(TEST_CONFIG.MESSAGE_DELIVERY);
                 // statuses can be grouped, so at most called number of times is the
                 // number of messages (+ include protocol overhead)
-                expect(alice.onStatus.mock.calls.length).toBeLessThanOrEqual(
+                expect(alice?.onStatus.mock.calls.length).toBeLessThanOrEqual(
                     2 * (1 + TEST_CONFIG.PROTOCOL_OVERHEAD_SIZE),
                 );
             });
         });
 
         describe('sends a message to Bob on a not valid SME', () => {
-            let waitForStatus: Promise<unknown>;
-
             beforeEach(async () => {
                 bob = await createPeer('bob', 'http://1.2.3.4:1234');
-                waitForStatus = waitFor(
-                    alice.messaging,
-                    'status',
-                    1,
-                    TEST_CONFIG.TEST_TIMEOUT_MS / 2,
-                );
                 await delay(TEST_CONFIG.MESSAGE_DELIVERY);
             });
 
             it('should NOT receive a DELIVERED ack (no valid SME)', async () => {
-                await expect(waitForStatus).rejects.toThrow();
-                expect(alice.onStatus).not.toHaveBeenCalled();
+                await sendMsgToBob();
+                await delay(TEST_CONFIG.MESSAGE_DELIVERY);
+                expect(alice?.onStatus).not.toHaveBeenCalled();
             });
         });
 
         describe('sends a message to Bob a SME that dont know him', () => {
             let sent: EncapsulatedIMProtoMessage;
-            let waitForStatus: Promise<unknown>;
 
             beforeEach(async () => {
                 logger.debug('>> Creating Bob with invalid SME');
@@ -157,20 +149,14 @@ describe('[Message Delivery] Message delivery and acknowledgment', () => {
                         } as SmashEndpoint,
                     ],
                 } as DIDDocument;
-                waitForStatus = waitFor(
-                    alice.messaging,
-                    'status',
-                    1,
-                    TEST_CONFIG.TEST_TIMEOUT_MS / 2,
-                );
                 sent = await sendMsgToBob();
                 await delay(TEST_CONFIG.MESSAGE_DELIVERY);
             });
 
             it('should NOT receive a DELIVERED ack (no SME mailbox)', async () => {
                 logger.debug('>> Verify that message wasnt delivered');
-                await expect(waitForStatus).rejects.toThrow();
-                expect(alice.onStatus).not.toHaveBeenCalled();
+                await delay(TEST_CONFIG.MESSAGE_DELIVERY);
+                expect(alice?.onStatus).not.toHaveBeenCalled();
             });
 
             describe('then Bob registers with this SME', () => {
@@ -186,12 +172,12 @@ describe('[Message Delivery] Message delivery and acknowledgment', () => {
                         ]);
                         await delay(2 * TEST_CONFIG.TEST_TIMEOUT_MS);
                         expect(bob.onData).toHaveBeenCalledWith(
-                            alice.did.id,
+                            alice?.did.id,
                             expect.objectContaining({
                                 sha256: sent.sha256,
                             }),
                         );
-                        expect(alice.onStatus).toHaveBeenCalledWith(
+                        expect(alice?.onStatus).toHaveBeenCalledWith(
                             'received',
                             expect.arrayContaining([sent.sha256]),
                         );
@@ -225,12 +211,12 @@ describe('[Message Delivery] Message delivery and acknowledgment', () => {
 //         ]);
 //         await delay(5000);
 //         expect(bob.onData).toHaveBeenCalledWith(
-//             alice.did.id,
+//             alice?.did.id,
 //             expect.objectContaining({
 //                 data: uniqueMessage,
 //             }),
 //         );
-//         expect(alice.onStatus).toHaveBeenCalledWith(
+//         expect(alice?.onStatus).toHaveBeenCalledWith(
 //             'received',
 //             expect.arrayContaining([sent.sha256]),
 //         );

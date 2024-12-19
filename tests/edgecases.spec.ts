@@ -42,20 +42,17 @@ describe('SmashMessaging: Edge cases', () => {
     beforeEach(async () => {
         alice = await createPeer('alice', socketServerUrl);
         bob = await createPeer('bob', socketServerUrl);
+        await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
     });
 
     afterEach(async () => {
-        alice?.messaging.removeAllListeners();
-        bob?.messaging.removeAllListeners();
         await alice?.messaging.close();
         await bob?.messaging.close();
         await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
-        alice = undefined;
-        bob = undefined;
         waitForEventCancelFns.forEach((cancel) => cancel());
         waitForEventCancelFns.length = 0;
         jest.resetAllMocks();
-        if (dateSpy) dateSpy.mockRestore();
+        dateSpy?.mockRestore();
     });
 
     describe('Session recovery', () => {
@@ -91,8 +88,10 @@ describe('SmashMessaging: Edge cases', () => {
             logger.info('>> Simulate Bob restart with lost session context');
             const bobExportedIdentity =
                 await bob.messaging.exportIdentityToJSON();
+
             await bob.messaging.close();
             await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
+
             const bobIdentity =
                 await SmashMessaging.deserializeIdentity(bobExportedIdentity);
             bob = await createPeer(
@@ -274,9 +273,11 @@ describe('SmashMessaging: Edge cases', () => {
                         await bob.messaging.exportIdentityToJSON();
                     const aliceExportedIdentity =
                         await alice.messaging.exportIdentityToJSON();
+
                     await bob.messaging.close();
                     await alice.messaging.close();
                     await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
+
                     logger.info('>> Both peers closed');
 
                     // 3b. Restart both peers
@@ -378,10 +379,10 @@ describe('SmashMessaging: Edge cases', () => {
     describe('Alice sends multiple messages and they get delayed', () => {
         it('Bob receives them unordered and reorders them', async () => {
             if (!bob || !alice) throw new Error('Bob or Alice not found');
-
             logger.info(
                 '>>> Bob receives unordered messages and reorders them',
             );
+
             const activateDelay = async () => {
                 logger.info('>> Activating delay on the mocked SME');
                 if (!bob) throw new Error('Bob not found');
@@ -430,7 +431,9 @@ describe('SmashMessaging: Edge cases', () => {
 
             logger.info('>> Wait for messages to be received');
             await waitForMessages;
+            await delay(3 * TEST_CONFIG.MESSAGE_DELIVERY);
             logger.info('>> Received messages');
+
             const receivedMessages = bob.onData.mock.calls.map(
                 (args: EncapsulatedIMProtoMessage[]) => args[1],
             );
@@ -451,6 +454,9 @@ describe('SmashMessaging: Edge cases', () => {
             expect(
                 sortSmashMessages(textMessages).map((text) => text.data),
             ).toEqual(originalOrder);
+
+            logger.info('>> Cleanup');
+            await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
         }, 15000);
     });
 });

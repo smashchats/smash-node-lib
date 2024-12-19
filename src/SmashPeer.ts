@@ -182,34 +182,43 @@ export class SmashPeer {
                 `failed to flush queue after ${attempt} retries (${this.id})`,
             );
         }
-        return this.mutex.acquire('flushQueue', async () => {
-            if (this.retryTimeout && !recursiveCall) {
-                this.logger.debug(
-                    'queue is already scheduled for flushing, skipping',
-                );
-                return;
-            }
-            try {
-                this.logger.debug(
-                    `> flushing attempt ${attempt + 1}/${this.MAX_RETRY_ATTEMPTS}`,
-                );
-                await this.flushEndpoints();
-                clearTimeout(this.retryTimeout);
-                this.retryTimeout = undefined;
-                return;
-            } catch {
-                const newDelay = Math.min(delay * 2, this.MAX_RETRY_DELAY_MS);
-                this.logger.debug(
-                    `retry ${attempt + 1}/${this.MAX_RETRY_ATTEMPTS} failed, ` +
-                        `retrying in ${newDelay}ms`,
-                );
-                new Promise<void>((resolve) => {
-                    this.retryTimeout = setTimeout(() => {
-                        resolve(this.flushQueue(attempt + 1, newDelay, true));
-                    }, newDelay);
-                }).then();
-            }
-        });
+        return this.mutex.acquire(
+            'flushQueue',
+            async () => {
+                if (this.retryTimeout && !recursiveCall) {
+                    this.logger.debug(
+                        'queue is already scheduled for flushing, skipping',
+                    );
+                } else {
+                    await this.attemptFlushOrRetry(attempt, delay);
+                }
+            },
+            { maxOccupationTime: 4000 },
+        );
+    }
+
+    private async attemptFlushOrRetry(attempt: number, delay: number) {
+        try {
+            this.logger.debug(
+                `> flushing attempt ${attempt + 1}/${this.MAX_RETRY_ATTEMPTS}`,
+            );
+            await this.flushEndpoints();
+            this.clearRetryTimeout();
+        } catch {
+            const newDelay = Math.min(delay * 2, this.MAX_RETRY_DELAY_MS);
+            this.logger.debug(
+                `retry ${attempt + 1}/${this.MAX_RETRY_ATTEMPTS} failed, ` +
+                    `retrying in ${newDelay}ms`,
+            );
+            await this.scheduleFlushQueue(attempt + 1, newDelay);
+        }
+    }
+
+    private async scheduleFlushQueue(attempt: number, delay: number) {
+        this.retryTimeout = setTimeout(
+            () => this.flushQueue(attempt, delay, true),
+            delay,
+        );
     }
 
     // TODO: pick either P2P or all Endpoints
@@ -226,13 +235,23 @@ export class SmashPeer {
         }
     }
 
-    async cancelRetry() {
-        return this.mutex.acquire('flushQueue', async () => {
-            if (this.retryTimeout) {
-                clearTimeout(this.retryTimeout);
-                this.retryTimeout = undefined;
-            }
-        });
+    cancelRetry() {
+        this.logger.debug(`SmashPeer::cancelRetry for peer ${this.id}`);
+        return this.mutex.acquire(
+            'flushQueue',
+            async () => {
+                this.logger.debug(
+                    `SmashPeer::cancelRetry: acquired (${this.retryTimeout})`,
+                );
+                this.clearRetryTimeout();
+            },
+            { skipQueue: true, timeout: 3000 },
+        );
+    }
+
+    private clearRetryTimeout() {
+        clearTimeout(this.retryTimeout);
+        this.retryTimeout = undefined;
     }
 
     // TODO: refresh DID

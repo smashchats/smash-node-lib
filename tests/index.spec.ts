@@ -74,7 +74,7 @@ class TestUtils {
 // describe('Only Bob is registered to an SME.', () => {
 
 describe('[SmashMessaging] Between peers registered to a SME', () => {
-    const logger = new Logger('SmashMessaging', 'DEBUG');
+    const logger = new Logger('index.spec', 'DEBUG');
 
     let RealDate: DateConstructor;
     let mockedNow: Date;
@@ -98,6 +98,11 @@ describe('[SmashMessaging] Between peers registered to a SME', () => {
         await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
     });
 
+    afterAll(async () => {
+        global.Date = RealDate;
+        await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
+    });
+
     beforeEach(async () => {
         dateSpy = jest
             .spyOn(Date, 'now')
@@ -115,10 +120,9 @@ describe('[SmashMessaging] Between peers registered to a SME', () => {
 
     afterEach(async () => {
         // Cleanup peers
-        alice?.messaging.removeAllListeners();
-        bob?.messaging.removeAllListeners();
         await alice?.messaging.close();
         await bob?.messaging.close();
+        await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
         jest.resetAllMocks();
         dateSpy.mockRestore();
     });
@@ -285,7 +289,8 @@ describe('[SmashMessaging] Between peers registered to a SME', () => {
         });
 
         afterEach(async () => {
-            await charlie.messaging.close();
+            await charlie?.messaging.close();
+            await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
         });
 
         it('Alice and Bob can message each other without errors while Charlie is connected', async () => {

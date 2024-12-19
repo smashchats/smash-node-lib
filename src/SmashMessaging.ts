@@ -27,9 +27,8 @@ import {
     IM_SESSION_RESET,
     SME_DEFAULT_CONFIG,
 } from '@src/types/index.js';
-import type { LogLevel } from '@src/utils/Logger.js';
-import { Logger } from '@src/utils/Logger.js';
-import { CryptoUtils } from '@src/utils/index.js';
+import type { LogLevel } from '@src/utils/index.js';
+import { CryptoUtils, Logger } from '@src/utils/index.js';
 import { EventEmitter } from 'events';
 
 interface IJWKJson extends CryptoKey {
@@ -236,12 +235,34 @@ export class SmashMessaging extends EventEmitter {
     }
 
     async close() {
-        await Promise.allSettled(
-            Object.values(this.peers).map((p) => p.cancelRetry()),
+        const peersToClose = Object.values(this.peers).map((p) =>
+            p.cancelRetry(),
         );
-        await this.smeSocketManager.closeAllSockets();
+        this.logger.debug(`>> closing (${peersToClose.length}) peers`);
+        const peersResult = await Promise.allSettled(peersToClose);
+        this.logger.debug(`>> closing (${this.endpoints.length}) endpoints`);
+        const socketsResult = await this.smeSocketManager.closeAllSockets();
         this.endpoints = [];
-        return;
+        const failedToClosePeers = peersResult.filter(
+            (r) => r.status === 'rejected',
+        );
+        const failedToCloseSockets = socketsResult.filter(
+            (r) => r.status === 'rejected',
+        );
+        if (failedToClosePeers.length || failedToCloseSockets.length) {
+            if (failedToClosePeers.length) {
+                this.logger.debug(
+                    `<< some peers failed to close: ${failedToClosePeers.map((r) => r.reason).join(', ')}`,
+                );
+            }
+            if (failedToCloseSockets.length) {
+                this.logger.debug(
+                    `<< some sockets failed to close: ${failedToCloseSockets.map((r) => r.reason).join(', ')}`,
+                );
+            }
+        } else {
+            this.logger.debug('<<< closed');
+        }
     }
 
     async initChats(chats: SmashChat[]) {

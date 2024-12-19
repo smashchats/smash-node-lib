@@ -9,65 +9,6 @@ import {
     onMessagesStatusFn,
 } from '@src/types/index.js';
 import { CryptoUtils, Logger } from '@src/utils/index.js';
-import type { Socket } from 'socket.io-client';
-
-const solveChallenge = async (
-    data: { iv: string; challenge: string },
-    auth: SMEConfig,
-    socket: Socket,
-    logger: Logger,
-) => {
-    try {
-        const ivBuffer = CryptoUtils.singleton.stringToBuffer(
-            data.iv,
-            auth.challengeEncoding,
-        );
-        const challengeBuffer = CryptoUtils.singleton.stringToBuffer(
-            data.challenge,
-            auth.challengeEncoding,
-        );
-        const smePublicKey = await CryptoUtils.singleton.importKey(
-            auth.smePublicKey,
-            auth.keyAlgorithm,
-        );
-
-        const symmetricKey = await CryptoUtils.singleton.deriveKey(
-            {
-                ...auth.keyAlgorithm,
-                public: smePublicKey,
-            } as KeyAlgorithm,
-            auth.preKeyPair.privateKey,
-            auth.encryptionAlgorithm,
-            false,
-            ['encrypt', 'decrypt'],
-        );
-
-        const unencryptedChallenge = await CryptoUtils.singleton.decrypt(
-            {
-                ...auth.encryptionAlgorithm,
-                iv: ivBuffer,
-            } as KeyAlgorithm,
-            symmetricKey,
-            challengeBuffer,
-        );
-
-        const solvedChallenge = CryptoUtils.singleton.bufferToString(
-            unencryptedChallenge,
-            auth.challengeEncoding,
-        );
-
-        logger.debug(
-            `> SME Challenge (${data.challenge}) -> (${solvedChallenge})`,
-        );
-        socket.emit('register', solvedChallenge);
-    } catch (err) {
-        logger.warn(
-            'Cannot solve challenge.',
-            err instanceof Error ? err.message : err,
-        );
-        throw err;
-    }
-};
 
 export class SMESocketReadWrite extends SMESocketWriteOnly {
     // TODO: limit DLQs size and number
@@ -99,24 +40,24 @@ export class SMESocketReadWrite extends SMESocketWriteOnly {
             // if a socket is already configured for this url,
             if (this.socket) {
                 // we close it
-                this.logger.debug('closing old socket');
-                this.socket.close();
+                this.logger.debug('>>> closing old socket');
+                await this.close();
             }
             // we initialize a new socket with given auth params
-            this.socket = SMESocketWriteOnly.initSocket(this.logger, auth.url, {
+            this.initSocket({
                 key: preKey,
                 keyAlgorithm: auth.keyAlgorithm,
             });
             // TODO: ack challenge
             // on auth failure the socket will be disconnected without throwing an error!!
-            this.socket.on('challenge', async (data) => {
+            this.socket!.on('challenge', async (data) => {
                 this.logger.debug(
                     'SMESocketReadWrite::challenge',
                     this.socket?.id,
                 );
-                await solveChallenge(data, auth, this.socket!, this.logger);
+                await this.solveChallenge(data, auth);
             });
-            this.socket.on('data', this.processMessages.bind(this));
+            this.socket!.on('data', this.processMessages.bind(this));
             return {
                 url: auth.url,
                 preKey,
@@ -216,5 +157,27 @@ export class SMESocketReadWrite extends SMESocketWriteOnly {
     ) {
         this.logger.debug('SMESocketReadWrite::emitReceivedMessages');
         this.onMessagesCallback(peerIk, messages);
+    }
+
+    private async solveChallenge(
+        data: { iv: string; challenge: string },
+        auth: SMEConfig,
+    ) {
+        try {
+            const solvedChallenge = await CryptoUtils.singleton.solveChallenge(
+                data,
+                auth,
+            );
+            this.logger.debug(
+                `> SME Challenge (${data.challenge}) -> (${solvedChallenge})`,
+            );
+            this.socket!.emit('register', solvedChallenge);
+        } catch (err) {
+            this.logger.warn(
+                'Cannot solve challenge.',
+                err instanceof Error ? err.message : err,
+            );
+            throw err;
+        }
     }
 }

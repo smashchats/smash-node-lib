@@ -64,7 +64,7 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
     beforeEach(async () => {
         const [identity, config] = await peerArgs(socketServerUrl);
         nabSMEConfig = config;
-        nab = new TestNAB(identity);
+        nab = new TestNAB(identity, undefined, 'DEBUG', 'TestNAB');
         await nab.setEndpoints(config);
         await delay(100);
         nabDid = await nab.getDID();
@@ -72,6 +72,7 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
 
     afterEach(async () => {
         await nab.close();
+        await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
         waitForEventCancelFns.forEach((cancel) => cancel());
         waitForEventCancelFns.length = 0;
         jest.resetAllMocks();
@@ -173,13 +174,14 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
             const [identity, config] = await peerArgs(socketServerUrl);
             userIdentity = identity;
             userSMEConfig = config;
-            user = new SmashUser(userIdentity);
+            user = new SmashUser(userIdentity, undefined, 'DEBUG', 'user');
             user.on(SMASH_NBH_ADDED, onUserNBHAdded);
             user.on(SMASH_NBH_PROFILE_LIST, onUserDiscover);
         });
 
         afterEach(async () => {
             await user.close();
+            await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
         });
 
         // TODO Poste Restante scenario with NAB (either here or in the Peer tests)
@@ -283,7 +285,12 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
 
                 beforeEach(async () => {
                     const [identity] = await peerArgs();
-                    targetUser = new SmashUser(identity);
+                    targetUser = new SmashUser(
+                        identity,
+                        undefined,
+                        'DEBUG',
+                        'targetUser',
+                    );
                     targetDid = await targetUser.getDID();
                     counter = 0;
                     (nab.onRelationship as jest.Mock).mockClear();
@@ -291,6 +298,7 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
 
                 afterEach(async () => {
                     await targetUser.close();
+                    await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
                 });
 
                 const testAction = async (

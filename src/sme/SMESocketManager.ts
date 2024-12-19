@@ -61,6 +61,9 @@ export class SMESocketManager {
         // if a socket is already configured for this url,
         if (this.smeSockets[smeConfig.url]) {
             // we copy its state to the new socket attempt
+            this.logger.debug(
+                `Copying state from existing socket for ${smeConfig.url}`,
+            );
             Object.assign(this.smeSockets[smeConfig.url], smeSocket);
         }
         // we attempt to initialize the socket with auth
@@ -77,7 +80,7 @@ export class SMESocketManager {
     }
 
     async closeAllSockets() {
-        await Promise.allSettled(
+        return Promise.allSettled(
             Object.values(this.smeSockets).map((socket) =>
                 this.closeSocket(socket),
             ),
