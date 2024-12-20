@@ -6,20 +6,23 @@ const { Server } = require('socket.io');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { URL: NodeURL } = require('node:url');
 
+const HOSTNAME = 'localhost';
 const PORT = 12345;
 
 const API_PATH = 'api';
 const WEBSOCKET_PATH = 'socket.io';
 const VALID_PATH = 'valid';
 const EMPTY_PATH = 'empty';
+const QUIET_PATH = 'quiet';
 
 // const log = console.log;
 const log = () => {};
 
 log(`Starting mock SME server on port ${PORT}`);
 log(`API path: /${API_PATH}`);
-log(`Valid WS path: /${WEBSOCKET_PATH}/${VALID_PATH}`);
-log(`Empty WS path: /${WEBSOCKET_PATH}/${EMPTY_PATH}`);
+log(`Valid WS path: /${VALID_PATH}`);
+log(`Empty WS path: /${EMPTY_PATH}`);
+log(`Quiet WS path: /${QUIET_PATH}`);
 
 const subtle = globalThis.crypto.subtle;
 
@@ -159,6 +162,54 @@ module.exports = async function () {
         const activeSockets = {};
         const messagesToDelay = {};
         const dataEvents = [];
+
+        const initDataEndpoint = async (
+            clientPublicKey,
+            client,
+            shouldAck = true,
+        ) => {
+            const clientKeyId = clientPublicKey
+                ? await exportKey(clientPublicKey)
+                : 'ANONYMOUS';
+
+            if (clientPublicKey) {
+                log(`Client identified as: ${clientKeyId}`);
+                activeSockets[clientKeyId] = client;
+
+                client.on('disconnect', async () => {
+                    log(`Client ${clientKeyId} disconnected`);
+                    delete activeSockets[clientKeyId];
+                    log(`Removed ${clientKeyId} from active sockets`);
+                });
+            } else {
+                log(`Anonymous client`);
+            }
+
+            client.on('data', async (peerId, sessionId, data, acknowledge) => {
+                log(`>> data: ${clientKeyId} --> ${peerId} (${sessionId})`);
+                if (!activeSockets[peerId]) {
+                    log(`No active socket found for peer ${peerId}`);
+                    return;
+                }
+                let delayMs = 0;
+                if (messagesToDelay[peerId]) {
+                    delayMs = messagesToDelay[peerId] * 250;
+                    messagesToDelay[peerId] = messagesToDelay[peerId] - 1;
+                    log(`Delaying message to peer ${peerId} by ${delayMs}ms`);
+                }
+                dataEvents.push({ peerId, sessionId, data });
+                log(`Queued data event for peer ${peerId}`);
+                setTimeout(() => {
+                    log(`Emitting delayed data to peer ${peerId}`);
+                    activeSockets[peerId].emit('data', sessionId, data);
+                }, delayMs);
+                if (shouldAck) {
+                    acknowledge();
+                    log('Data acknowledged');
+                }
+            });
+        };
+
         const httpServer = createServer((req, res) => {
             log(`Received ${req.method} request for ${req.url}`);
 
@@ -189,7 +240,7 @@ module.exports = async function () {
                 log('Handling GET /delay-next-messages request');
                 const peerId = getPeerIdFromUrl(req.url);
                 if (!peerId) {
-                    console.warn('Missing peerId parameter');
+                    log('Missing peerId parameter');
                     res.writeHead(400);
                     res.end('Missing peerId parameter');
                     return;
@@ -279,63 +330,48 @@ module.exports = async function () {
 
         const mainNamespace = socketServer.of('/' + VALID_PATH);
         const emptyNamespace = socketServer.of('/' + EMPTY_PATH);
+        const quietNamespace = socketServer.of('/' + QUIET_PATH);
+
+        quietNamespace.on('connection', async (client) => {
+            log('>>> New connection on quiet namespace');
+            const auth = !!client.handshake.auth.key;
+            log('> Client authentication:', auth ? 'present' : 'absent');
+            const clientPublicKey = auth
+                ? await importClientPublicKey(client)
+                : undefined;
+            log('>> Initializing data endpoint without ack');
+            await initDataEndpoint(clientPublicKey, client, false);
+            if (clientPublicKey) {
+                log('>> Initializing challenge');
+                await initChallengeEndpoint(clientPublicKey, client);
+            }
+        });
 
         emptyNamespace.on('connection', async (client) => {
-            log('New connection on empty namespace');
+            log('>>> New connection on empty namespace');
             const auth = !!client.handshake.auth.key;
-            log('Client authentication:', auth ? 'present' : 'absent');
+            log('> Client authentication:', auth ? 'present' : 'absent');
             const clientPublicKey = auth
                 ? await importClientPublicKey(client)
                 : undefined;
             if (clientPublicKey) {
-                log('Initializing challenge for authenticated client');
+                log('>> Initializing challenge for authenticated client');
                 await initChallengeEndpoint(clientPublicKey, client);
             }
         });
 
         mainNamespace.on('connection', async (client) => {
-            log('New connection on main namespace');
+            log('>>> New connection on main namespace');
             const auth = !!client.handshake.auth.key;
-            log('Client authentication:', auth ? 'present' : 'absent');
+            log('> Client authentication:', auth ? 'present' : 'absent');
             const clientPublicKey = auth
                 ? await importClientPublicKey(client)
                 : undefined;
-            const clientKeyId = auth
-                ? await exportKey(clientPublicKey)
-                : 'ANONYMOUS';
-            log(`Client identified as: ${clientKeyId}`);
-            activeSockets[clientKeyId] = client;
 
-            client.on('data', async (peerId, sessionId, data, acknowledge) => {
-                log(`Received data for peer ${peerId}, session ${sessionId}`);
-                if (!activeSockets[peerId]) {
-                    console.warn(`No active socket found for peer ${peerId}`);
-                    return;
-                }
-                let delayMs = 0;
-                if (messagesToDelay[peerId]) {
-                    delayMs = messagesToDelay[peerId] * 250;
-                    messagesToDelay[peerId] = messagesToDelay[peerId] - 1;
-                    log(`Delaying message to peer ${peerId} by ${delayMs}ms`);
-                }
-                dataEvents.push({ peerId, sessionId, data });
-                log(`Queued data event for peer ${peerId}`);
-                setTimeout(() => {
-                    log(`Emitting delayed data to peer ${peerId}`);
-                    activeSockets[peerId].emit('data', sessionId, data);
-                }, delayMs);
-                acknowledge();
-                log('Data acknowledged');
-            });
-
-            client.on('disconnect', async () => {
-                log(`Client ${clientKeyId} disconnected`);
-                delete activeSockets[clientKeyId];
-                log(`Removed ${clientKeyId} from active sockets`);
-            });
-
+            log('>> Initializing data endpoint');
+            await initDataEndpoint(clientPublicKey, client);
             if (clientPublicKey) {
-                log('Initializing challenge for authenticated client');
+                log('>> Initializing challenge');
                 await initChallengeEndpoint(clientPublicKey, client);
             }
         });
@@ -348,7 +384,8 @@ module.exports = async function () {
     });
 };
 
-module.exports.apiServerUrl = `http://localhost:${PORT}/${API_PATH}`;
-module.exports.socketServerUrl = `http://localhost:${PORT}/${VALID_PATH}`;
-module.exports.emptySocketServerUrl = `http://localhost:${PORT}/${EMPTY_PATH}`;
+module.exports.apiServerUrl = `http://${HOSTNAME}:${PORT}/${API_PATH}`;
+module.exports.socketServerUrl = `http://${HOSTNAME}:${PORT}/${VALID_PATH}`;
+module.exports.emptySocketServerUrl = `http://${HOSTNAME}:${PORT}/${EMPTY_PATH}`;
+module.exports.quietSocketServerUrl = `http://${HOSTNAME}:${PORT}/${QUIET_PATH}`;
 module.exports.SME_PUBLIC_KEY = SME_PUBLIC_KEY;

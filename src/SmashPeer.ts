@@ -26,7 +26,8 @@ export class SmashPeer {
     // TODO subscribe on changes like updates to DID, IK, EK, PK...
     private endpoints: SmashPeerEndpoint[] = [];
 
-    private readonly messageQueue: Set<EncapsulatedIMProtoMessage> = new Set();
+    private readonly messageQueue: Map<sha256, EncapsulatedIMProtoMessage> =
+        new Map();
 
     // TODO allow loading relationship at lib initialization time
     private relationship: Relationship = 'clear';
@@ -150,8 +151,7 @@ export class SmashPeer {
     private async queueEncapsulatedMessage(
         encapsulatedMessage: EncapsulatedIMProtoMessage,
     ) {
-        // TODO clear on 'received'
-        this.messageQueue.add(encapsulatedMessage);
+        this.messageQueue.set(encapsulatedMessage.sha256, encapsulatedMessage);
         await Promise.allSettled(
             this.endpoints.map((endpoint) =>
                 endpoint.queue(encapsulatedMessage),
@@ -168,6 +168,15 @@ export class SmashPeer {
         const encapsulatedMessage = await this.encapsulateMessage(message);
         await this.queueEncapsulatedMessage(encapsulatedMessage);
         return encapsulatedMessage;
+    }
+
+    async ack(messageIds: sha256[]) {
+        messageIds.forEach((messageId) => {
+            this.messageQueue.delete(messageId);
+        });
+        await Promise.allSettled(
+            this.endpoints.map((endpoint) => endpoint.ack(messageIds)),
+        );
     }
 
     private readonly mutex = new AsyncLock();

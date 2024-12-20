@@ -12,7 +12,7 @@ import {
 import { emptySocketServerUrl, socketServerUrl } from './jest.global.cjs';
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
-import { SME_PUBLIC_KEY } from './jest.global.cjs';
+import { SME_PUBLIC_KEY, quietSocketServerUrl } from './jest.global.cjs';
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
 import { TEST_CONFIG, aliasWaitFor, delay } from './time.utils';
@@ -126,6 +126,7 @@ describe('[Message Delivery] Message delivery and acknowledgment', () => {
                         smePublicKey: SME_PUBLIC_KEY,
                     },
                 ]);
+                bob.did = await bob.messaging.getDID();
                 await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
                 await delay(TEST_CONFIG.MESSAGE_DELIVERY);
             });
@@ -135,6 +136,65 @@ describe('[Message Delivery] Message delivery and acknowledgment', () => {
                 await delay(TEST_CONFIG.MESSAGE_DELIVERY);
                 expect(alice?.onStatus).not.toHaveBeenCalled();
             });
+        });
+
+        describe('sends a message to Bob on an Endpoint that doesnt send ACKs', () => {
+            it(
+                'should stop trying to send the message upon RECEIVED ack',
+                async () => {
+                    logger.info('>>>> RECEIVED ACK should clear queue');
+                    let sent: EncapsulatedIMProtoMessage | undefined;
+
+                    logger.info('>> Creating Bob with quiet endpoint');
+                    bob = await createPeer('bob', quietSocketServerUrl);
+                    await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
+
+                    logger.info('>> Alice sends a message to Bob');
+                    alice?.messaging
+                        .sendTextMessage(bob.did, 'test message', '')
+                        .then(
+                            (sentMessage: EncapsulatedIMProtoMessage) =>
+                                (sent = sentMessage),
+                        )
+                        .catch((error: Error) => {
+                            console.error(
+                                'Error sending message:',
+                                error.message,
+                            );
+                        });
+                    await delay(TEST_CONFIG.MESSAGE_DELIVERY * 3);
+
+                    logger.info(
+                        '>> Verify that message wasnt marked as delivered',
+                    );
+                    expect(alice?.onStatus).not.toHaveBeenCalledWith(
+                        'delivered',
+                        expect.arrayContaining([sent?.sha256]),
+                    );
+
+                    logger.info('>> Waiting for potential retries to complete');
+                    // we need to let long enough for exponential retries to be obviously never ending
+                    await delay(TEST_CONFIG.MESSAGE_DELIVERY * 40);
+
+                    logger.info(
+                        '>> Verify that message was marked as received',
+                    );
+                    expect(alice?.onStatus).toHaveBeenCalledWith(
+                        'received',
+                        expect.arrayContaining([sent?.sha256]),
+                    );
+
+                    logger.info('>> Verify that message stopped re-sending');
+                    expect(bob?.onData.mock.calls.length).toBeLessThanOrEqual(
+                        // *2 to let some delay for the message to be ACKed and cleared
+                        (1 + 2 * TEST_CONFIG.PROTOCOL_OVERHEAD_SIZE) * 2,
+                    );
+
+                    logger.info('>> Cleanup');
+                    await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
+                },
+                3 * TEST_CONFIG.MESSAGE_DELIVERY_TIMEOUT,
+            );
         });
 
         describe('sends a message to Bob a SME that dont know him', () => {
@@ -180,6 +240,7 @@ describe('[Message Delivery] Message delivery and acknowledgment', () => {
                                 smePublicKey: SME_PUBLIC_KEY,
                             } as SMEConfigJSONWithoutDefaults,
                         ]);
+                        bob.did = await bob.messaging.getDID();
                         await delay(2 * TEST_CONFIG.TEST_TIMEOUT_MS);
                         expect(bob.onData).toHaveBeenCalledWith(
                             alice?.did.id,
@@ -219,6 +280,7 @@ describe('[Message Delivery] Message delivery and acknowledgment', () => {
 //                 smePublicKey: 'smePublicKey==',
 //             } as SMEConfigJSONWithoutDefaults,
 //         ]);
+//         bob.did = await bob.messaging.getDID();
 //         await delay(5000);
 //         expect(bob.onData).toHaveBeenCalledWith(
 //             alice?.did.id,

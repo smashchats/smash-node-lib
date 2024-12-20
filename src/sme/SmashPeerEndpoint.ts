@@ -1,26 +1,39 @@
 import { SmashPeer } from '@src/SmashPeer.js';
 import { SignalSession } from '@src/signal/index.js';
-import { EncapsulatedIMProtoMessage, SmashEndpoint } from '@src/types/index.js';
+import {
+    EncapsulatedIMProtoMessage,
+    SmashEndpoint,
+    sha256,
+} from '@src/types/index.js';
 import AsyncLock from 'async-lock';
 
 export class SmashPeerEndpoint {
     private session: SignalSession | undefined;
-    private readonly messageQueue: Set<EncapsulatedIMProtoMessage> = new Set();
+    private readonly messageQueue: Map<sha256, EncapsulatedIMProtoMessage> =
+        new Map();
     // private readonly socket: SMESocketWriteOnly;
 
     constructor(
         private readonly peer: SmashPeer,
         public readonly endpointConfig: SmashEndpoint,
-        historicalMessageQueue: Set<EncapsulatedIMProtoMessage>,
+        historicalMessageQueue: Map<sha256, EncapsulatedIMProtoMessage>,
     ) {
-        this.messageQueue = new Set([...historicalMessageQueue]);
+        this.messageQueue = new Map([...historicalMessageQueue]);
     }
 
     private readonly mutex = new AsyncLock();
 
     queue(message: EncapsulatedIMProtoMessage): Promise<void> {
-        return this.mutex.acquire('queue', async () => {
-            this.messageQueue.add(message);
+        return this.mutex.acquire('queue', () => {
+            this.messageQueue.set(message.sha256, message);
+        });
+    }
+
+    async ack(messageIds: sha256[]) {
+        return this.mutex.acquire('queue', () => {
+            messageIds.forEach((messageId) => {
+                this.messageQueue.delete(messageId);
+            });
         });
     }
 
@@ -30,9 +43,9 @@ export class SmashPeerEndpoint {
      * @throws Error if message isnt delivered within 3 seconds.
      */
     async flush(): Promise<void> {
+        await this.initSession();
         return this.mutex.acquire('queue', async () => {
-            await this.initSession();
-            const undeliveredMessages = Array.from(this.messageQueue);
+            const undeliveredMessages = Array.from(this.messageQueue.values());
             if (!undeliveredMessages.length) {
                 this.peer.logger.debug(
                     `> no undelivered messages for ${this.endpointConfig.url}`,
@@ -78,9 +91,7 @@ export class SmashPeerEndpoint {
                 `> initializing new session with ${this.peer.id} @ ${this.endpointConfig.url}`,
             );
             // ensure user profile is sent at the start of every new session
-            this.messageQueue.add(
-                await this.peer.getEncapsulatedProfileMessage(),
-            );
+            await this.queue(await this.peer.getEncapsulatedProfileMessage());
             // this operation verifies both EK and the Endpoint's PreKey
             this.session = await this.peer.sessionManager.initSession(
                 await this.peer.getDID(),

@@ -227,9 +227,14 @@ export class SmashMessaging extends EventEmitter {
             IM_ACK_RECEIVED,
             new DataForwardingResolver(IM_ACK_RECEIVED),
         );
-        this.on(IM_ACK_RECEIVED, (_, messageIds: sha256[]) => {
-            this.logger.debug(`Received ACK for ${messageIds}`);
+        this.on(IM_ACK_RECEIVED, (from: DIDString, messageIds: sha256[]) => {
+            this.logger.debug(`>> Received ACK for ${messageIds} from ${from}`);
             this.emit('status', 'received', messageIds);
+            this.peers[from]?.ack(messageIds).then(() => {
+                this.logger.debug(
+                    `> cleared ${messageIds} from sending queues`,
+                );
+            });
         });
         this.logger.info(`Loaded Smash lib (log level: ${LOG_LEVEL})`);
     }
