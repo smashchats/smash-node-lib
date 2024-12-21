@@ -168,9 +168,11 @@ export default async function setup(): Promise<void> {
             peerId: string;
             sessionId: string;
             data: unknown;
+            endpoint: string;
         }[] = [];
 
         const initDataEndpoint = async (
+            endpoint: string,
             clientPublicKey: CryptoKey | undefined,
             client: Socket,
             shouldAck = true,
@@ -213,7 +215,7 @@ export default async function setup(): Promise<void> {
                             `Delaying message to peer ${peerId} by ${delayMs}ms`,
                         );
                     }
-                    dataEvents.push({ peerId, sessionId, data });
+                    dataEvents.push({ peerId, sessionId, data, endpoint });
                     log(`Queued data event for peer ${peerId}`);
                     setTimeout(() => {
                         log(`Emitting delayed data to peer ${peerId}`);
@@ -357,7 +359,7 @@ export default async function setup(): Promise<void> {
                 ? await importClientPublicKey(client)
                 : undefined;
             log('>> Initializing data endpoint without ack');
-            await initDataEndpoint(clientPublicKey, client, false);
+            await initDataEndpoint('quiet', clientPublicKey, client, false);
             if (clientPublicKey) {
                 log('>> Initializing challenge');
                 await initChallengeEndpoint(clientPublicKey, client);
@@ -386,7 +388,7 @@ export default async function setup(): Promise<void> {
                 : undefined;
 
             log('>> Initializing data endpoint');
-            await initDataEndpoint(clientPublicKey, client);
+            await initDataEndpoint('main', clientPublicKey, client);
             if (clientPublicKey) {
                 log('>> Initializing challenge');
                 await initChallengeEndpoint(clientPublicKey, client);

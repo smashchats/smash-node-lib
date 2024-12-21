@@ -31,7 +31,7 @@ export interface TestPeer {
 
 export const createPeer = async (
     name: string,
-    serverUrl?: string,
+    serverUrl?: string | string[],
     loadIdentity?: Identity,
     nbPreKeys: number = 1,
     nbOnetimeKeys: number = 0,
@@ -40,12 +40,10 @@ export const createPeer = async (
         loadIdentity ??
         (await SmashMessaging.generateIdentity(nbPreKeys, nbOnetimeKeys, true));
     const config = serverUrl
-        ? [
-              {
-                  url: serverUrl,
-                  smePublicKey: SME_PUBLIC_KEY,
-              },
-          ]
+        ? (Array.isArray(serverUrl) ? serverUrl : [serverUrl]).map((url) => ({
+              url,
+              smePublicKey: SME_PUBLIC_KEY,
+          }))
         : [];
     const messaging = new SmashMessaging(identity, undefined, 'DEBUG', name);
     await messaging.setEndpoints(config);
