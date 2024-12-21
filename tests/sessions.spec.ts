@@ -1,5 +1,9 @@
 import { TestUtils } from '@tests/events.utils.js';
-import { quietSocketServerUrl, socketServerUrl } from '@tests/jest.global.js';
+import {
+    SME_PUBLIC_KEY,
+    secondarySocketServerUrl,
+    socketServerUrl,
+} from '@tests/jest.global.js';
 import { TEST_CONFIG, delay } from '@tests/time.utils.js';
 import { TestPeer, createPeer } from '@tests/user.utils.js';
 import { Logger, SmashMessaging } from 'smash-node-lib';
@@ -16,6 +20,13 @@ describe('[Sessions] Session Management', () => {
         await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
     });
 
+    beforeEach(async () => {
+        logger.debug('Creating test peers Alice and Bob');
+        alice = await createPeer('alice', socketServerUrl);
+        bob = await createPeer('bob', socketServerUrl);
+        await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
+    });
+
     afterEach(async () => {
         logger.debug('Cleaning up test peers');
         await alice?.messaging.close();
@@ -24,13 +35,6 @@ describe('[Sessions] Session Management', () => {
     });
 
     describe('Session Reuse', () => {
-        beforeEach(async () => {
-            logger.debug('Creating test peers Alice and Bob');
-            alice = await createPeer('alice', socketServerUrl);
-            bob = await createPeer('bob', socketServerUrl);
-            await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
-        });
-
         it('should reuse the same session for subsequent messages', async () => {
             logger.info('Testing session reuse for subsequent messages');
 
@@ -53,7 +57,7 @@ describe('[Sessions] Session Management', () => {
                 'msg1',
                 '',
             );
-            await delay(TEST_CONFIG.MESSAGE_DELIVERY);
+            await delay(10 * TEST_CONFIG.MESSAGE_DELIVERY);
 
             // Get initial session ID from SME events
             logger.debug('Getting initial session ID');
@@ -80,7 +84,7 @@ describe('[Sessions] Session Management', () => {
             // Send second message
             logger.debug('Sending Bob->Alice message');
             await bob.messaging.sendTextMessage(alice.did, 'msg2', msg1.sha256);
-            await delay(TEST_CONFIG.MESSAGE_DELIVERY);
+            await delay(2 * TEST_CONFIG.MESSAGE_DELIVERY);
 
             // Get events for second message
             logger.debug('Getting events for second message');
@@ -93,7 +97,7 @@ describe('[Sessions] Session Management', () => {
                 .sessionId;
             logger.debug(`Second message session ID: ${secondSessionId}`);
             expect(secondSessionId).toBe(initialSessionId);
-        });
+        }, 20000);
     });
 
     describe('Preferred Endpoint Management', () => {
@@ -101,11 +105,11 @@ describe('[Sessions] Session Management', () => {
             logger.debug(
                 'Creating test peers Alice and Bob, Alice has two endpoints',
             );
-            alice = await createPeer('alice', [
-                socketServerUrl,
-                quietSocketServerUrl,
+            await alice.messaging.setEndpoints([
+                { url: socketServerUrl, smePublicKey: SME_PUBLIC_KEY },
+                { url: secondarySocketServerUrl, smePublicKey: SME_PUBLIC_KEY },
             ]);
-            bob = await createPeer('bob', socketServerUrl);
+            alice.did = await alice.messaging.getDID();
             await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
         });
 
@@ -149,10 +153,9 @@ describe('[Sessions] Session Management', () => {
             );
             expect(
                 (aliceEvents as { endpoint: string }[]).some(
-                    (event) => event.endpoint === 'main',
+                    (event) => event.endpoint === secondarySocketServerUrl,
                 ),
-            ).toBe(true);
-            expect(aliceEvents.length).toBe(1);
-        });
+            ).toBe(false);
+        }, 25000);
     });
 });

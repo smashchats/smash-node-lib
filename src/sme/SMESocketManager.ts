@@ -2,13 +2,16 @@ import { SessionManager } from '@src/signal/index.js';
 import { SMESocketReadWrite } from '@src/sme/SMESocketReadWrite.js';
 import { SMESocketWriteOnly } from '@src/sme/SMESocketWriteOnly.js';
 import {
+    EncapsulatedIMProtoMessage,
+    IMSessionEndpointMessage,
+    IM_SESSION_ENDPOINT,
     Identity,
     SMEConfig,
     SmashEndpoint,
     onMessagesFn,
     onMessagesStatusFn,
 } from '@src/types/index.js';
-import { Logger } from '@src/utils/index.js';
+import { CryptoUtils, Logger } from '@src/utils/index.js';
 
 export class SMESocketManager {
     private readonly smeSockets: Record<string, SMESocketWriteOnly>;
@@ -30,7 +33,7 @@ export class SMESocketManager {
                 this.logger,
             );
         } else {
-            this.logger.debug(`Reusing existing SMESocketWriteOnly for ${url}`);
+            this.logger.debug(`Reusing existing socket for ${url}`);
         }
         return this.smeSockets[url];
     }
@@ -69,6 +72,17 @@ export class SMESocketManager {
         this.smeSockets[smeConfig.url] = smeSocket;
         await oldSocket?.close();
         // and return the configured endpoint
+        if (!this.cachedPEMessage) {
+            // TODO dynamically select preferred based on metrics
+            this.logger.debug(
+                `Setting user's preferred endpoint to ${endpoint.url}`,
+            );
+            this.cachedPEMessage =
+                await CryptoUtils.singleton.encapsulateMessage({
+                    type: IM_SESSION_ENDPOINT,
+                    data: endpoint,
+                } as IMSessionEndpointMessage);
+        }
         return endpoint;
     }
 
@@ -78,6 +92,14 @@ export class SMESocketManager {
                 this.closeSocket(socket),
             ),
         );
+    }
+
+    private cachedPEMessage?: EncapsulatedIMProtoMessage;
+    getPreferredEndpointMessage(): EncapsulatedIMProtoMessage {
+        if (!this.cachedPEMessage) {
+            throw new Error('Preferred endpoint not set');
+        }
+        return this.cachedPEMessage;
     }
 
     /**

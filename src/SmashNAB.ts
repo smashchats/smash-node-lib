@@ -14,6 +14,7 @@ import {
     SMEConfigJSONWithoutDefaults,
     SME_DEFAULT_CONFIG,
     SmashActionJson,
+    SmashChatDiscoverMessage,
     SmashChatRelationshipData,
     SmashChatRelationshipMessage,
     sha256,
@@ -113,7 +114,7 @@ export abstract class SmashNAB extends SmashMessaging {
         // TODO: Never
         this.superRegister(
             SMASH_NBH_DISCOVER,
-            new NeverResolver(SMASH_NBH_DISCOVER),
+            new NeverResolver<SmashChatDiscoverMessage>(SMASH_NBH_DISCOVER),
         );
         this.on(SMASH_NBH_DISCOVER, this.onDiscover.bind(this));
     }

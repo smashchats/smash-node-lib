@@ -16,7 +16,11 @@ import { CryptoUtils, Logger } from '@src/utils/index.js';
 
 export class SignalSession {
     public readonly createdAtTime: number;
+    // TODO cleanup outdated sessions after a grace period
+    // TODO think about coordinated TTL constants
     public static readonly SESSION_TTL_MS = EXPIRATION_TIME_MS;
+
+    public firstUse: boolean = true;
 
     constructor(
         public readonly id: string,
@@ -38,6 +42,7 @@ export class SignalSession {
         logger: Logger,
     ) {
         try {
+            logger.debug('SignalSession::create');
             const bundle = new PreKeyBundleProtocol();
             bundle.registrationId = 0; // warning: using fixed value, unsure about usage!
 
@@ -66,12 +71,14 @@ export class SignalSession {
             const sessionId = await CryptoUtils.singleton.keySha256(
                 cipher.currentRatchetKey.publicKey.key,
             );
-            return new SignalSession(
+            const session = new SignalSession(
                 sessionId,
                 cipher,
                 peerDidDocument.ik,
                 logger,
             );
+            logger.debug(`>> session created with id ${sessionId}`);
+            return session;
         } catch (err) {
             logger.warn('Cannot create session.');
             throw err;

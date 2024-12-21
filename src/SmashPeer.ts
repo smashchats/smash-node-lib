@@ -11,7 +11,6 @@ import {
     IMProfileMessage,
     IMProtoMessage,
     IM_PROFILE,
-    ISO8601,
     Relationship,
     SMASH_NBH_RELATIONSHIP,
     SmashEndpoint,
@@ -23,22 +22,17 @@ import AsyncLock from 'async-lock';
 import { clearTimeout, setTimeout } from 'timers';
 
 export class SmashPeer {
+    // TODO: default to use 'id' everywhere document is not needed
+    public readonly id: DIDString;
     // TODO subscribe on changes like updates to DID, IK, EK, PK...
     private endpoints: SmashPeerEndpoint[] = [];
 
     private readonly messageQueue: Map<sha256, EncapsulatedIMProtoMessage> =
         new Map();
-
-    // TODO allow loading relationship at lib initialization time
-    private relationship: Relationship = 'clear';
-    private lastRelationshipSha256: sha256 | undefined;
-
-    // TODO: default to use 'id' everywhere document is not needed
-    public readonly id: DIDString;
-
     private readonly MAX_RETRY_ATTEMPTS = 10;
     private readonly INITIAL_RETRY_DELAY_MS = 1000;
     private readonly MAX_RETRY_DELAY_MS = 600000; // 10 minutes
+    private readonly mutex = new AsyncLock();
 
     constructor(
         private readonly did: DID,
@@ -57,7 +51,7 @@ export class SmashPeer {
     async sendUserProfile(profile: IMProfile) {
         this.setUserProfile(profile);
         this.logger.debug(`> sending user profile for ${this.id}`);
-        await this.queueEncapsulatedMessage(
+        await this.queueAllEndpoints(
             await this.getEncapsulatedProfileMessage(),
         );
         await this.flushQueue();
@@ -77,13 +71,18 @@ export class SmashPeer {
             throw new Error('User profile not set');
         }
         if (!this.cachedEncapsulatedUserProfile) {
-            this.cachedEncapsulatedUserProfile = await this.encapsulateMessage({
-                type: IM_PROFILE,
-                data: this.cachedUserProfile,
-            } as IMProfileMessage);
+            this.cachedEncapsulatedUserProfile =
+                await CryptoUtils.singleton.encapsulateMessage({
+                    type: IM_PROFILE,
+                    data: this.cachedUserProfile,
+                } as IMProfileMessage);
         }
         return this.cachedEncapsulatedUserProfile;
     }
+
+    // TODO allow loading relationship at lib initialization time
+    private relationship: Relationship = 'clear';
+    private lastRelationshipSha256: sha256 | undefined;
 
     async setRelationship(relationship: Relationship, nabs: SmashPeer[]) {
         if (this.relationship === relationship) {
@@ -103,52 +102,45 @@ export class SmashPeer {
         );
     }
 
-    async configureEndpoints(sendSessionReset: boolean = true): Promise<void> {
-        if (
-            sendSessionReset &&
-            Date.now() - this.lastMessageTime < SignalSession.SESSION_TTL_MS
-        ) {
-            // if last message is before session TTL,
-            // then we need to send a session reset message
-            // to let the other peer know that our sessions have been renewed earlier than expected
-            await this.triggerSessionReset();
-        } else {
+    async configureEndpoints(): Promise<void> {
+        return this.mutex.acquire(`configureEndpoints-${this.id}`, async () => {
             const did = await this.getDID();
             this.logger.debug(
                 `SmashPeer::configureEndpoints for peer ${this.id} (${did.endpoints.length})`,
             );
+            // if last message is before session TTL,
+            // then we need to send a session reset message
+            // to let the other peer know that our sessions have been renewed earlier than expected
+            if (
+                Date.now() - this.lastMessageTime <
+                SignalSession.SESSION_TTL_MS
+            ) {
+                await this.triggerSessionResetByUser();
+            }
+            // then we can (re)configure endpoints
             this.endpoints = did.endpoints.map(
-                (endpointConfig: SmashEndpoint) =>
+                (endpointConfig) =>
                     new SmashPeerEndpoint(
                         this,
                         endpointConfig,
                         this.messageQueue,
                     ),
             );
-        }
+            // flush message queues in the background on (re)-configure
+            this.flushQueue().then();
+        });
     }
 
     async sendMessage(
         message: IMProtoMessage,
     ): Promise<EncapsulatedIMProtoMessage> {
         const sentMessage = await this.queueMessage(message);
+        this.logger.debug('> flushing ', JSON.stringify(sentMessage));
         await this.flushQueue();
-        this.logger.debug('> sent ', JSON.stringify(sentMessage));
         return sentMessage;
     }
 
-    private async encapsulateMessage(
-        message: IMProtoMessage,
-    ): Promise<EncapsulatedIMProtoMessage> {
-        const timestamp = new Date().toISOString() as ISO8601;
-        const sha256 = await CryptoUtils.singleton.sha256fromObject({
-            ...message,
-            timestamp,
-        });
-        return { ...message, sha256, timestamp };
-    }
-
-    private async queueEncapsulatedMessage(
+    private async queueAllEndpoints(
         encapsulatedMessage: EncapsulatedIMProtoMessage,
     ) {
         this.messageQueue.set(encapsulatedMessage.sha256, encapsulatedMessage);
@@ -162,24 +154,30 @@ export class SmashPeer {
         );
     }
 
-    async queueMessage(
+    private async queueMessage(
         message: IMProtoMessage,
     ): Promise<EncapsulatedIMProtoMessage> {
-        const encapsulatedMessage = await this.encapsulateMessage(message);
-        await this.queueEncapsulatedMessage(encapsulatedMessage);
-        return encapsulatedMessage;
+        // mutex: wait dont queue and flush the same queues at the same time
+        return this.mutex.acquire(`flushQueue-${this.id}`, async () => {
+            const encapsulatedMessage =
+                await CryptoUtils.singleton.encapsulateMessage(message);
+            await this.queueAllEndpoints(encapsulatedMessage);
+            return encapsulatedMessage;
+        });
     }
 
     async ack(messageIds: sha256[]) {
-        messageIds.forEach((messageId) => {
-            this.messageQueue.delete(messageId);
+        // mutex: wait dont clear and flush the same queues at the same time
+        return this.mutex.acquire(`flushQueue-${this.id}`, async () => {
+            messageIds.forEach((messageId) => {
+                this.messageQueue.delete(messageId);
+            });
+            await Promise.allSettled(
+                this.endpoints.map((endpoint) => endpoint.ack(messageIds)),
+            );
         });
-        await Promise.allSettled(
-            this.endpoints.map((endpoint) => endpoint.ack(messageIds)),
-        );
     }
 
-    private readonly mutex = new AsyncLock();
     private retryTimeout?: NodeJS.Timeout;
     async flushQueue(
         attempt: number = 0,
@@ -187,13 +185,18 @@ export class SmashPeer {
         recursiveCall: boolean = false,
     ): Promise<void> {
         if (attempt >= this.MAX_RETRY_ATTEMPTS) {
-            throw new Error(
-                `failed to flush queue after ${attempt} retries (${this.id})`,
-            );
+            throw new Error(`failed to flush queue after ${attempt} retries`);
         }
+        // mutex: wait dont flush the same peer queue multiple times
         return this.mutex.acquire(
-            'flushQueue',
+            `flushQueue-${this.id}`,
             async () => {
+                if (this.messageQueue.size === 0) {
+                    this.logger.debug(
+                        `message queue is empty, skipping flushQueue`,
+                    );
+                    return;
+                }
                 if (this.retryTimeout && !recursiveCall) {
                     this.logger.debug(
                         'queue is already scheduled for flushing, skipping',
@@ -211,14 +214,16 @@ export class SmashPeer {
             this.logger.debug(
                 `> flushing attempt ${attempt + 1}/${this.MAX_RETRY_ATTEMPTS}`,
             );
-            await this.flushEndpoints();
+            await this.flush();
             this.clearRetryTimeout();
         } catch {
+            // FAILURE, exponential backoff
             const newDelay = Math.min(delay * 2, this.MAX_RETRY_DELAY_MS);
             this.logger.debug(
                 `retry ${attempt + 1}/${this.MAX_RETRY_ATTEMPTS} failed, ` +
                     `retrying in ${newDelay}ms`,
             );
+            this.sessionManager.resetPreferredSession((await this.getDID()).ik);
             await this.scheduleFlushQueue(attempt + 1, newDelay);
         }
     }
@@ -230,13 +235,46 @@ export class SmashPeer {
         );
     }
 
+    private preferredEndpoint: SmashPeerEndpoint | undefined;
+    setPreferredEndpoint(endpoint: SmashEndpoint): Promise<void> {
+        // mutex: prevent flushing while changing preferred endpoint
+        return this.mutex.acquire(`preferredEndpoint-${this.id}`, () => {
+            // TODO: if doesnt exist, create it
+            this.preferredEndpoint = this.endpoints.find(
+                (e) =>
+                    e.endpointConfig.url === endpoint.url &&
+                    e.endpointConfig.preKey === endpoint.preKey,
+            );
+            this.logger.debug(
+                `> setPreferredEndpoint for ${this.id} to ${this.preferredEndpoint?.endpointConfig.url}`,
+            );
+        });
+    }
+
     // TODO: pick either P2P or all Endpoints
-    private async flushEndpoints() {
+    private flush(): Promise<void> {
+        // mutex: wait for preferred endpoint to be set before flushing
+        return this.mutex.acquire(`preferredEndpoint-${this.id}`, async () => {
+            const session = this.sessionManager.getPreferredForPeerIk(
+                (await this.getDID()).ik,
+            );
+            if (session && this.preferredEndpoint) {
+                this.logger.debug(
+                    `> flushing current message queue (${this.messageQueue.size}) to preferred endpoint ${this.preferredEndpoint.endpointConfig.url}`,
+                );
+                await this.preferredEndpoint.flush(session);
+            } else {
+                await this.flushAllEndpoints();
+            }
+        });
+    }
+
+    private async flushAllEndpoints() {
         this.logger.debug(
             `> flushing current message queue (${this.messageQueue.size}) to ${this.endpoints.length} endpoints`,
         );
         const results = await Promise.allSettled(
-            this.endpoints.map((endpoint) => endpoint.flush()),
+            this.endpoints.map((endpoint) => endpoint.flush(undefined)),
         );
         const failed = results.find((r) => r.status === 'rejected');
         if (failed) {
@@ -244,11 +282,12 @@ export class SmashPeer {
         }
     }
 
-    cancelRetry() {
+    async cancelRetry() {
         this.logger.debug(`SmashPeer::cancelRetry for peer ${this.id}`);
+        // mutex: wait for flushqueue before clearing retries
         return this.mutex.acquire(
-            'flushQueue',
-            async () => {
+            `flushQueue-${this.id}`,
+            () => {
                 this.logger.debug(
                     `SmashPeer::cancelRetry: acquired (${this.retryTimeout})`,
                 );
@@ -263,32 +302,33 @@ export class SmashPeer {
         this.retryTimeout = undefined;
     }
 
-    // TODO: refresh DID
-
-    private async resetSessions(keepActive: boolean = false) {
-        const did = await this.getDID();
-        await this.sessionManager.handleSessionReset(did.ik, keepActive);
-        await this.configureEndpoints(false);
-        await this.flushQueue();
+    private async resetSessions(deleteActiveSession: boolean = false) {
+        this.endpoints.forEach((endpoint) => endpoint.resetSession());
+        this.sessionManager.removeAllSessionsForPeerIK(
+            (await this.getDID()).ik,
+            deleteActiveSession,
+        );
     }
 
-    async triggerSessionReset(): Promise<EncapsulatedIMProtoMessage> {
+    async triggerSessionResetByUser(): Promise<EncapsulatedIMProtoMessage> {
         this.logger.debug(`Triggering session reset for ${this.id}`);
-        await this.resetSessions();
-        return this.sendMessage(IM_RESET_SESSION_MESSAGE);
+        const deleteActiveSession = true;
+        await this.resetSessions(deleteActiveSession);
+        return this.queueMessage(IM_RESET_SESSION_MESSAGE);
     }
 
     private readonly alreadyProcessedSessionReset: string[] = [];
     async incomingSessionReset(sha256: string) {
-        await this.mutex.acquire('sessionReset', async () => {
+        // mutex to cover for potential parallel calls of this method by the same peer
+        await this.mutex.acquire(`sessionReset-${this.id}`, async () => {
             if (this.alreadyProcessedSessionReset.includes(sha256)) {
                 this.logger.debug(
-                    `Already processed session reset ${sha256}, skipping`,
+                    `> Already processed session reset ${sha256}, skipping`,
                 );
                 return;
             }
-            this.logger.debug(`Processing session reset ${sha256}`);
-            await this.resetSessions(true);
+            this.logger.debug(`<<< Processing session reset ${sha256} >>>`);
+            await this.resetSessions();
             this.alreadyProcessedSessionReset.push(sha256);
         });
     }

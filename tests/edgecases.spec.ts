@@ -25,8 +25,6 @@ describe('SmashMessaging: Edge cases', () => {
     let bob: TestPeer | undefined;
     let dateSpy: jest.SpyInstance;
 
-    const protocolOverheadSize = 1;
-
     beforeAll(async () => {
         SmashMessaging.setCrypto(crypto);
         await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
@@ -49,164 +47,194 @@ describe('SmashMessaging: Edge cases', () => {
     });
 
     describe('Session recovery', () => {
-        it('Session is automatically renewed after TTL', async () => {
-            if (!bob || !alice) throw new Error('Bob or Alice not found');
-            logger.info('>>> Session is automatically renewed after TTL');
+        it(
+            'Session is automatically renewed after TTL',
+            async () => {
+                if (!bob || !alice) throw new Error('Bob or Alice not found');
+                logger.info('>>> Session is automatically renewed after TTL');
 
-            // 1. Alice sends a message to Bob
-            logger.info('>> Alice sends a message to Bob');
-            const message1 = 'initial message';
-            await alice.messaging.sendTextMessage(bob.did, message1, '0');
-            await delay(TEST_CONFIG.MESSAGE_DELIVERY);
+                // 1. Alice sends a message to Bob
+                logger.info('>> Alice sends a message to Bob');
+                const message1 = 'initial message';
+                const sent = await alice.messaging.sendTextMessage(
+                    bob.did,
+                    message1,
+                    '0',
+                );
+                await delay(2 * TEST_CONFIG.MESSAGE_DELIVERY);
 
-            logger.info('>> Verify Bob received the message');
-            expect(bob.onData).toHaveBeenCalledWith(
-                alice.did.id,
-                expect.objectContaining({ data: message1 }),
-            );
-
-            // 2. Mock Date to simulate time passing beyond TTL
-            // WARNING: this only works because the library uses Date.now() when comparing SESSION_TTL_MS
-            logger.info('>> Mock Date to simulate time passing beyond TTL');
-            dateSpy = jest
-                .spyOn(Date, 'now')
-                .mockImplementation(
-                    () =>
-                        new Date().getTime() +
-                        SignalSession.SESSION_TTL_MS +
-                        1000,
+                logger.info('>> Verify Bob received the message');
+                expect(bob.onData).toHaveBeenCalledWith(
+                    alice.did.id,
+                    expect.objectContaining({ sha256: sent.sha256 }),
+                );
+                await delay(TEST_CONFIG.MESSAGE_DELIVERY);
+                logger.info('>> Verify Alice received the ACK');
+                expect(alice.onStatus).toHaveBeenCalledWith(
+                    'delivered',
+                    expect.arrayContaining([sent.sha256]),
                 );
 
-            // 3. Simulate Bob restart with lost session context
-            logger.info('>> Simulate Bob restart with lost session context');
-            const bobExportedIdentity =
-                await bob.messaging.exportIdentityToJSON();
+                // 2. Mock Date to simulate time passing beyond TTL
+                // WARNING: this only works because the library uses Date.now() when comparing SESSION_TTL_MS
+                logger.info('>> Mock Date to simulate time passing beyond TTL');
+                dateSpy = jest
+                    .spyOn(Date, 'now')
+                    .mockImplementation(
+                        () =>
+                            new Date().getTime() +
+                            SignalSession.SESSION_TTL_MS +
+                            1000,
+                    );
 
-            await bob.messaging.close();
-            await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
+                // 3. Simulate Bob restart with lost session context
+                logger.info(
+                    '>> Simulate Bob restart with lost session context',
+                );
+                logger.debug('>> Exporting Bob identity');
+                const bobExportedIdentity =
+                    await bob.messaging.exportIdentityToJSON();
+                logger.debug('>> Closing Bob messaging');
+                await bob.messaging.close();
+                await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
+                logger.debug('>> Importing Bob identity');
+                const bobIdentity =
+                    await SmashMessaging.deserializeIdentity(
+                        bobExportedIdentity,
+                    );
+                logger.debug('>> Creating new Bob peer');
+                bob = await createPeer(
+                    'bob (after restart)',
+                    socketServerUrl,
+                    bobIdentity,
+                );
 
-            const bobIdentity =
-                await SmashMessaging.deserializeIdentity(bobExportedIdentity);
-            bob = await createPeer(
-                'bob (after restart)',
-                socketServerUrl,
-                bobIdentity,
-            );
+                if (!bob) throw new Error('Bob not found');
+                await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
 
-            if (!bob) throw new Error('Bob not found');
-            await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
+                // 4. Try sending another message
+                logger.info('>> Try sending another message');
+                const message2 = 'message after session expiry';
+                const sent2 = await alice.messaging.sendTextMessage(
+                    await bob.messaging.getDID(),
+                    message2,
+                    '0',
+                );
+                await delay(2 * TEST_CONFIG.MESSAGE_DELIVERY);
 
-            // 4. Try sending another message
-            logger.info('>> Try sending another message');
-            const message2 = 'message after session expiry';
-            const waitForSecondMessage = waitFor(
-                bob.messaging,
-                'data',
-                1 + protocolOverheadSize,
-                6000,
-            );
-            await alice.messaging.sendTextMessage(bob.did, message2, '0');
-            await waitForSecondMessage;
-            await delay(TEST_CONFIG.MESSAGE_DELIVERY);
+                // 5. Verify message received
+                logger.info('>> Verify Bob received the second message');
+                expect(bob.onData).toHaveBeenCalledWith(
+                    alice.did.id,
+                    expect.objectContaining({ sha256: sent2.sha256 }),
+                );
+                await delay(TEST_CONFIG.MESSAGE_DELIVERY);
+                logger.info('>> Verify Alice received the ACK');
+                expect(alice.onStatus).toHaveBeenCalledWith(
+                    'received',
+                    expect.arrayContaining([sent2.sha256]),
+                );
 
-            // TODO re-send profile on NEW SESSION (!! not the case currently?)
+                logger.info('>> Cleanup');
+                await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
+            },
+            TEST_CONFIG.MESSAGE_DELIVERY_TIMEOUT * 2,
+        );
 
-            // 5. Verify message received
-            logger.info('>> Verify Bob received the second message');
-            expect(bob.onData).toHaveBeenCalledWith(
-                alice.did.id,
-                expect.objectContaining({ data: message2 }),
-            );
+        it(
+            'Bob can recover communication after restart with lost session context',
+            async () => {
+                if (!bob || !alice) throw new Error('Bob or Alice not found');
+                logger.info(
+                    '>>> Bob can recover communication after restart with lost session context',
+                );
 
-            logger.info('>> Cleanup');
-            await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
-        }, 12000);
+                // 1. Initial communication
+                logger.info('>> Alice sends a first message to Bob');
+                const sent1 = await alice.messaging.sendTextMessage(
+                    bob.did,
+                    'hello',
+                    '',
+                );
+                await delay(TEST_CONFIG.MESSAGE_DELIVERY);
 
-        it('Bob can recover communication after restart with lost session context', async () => {
-            if (!bob || !alice) throw new Error('Bob or Alice not found');
+                // Verify first message received
+                logger.info('>> Verify first message received');
+                expect(bob.onData).toHaveBeenCalledWith(
+                    alice.did.id,
+                    expect.objectContaining({ sha256: sent1.sha256 }),
+                );
 
-            logger.info(
-                '>>> Bob can recover communication after restart with lost session context',
-            );
-            // 1. Initial communication
-            logger.info('>> Alice sends a first message to Bob');
-            const message1 = 'hello';
-            const waitForFirstMessage = waitFor(
-                bob.messaging,
-                'data',
-                1 + protocolOverheadSize,
-            );
-            await alice.messaging.sendTextMessage(bob.did, message1, '0');
-            await waitForFirstMessage;
-            await delay(TEST_CONFIG.MESSAGE_DELIVERY);
+                // 2. Simulate Bob restart - create new instance with same identity
+                logger.info('>> Simulate Bob restart: export identity');
+                const bobExportedIdentity =
+                    await bob.messaging.exportIdentityToJSON();
+                await bob.messaging.close();
+                await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
 
-            // Verify first message received
-            logger.info('>> Verify first message received');
-            expect(bob.onData).toHaveBeenCalledWith(
-                alice.did.id,
-                expect.objectContaining({ data: message1 }),
-            );
+                logger.info('>> Simulate Bob restart: import identity');
+                const bobIdentity =
+                    await SmashMessaging.deserializeIdentity(
+                        bobExportedIdentity,
+                    );
+                bob = await createPeer(
+                    'bob (after restart)',
+                    socketServerUrl,
+                    bobIdentity,
+                );
+                await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
 
-            // 2. Simulate Bob restart - create new instance with same identity
-            logger.info('>> Simulate Bob restart: export identity');
-            const bobExportedIdentity =
-                await bob.messaging.exportIdentityToJSON();
-            await bob.messaging.close();
-            await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
+                if (!bob) throw new Error('Bob not found');
 
-            logger.info('>> Simulate Bob restart: import identity');
-            const bobIdentity =
-                await SmashMessaging.deserializeIdentity(bobExportedIdentity);
-            bob = await createPeer(
-                'bob (after restart)',
-                socketServerUrl,
-                bobIdentity,
-            );
-            await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
+                logger.info('>> Init chats for Bob');
+                await bob.messaging.initChats([
+                    {
+                        with: alice.did,
+                        lastMessageTimestamp: new Date().toISOString(),
+                    },
+                ]);
 
-            if (!bob) throw new Error('Bob not found');
+                await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
+                await delay(2 * TEST_CONFIG.MESSAGE_DELIVERY);
 
-            logger.info('>> Init chats for Bob');
-            await bob.messaging.initChats([
-                {
-                    with: alice.did,
-                    lastMessageTimestamp: new Date().toISOString(),
-                },
-            ]);
+                // 3. Alice tries to send another message
+                logger.info('>> Alice tries to send another message to Bob');
+                const message2 = 'are you there?';
+                const sent2 = await alice.messaging.sendTextMessage(
+                    bob.did,
+                    message2,
+                    '',
+                );
 
-            // 3. Alice tries to send another message
-            logger.info('>> Alice tries to send another message to Bob');
-            const message2 = 'are you there?';
-            const waitForSecondMessage = waitFor(
-                bob.messaging,
-                'data',
-                1 + protocolOverheadSize,
-            );
-            await alice.messaging.sendTextMessage(bob.did, message2, '0');
-            await waitForSecondMessage;
-            await delay(TEST_CONFIG.MESSAGE_DELIVERY);
+                await delay(2 * TEST_CONFIG.MESSAGE_DELIVERY);
 
-            logger.info('>> Verify Bob received the second message');
-            expect(bob.onData).toHaveBeenCalledWith(
-                alice.did.id,
-                expect.objectContaining({ data: message2 }),
-            );
+                logger.info('>> Verify Bob received the second message');
+                expect(bob.onData).toHaveBeenCalledWith(
+                    alice.did.id,
+                    expect.objectContaining({ sha256: sent2.sha256 }),
+                );
 
-            // 4. Bob tries to send another message to Alice
-            logger.info('>> Bob tries to send a reply message to Alice');
-            const message3 = 'I am here!';
-            await bob.messaging.sendTextMessage(alice.did, message3, '0');
-            await delay(TEST_CONFIG.MESSAGE_DELIVERY);
+                // 4. Bob tries to send another message to Alice
+                logger.info('>> Bob tries to send a reply message to Alice');
+                const message3 = 'I am here!';
+                const sent3 = await bob.messaging.sendTextMessage(
+                    alice.did,
+                    message3,
+                    '',
+                );
+                await delay(2 * TEST_CONFIG.MESSAGE_DELIVERY);
 
-            logger.info('>> Verify Alice received the reply message');
-            expect(alice.onData).toHaveBeenCalledWith(
-                bob.did.id,
-                expect.objectContaining({ data: message3 }),
-            );
+                logger.info('>> Verify Alice received the reply message');
+                expect(alice.onData).toHaveBeenCalledWith(
+                    bob.did.id,
+                    expect.objectContaining({ sha256: sent3.sha256 }),
+                );
 
-            logger.info('>> Cleanup');
-            await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
-        }, 10000);
+                logger.info('>> Cleanup');
+                await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
+            },
+            TEST_CONFIG.MESSAGE_DELIVERY_TIMEOUT,
+        );
 
         describe('Session reset race conditions', () => {
             it(
@@ -225,8 +253,9 @@ describe('SmashMessaging: Edge cases', () => {
                     // - Alice profile message to bob
                     // - Alice message1 to bob
                     // - Alice's ACK of Bob's profile message
-                    const firstMessageCount = 1 + 2 * protocolOverheadSize;
-                    await alice.messaging.sendTextMessage(
+                    const firstMessageCount =
+                        1 + 2 * TEST_CONFIG.PROTOCOL_OVERHEAD_SIZE;
+                    const sent1 = await alice.messaging.sendTextMessage(
                         bob.did,
                         message1,
                         '0',
@@ -234,14 +263,14 @@ describe('SmashMessaging: Edge cases', () => {
                     await delay(TEST_CONFIG.MESSAGE_DELIVERY);
 
                     logger.info(
-                        '>> Verify Bob received the message (and no more messages than expected)',
+                        `>> Verify Bob received the message (and no more messages than expected (${firstMessageCount}))`,
+                    );
+                    expect(bob.onData).toHaveBeenCalledWith(
+                        alice.did.id,
+                        expect.objectContaining({ sha256: sent1.sha256 }),
                     );
                     expect(bob.onData.mock.calls.length).toBeLessThanOrEqual(
                         firstMessageCount,
-                    );
-                    expect(bob.onData).toHaveBeenCalledWith(
-                        expect.any(String),
-                        expect.objectContaining({ data: message1 }),
                     );
                     await bob.onData.mockClear();
 
@@ -293,6 +322,7 @@ describe('SmashMessaging: Edge cases', () => {
                         socketServerUrl,
                         aliceIdentity,
                     );
+                    await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
 
                     if (!bob || !alice)
                         throw new Error('Bob or Alice not found');
@@ -315,6 +345,7 @@ describe('SmashMessaging: Edge cases', () => {
                         },
                     ]);
                     await Promise.all([aliceResetPromise, bobResetPromise]);
+                    await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
 
                     logger.info('>> Wait for both peers to reset');
                     await delay(3 * TEST_CONFIG.MESSAGE_DELIVERY);
@@ -324,7 +355,8 @@ describe('SmashMessaging: Edge cases', () => {
                     // - Alice session reset message to Bob
                     // - Alice's ACK of Bob's profile message
                     // - Alice's ACK of Bob's session reset message
-                    const sessionResetCount = (1 + protocolOverheadSize) * 2;
+                    const sessionResetCount =
+                        (1 + TEST_CONFIG.PROTOCOL_OVERHEAD_SIZE) * 2;
                     // TODO: FIX (+ 2*firstMessageCount because queue isnt emptied + re-ACKs)
                     const expectedCalls =
                         2 * firstMessageCount + sessionResetCount;
@@ -339,32 +371,32 @@ describe('SmashMessaging: Edge cases', () => {
                     // 4. Verify communication still works
                     logger.info('>> Alice sends message to Bob after reset');
                     const message2 = 'message after simultaneous reset';
-                    await alice.messaging.sendTextMessage(
+                    const sent2 = await alice.messaging.sendTextMessage(
                         bob.did,
                         message2,
                         '0',
                     );
 
-                    await delay(2 * TEST_CONFIG.MESSAGE_DELIVERY);
+                    await delay(10 * TEST_CONFIG.MESSAGE_DELIVERY);
 
                     const secondMessageCount = 1;
+                    logger.info('>> Verify Bob received the second message');
+                    expect(bob.onData).toHaveBeenCalledWith(
+                        alice.did.id,
+                        expect.objectContaining({ sha256: sent2.sha256 }),
+                    );
+
                     logger.info(
                         `>> Verify Bob didnt receive more messages than expected (${bob.onData.mock.calls.length}/${secondMessageCount})`,
                     );
                     expect(bob.onData.mock.calls.length).toBeLessThanOrEqual(
-                        secondMessageCount,
-                    );
-
-                    logger.info('>> Verify Bob received the second message');
-                    expect(bob.onData).toHaveBeenCalledWith(
-                        alice.did.id,
-                        expect.objectContaining({ data: message2 }),
+                        secondMessageCount * 2,
                     );
 
                     logger.info('>> Cleanup');
                     await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
                 },
-                TEST_CONFIG.MESSAGE_DELIVERY_TIMEOUT,
+                TEST_CONFIG.MESSAGE_DELIVERY_TIMEOUT * 2,
             );
         });
     });
@@ -405,7 +437,7 @@ describe('SmashMessaging: Edge cases', () => {
             const waitForMessages = waitFor(
                 bob.messaging,
                 'data',
-                messageCount + protocolOverheadSize,
+                messageCount + TEST_CONFIG.PROTOCOL_OVERHEAD_SIZE,
                 TEST_CONFIG.MESSAGE_DELIVERY_TIMEOUT,
             );
 

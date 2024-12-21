@@ -8,18 +8,23 @@ const PORT = 12345;
 const API_PATH = 'api';
 const WEBSOCKET_PATH = 'socket.io';
 const VALID_PATH = 'valid';
+const SECONDARY_PATH = 'secondary';
 const EMPTY_PATH = 'empty';
 const QUIET_PATH = 'quiet';
-
-// const log = console.log;
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const log = (..._args: unknown[]) => {};
+const log = console.log;
 
 log(`Starting mock SME server on port ${PORT}`);
 log(`API path: /${API_PATH}`);
 log(`Valid WS path: /${VALID_PATH}`);
+log(`Secondary WS path: /${SECONDARY_PATH}`);
 log(`Empty WS path: /${EMPTY_PATH}`);
 log(`Quiet WS path: /${QUIET_PATH}`);
+
+export const apiServerUrl = `http://${HOSTNAME}:${PORT}/${API_PATH}`;
+export const socketServerUrl = `http://${HOSTNAME}:${PORT}/${VALID_PATH}`;
+export const emptySocketServerUrl = `http://${HOSTNAME}:${PORT}/${EMPTY_PATH}`;
+export const quietSocketServerUrl = `http://${HOSTNAME}:${PORT}/${QUIET_PATH}`;
+export const secondarySocketServerUrl = `http://${HOSTNAME}:${PORT}/${SECONDARY_PATH}`;
 
 const subtle = globalThis.crypto.subtle;
 
@@ -215,10 +220,17 @@ export default async function setup(): Promise<void> {
                             `Delaying message to peer ${peerId} by ${delayMs}ms`,
                         );
                     }
-                    dataEvents.push({ peerId, sessionId, data, endpoint });
+                    dataEvents.push({
+                        peerId,
+                        sessionId,
+                        data,
+                        endpoint,
+                    });
                     log(`Queued data event for peer ${peerId}`);
                     setTimeout(() => {
-                        log(`Emitting delayed data to peer ${peerId}`);
+                        log(
+                            `Emitting data to peer ${peerId} (delay ${delayMs}ms)`,
+                        );
                         activeSockets[peerId].emit('data', sessionId, data);
                     }, delayMs);
                     if (shouldAck) {
@@ -348,6 +360,7 @@ export default async function setup(): Promise<void> {
         });
 
         const mainNamespace = socketServer.of('/' + VALID_PATH);
+        const secondaryNamespace = socketServer.of('/' + SECONDARY_PATH);
         const emptyNamespace = socketServer.of('/' + EMPTY_PATH);
         const quietNamespace = socketServer.of('/' + QUIET_PATH);
 
@@ -359,7 +372,12 @@ export default async function setup(): Promise<void> {
                 ? await importClientPublicKey(client)
                 : undefined;
             log('>> Initializing data endpoint without ack');
-            await initDataEndpoint('quiet', clientPublicKey, client, false);
+            await initDataEndpoint(
+                quietSocketServerUrl,
+                clientPublicKey,
+                client,
+                false,
+            );
             if (clientPublicKey) {
                 log('>> Initializing challenge');
                 await initChallengeEndpoint(clientPublicKey, client);
@@ -388,7 +406,27 @@ export default async function setup(): Promise<void> {
                 : undefined;
 
             log('>> Initializing data endpoint');
-            await initDataEndpoint('main', clientPublicKey, client);
+            await initDataEndpoint(socketServerUrl, clientPublicKey, client);
+            if (clientPublicKey) {
+                log('>> Initializing challenge');
+                await initChallengeEndpoint(clientPublicKey, client);
+            }
+        });
+
+        secondaryNamespace.on('connection', async (client) => {
+            log('>>> New connection on secondary namespace');
+            const auth = !!client.handshake.auth.key;
+            log('> Client authentication:', auth ? 'present' : 'absent');
+            const clientPublicKey = auth
+                ? await importClientPublicKey(client)
+                : undefined;
+
+            log('>> Initializing data endpoint');
+            await initDataEndpoint(
+                secondarySocketServerUrl,
+                clientPublicKey,
+                client,
+            );
             if (clientPublicKey) {
                 log('>> Initializing challenge');
                 await initChallengeEndpoint(clientPublicKey, client);
@@ -404,8 +442,3 @@ export default async function setup(): Promise<void> {
         });
     });
 }
-
-export const apiServerUrl = `http://${HOSTNAME}:${PORT}/${API_PATH}`;
-export const socketServerUrl = `http://${HOSTNAME}:${PORT}/${VALID_PATH}`;
-export const emptySocketServerUrl = `http://${HOSTNAME}:${PORT}/${EMPTY_PATH}`;
-export const quietSocketServerUrl = `http://${HOSTNAME}:${PORT}/${QUIET_PATH}`;

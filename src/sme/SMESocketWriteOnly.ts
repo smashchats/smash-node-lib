@@ -19,7 +19,7 @@ export class SMESocketWriteOnly {
 
     async close(TIMEOUT_MS = 3000): Promise<void> {
         return new Promise((resolve) => {
-            this.logger.info(`> Disconnecting from SME ${this.url}`);
+            this.logger.debug(`> Disconnecting from SME ${this.url}`);
             const socket = this.socket;
             if (!socket) {
                 return resolve();

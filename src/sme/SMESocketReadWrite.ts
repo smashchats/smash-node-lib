@@ -56,8 +56,6 @@ export class SMESocketReadWrite extends SMESocketWriteOnly {
                                 data,
                                 auth,
                             );
-
-                        this.logger.debug(`> SME Challenge IV (${data.iv})`);
                         this.logger.debug(
                             `> SME Challenge (${data.challenge}) -> (${solvedChallenge})`,
                         );
@@ -92,15 +90,15 @@ export class SMESocketReadWrite extends SMESocketWriteOnly {
 
     private async processMessages(sessionId: string, data: ArrayBuffer) {
         this.logger.debug(
-            `SMESocketReadWrite::processMessages for ${sessionId}`,
+            `SMESocketReadWrite::processMessages for session ${sessionId}`,
         );
-        const session = this.sessionManager.getSessionById(sessionId);
+        const session = this.sessionManager.getById(sessionId);
         if (session) {
             this.logger.info(`Incoming data for session ${sessionId}`);
-            this.emitReceivedMessages(
-                await session.decryptData(data),
-                session.peerIk,
-            );
+            const decryptedMessages = await session.decryptData(data);
+            this.sessionManager.setPreferred(session);
+            this.emitReceivedMessages(decryptedMessages, session.peerIk);
+            this.logger.info(`Incoming data for session ${sessionId}`);
         } else {
             await this.attemptNewSession(sessionId, data);
         }
@@ -111,6 +109,7 @@ export class SMESocketReadWrite extends SMESocketWriteOnly {
             const [parsedSession, firstMessages] =
                 await this.sessionManager.parseSession(sessionId, data);
             this.logger.info(`New session ${sessionId}`);
+            this.sessionManager.setPreferred(parsedSession);
             this.emitReceivedMessages(firstMessages, parsedSession.peerIk);
             await this.processQueuedMessages(parsedSession);
         } catch (err) {
@@ -125,7 +124,7 @@ export class SMESocketReadWrite extends SMESocketWriteOnly {
                 );
                 this.addToDlq(sessionId, data);
             } else {
-                this.logger.warn(`Unprocessable data for ${sessionId}`);
+                this.logger.warn(`Unprocessable data for session ${sessionId}`);
                 throw err;
             }
         }

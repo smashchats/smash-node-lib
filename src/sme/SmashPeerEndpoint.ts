@@ -7,11 +7,12 @@ import {
 } from '@src/types/index.js';
 import AsyncLock from 'async-lock';
 
+const QUEUE_MUTEX_NAME = 'queue';
+
+// TODO should this class be merged 1:1 with SignalSession?
 export class SmashPeerEndpoint {
-    private session: SignalSession | undefined;
     private readonly messageQueue: Map<sha256, EncapsulatedIMProtoMessage> =
         new Map();
-    // private readonly socket: SMESocketWriteOnly;
 
     constructor(
         private readonly peer: SmashPeer,
@@ -24,15 +25,25 @@ export class SmashPeerEndpoint {
     private readonly mutex = new AsyncLock();
 
     queue(message: EncapsulatedIMProtoMessage): Promise<void> {
-        return this.mutex.acquire('queue', () => {
-            this.messageQueue.set(message.sha256, message);
+        return this.mutex.acquire(QUEUE_MUTEX_NAME, () => {
+            this.queueBypassingMutex(message);
         });
     }
 
+    private queueBypassingMutex(message: EncapsulatedIMProtoMessage) {
+        this.messageQueue.set(message.sha256, message);
+        this.peer.logger.debug(
+            `> queued message ${message.sha256} for ${this.endpointConfig.url} (${this.messageQueue.size})`,
+        );
+    }
+
     async ack(messageIds: sha256[]) {
-        return this.mutex.acquire('queue', () => {
+        return this.mutex.acquire(QUEUE_MUTEX_NAME, () => {
             messageIds.forEach((messageId) => {
                 this.messageQueue.delete(messageId);
+                this.peer.logger.debug(
+                    `> acknowledged message ${messageId} for ${this.endpointConfig.url} (${this.messageQueue.size})`,
+                );
             });
         });
     }
@@ -42,16 +53,17 @@ export class SmashPeerEndpoint {
      * If the session is expired, it will be re-initialized.
      * @throws Error if message isnt delivered within 3 seconds.
      */
-    async flush(): Promise<void> {
-        await this.initSession();
-        return this.mutex.acquire('queue', async () => {
-            const undeliveredMessages = Array.from(this.messageQueue.values());
-            if (!undeliveredMessages.length) {
+    async flush(shouldUseSession: SignalSession | undefined): Promise<void> {
+        const session = shouldUseSession ?? (await this.thisSession());
+        return this.mutex.acquire(QUEUE_MUTEX_NAME, async () => {
+            await this.init(session);
+            if (!this.messageQueue.size) {
                 this.peer.logger.debug(
-                    `> no undelivered messages for ${this.endpointConfig.url}`,
+                    `> no undelivered messages to flush for ${this.endpointConfig.url}`,
                 );
                 return;
             }
+            const undeliveredMessages = Array.from(this.messageQueue.values());
             this.peer.logger.debug(
                 `> flushing ${undeliveredMessages.length} messages to ${this.endpointConfig.url}`,
             );
@@ -61,11 +73,14 @@ export class SmashPeerEndpoint {
             try {
                 await socket.sendData(
                     this.endpointConfig.preKey,
-                    this.session!.id,
-                    await this.session!.encryptMessages(undeliveredMessages),
+                    session.id,
+                    await session.encryptMessages(undeliveredMessages),
                     undeliveredMessages.map((m) => m.sha256),
                 );
                 this.messageQueue.clear();
+                this.peer.logger.debug(
+                    `> flushed ${undeliveredMessages.length} messages to ${this.endpointConfig.url} (cleared queue)`,
+                );
             } catch (error) {
                 this.peer.logger.error(
                     `> failed to flush messages to ${this.endpointConfig.url}: ${(error as Error).message}`,
@@ -80,23 +95,44 @@ export class SmashPeerEndpoint {
         });
     }
 
-    private async initSession() {
-        if (!this.session || this.session.isExpired()) {
-            if (this.session) {
-                this.peer.logger.info(
-                    `> /!\\ expired session with ${this.peer.id} @ ${this.endpointConfig.url}`,
-                );
-            }
+    private async init(session: SignalSession): Promise<void> {
+        if (session.firstUse) {
             this.peer.logger.debug(
-                `> initializing new session with ${this.peer.id} @ ${this.endpointConfig.url}`,
+                `> initializing first use session ${session.id}`,
             );
-            // ensure user profile is sent at the start of every new session
-            await this.queue(await this.peer.getEncapsulatedProfileMessage());
-            // this operation verifies both EK and the Endpoint's PreKey
-            this.session = await this.peer.sessionManager.initSession(
+            await Promise.allSettled([
+                this.peer.getEncapsulatedProfileMessage().then((message) => {
+                    this.peer.logger.debug(
+                        `> queueing profile message for ${this.endpointConfig.url}`,
+                    );
+                    this.queueBypassingMutex(message);
+                }),
+                (async () => {
+                    const msg =
+                        this.peer.smeSocketManager.getPreferredEndpointMessage();
+                    this.peer.logger.debug(
+                        `> queueing preferred endpoint message for ${this.endpointConfig.url}`,
+                    );
+                    this.queueBypassingMutex(msg);
+                })(),
+            ]);
+            session.firstUse = false;
+        }
+    }
+
+    private session?: SignalSession;
+    private async thisSession(): Promise<SignalSession> {
+        if (!this.session || this.session.isExpired()) {
+            const session = await this.peer.sessionManager.initSession(
                 await this.peer.getDID(),
                 this.endpointConfig,
             );
+            this.session = session;
         }
+        return this.session;
+    }
+
+    resetSession() {
+        this.session = undefined;
     }
 }

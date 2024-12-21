@@ -1,5 +1,12 @@
 import { Curve } from '2key-ratchet';
-import { ENCODING, SMEConfig, sha256 } from '@src/types/index.js';
+import {
+    ENCODING,
+    EncapsulatedIMProtoMessage,
+    IMProtoMessage,
+    ISO8601,
+    SMEConfig,
+    sha256,
+} from '@src/types/index.js';
 import { Logger } from '@src/utils/Logger.js';
 import { Buffer } from 'buffer';
 
@@ -135,5 +142,16 @@ export class CryptoUtils {
             unencryptedChallenge,
             auth.challengeEncoding,
         );
+    }
+
+    async encapsulateMessage(
+        message: IMProtoMessage,
+    ): Promise<EncapsulatedIMProtoMessage> {
+        const timestamp = new Date().toISOString() as ISO8601;
+        const sha256 = await this.sha256fromObject({
+            ...message,
+            timestamp,
+        });
+        return { ...message, sha256, timestamp };
     }
 }

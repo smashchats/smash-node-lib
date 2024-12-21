@@ -15,6 +15,8 @@ import type {
     IMProfileMessage,
     IMProtoMessage,
     IMReceivedACKMessage,
+    IMSessionEndpointMessage,
+    IMSessionResetMessage,
     IMTextMessage,
     SMEConfigJSONWithoutDefaults,
     SmashEndpoint,
@@ -24,12 +26,14 @@ import {
     IM_ACK_RECEIVED,
     IM_CHAT_TEXT,
     IM_PROFILE,
+    IM_SESSION_ENDPOINT,
     IM_SESSION_RESET,
     SME_DEFAULT_CONFIG,
 } from '@src/types/index.js';
 import type { LogLevel } from '@src/utils/index.js';
 import { CryptoUtils, Logger } from '@src/utils/index.js';
 import { EventEmitter } from 'events';
+import { setInterval } from 'timers';
 
 interface IJWKJson extends CryptoKey {
     jwk?: JsonWebKey;
@@ -48,12 +52,19 @@ interface SmashChat {
 
 type ProfileMeta = Omit<IMProfile, 'did'>;
 
-class SessionResetHandler extends BaseResolver<IMProtoMessage, void> {
-    resolve(
-        peer: SmashPeer,
-        message: EncapsulatedIMProtoMessage,
-    ): Promise<void> {
-        return peer.incomingSessionReset(message.sha256);
+class PreferredEndpointHandler extends BaseResolver<
+    IMSessionEndpointMessage,
+    void
+> {
+    resolve(peer: SmashPeer, message: IMSessionEndpointMessage): Promise<void> {
+        peer.setPreferredEndpoint(message.data);
+        return Promise.resolve();
+    }
+}
+
+class SessionResetHandler extends BaseResolver<IMSessionResetMessage, void> {
+    resolve(peer: SmashPeer, message: IMSessionResetMessage): Promise<void> {
+        return peer.incomingSessionReset(message.sha256!);
     }
 }
 
@@ -200,6 +211,9 @@ export class SmashMessaging extends EventEmitter {
     private endpoints: SmashEndpoint[];
     private readonly sessionManager: SessionManager;
     private readonly smeSocketManager: SMESocketManager;
+    private readonly processedMessages: Map<sha256, number> = new Map();
+    private static readonly cacheExpiryTime = 1000 * 60 * 60; // 1 hour
+    private static readonly cacheCleanupInterval = 1000 * 60 * 15; // 15 minutes
 
     constructor(
         protected readonly identity: Identity,
@@ -224,6 +238,10 @@ export class SmashMessaging extends EventEmitter {
             new SessionResetHandler(IM_SESSION_RESET),
         );
         this.superRegister(
+            IM_SESSION_ENDPOINT,
+            new PreferredEndpointHandler(IM_SESSION_ENDPOINT),
+        );
+        this.superRegister(
             IM_ACK_RECEIVED,
             new DataForwardingResolver(IM_ACK_RECEIVED),
         );
@@ -237,6 +255,12 @@ export class SmashMessaging extends EventEmitter {
             });
         });
         this.logger.info(`Loaded Smash lib (log level: ${LOG_LEVEL})`);
+
+        // Start cleanup interval
+        setInterval(
+            () => this.cleanupProcessedMessages(),
+            SmashMessaging.cacheCleanupInterval,
+        );
     }
 
     async close() {
@@ -285,39 +309,80 @@ export class SmashMessaging extends EventEmitter {
     async setEndpoints(
         newEndpoints: SMEConfigJSONWithoutDefaults[],
     ): Promise<void> {
+        this.logger.debug('SmashMessaging::setEndpoints');
         // ASSUMPTION#3: Endpoints can be uniquely identified by their URL.
-        const existingEndpointURLs = this.endpoints.map((e) => e.url);
-        // disconnecting old endpoints
-        await Promise.allSettled(
-            existingEndpointURLs
-                .filter((url) => !newEndpoints.some((e) => e.url === url))
-                .map((url) => this.smeSocketManager.close(url)),
+        // Create lookup map of existing endpoint URLs for O(1) lookups
+        const existingUrlMap = new Map(
+            this.endpoints.map((endpoint) => [endpoint.url, endpoint]),
         );
-        // initializing new endpoints or renewed endpoints
-        const initEndpoints = await Promise.allSettled(
-            newEndpoints.map((smeConfig) => {
-                return this.smeSocketManager.initWithAuth(
-                    this.identity,
-                    {
-                        ...SME_DEFAULT_CONFIG,
-                        ...smeConfig,
-                        // TODO PreKeyPair Management
-                        preKeyPair: this.identity.signedPreKeys[0],
-                    },
-                    this.sessionManager,
-                );
-            }),
+        const endpointsToConnect: SMEConfigJSONWithoutDefaults[] = [];
+        for (const newEndpoint of newEndpoints) {
+            if (existingUrlMap.has(newEndpoint.url)) {
+                continue;
+            } else {
+                endpointsToConnect.push(newEndpoint);
+            }
+        }
+        const newUrlSet = new Set(newEndpoints.map((e) => e.url));
+        const endpointsToDisconnect = this.endpoints.filter(
+            (endpoint) => !newUrlSet.has(endpoint.url),
         );
-        this.endpoints = initEndpoints
-            .filter((r) => r.status === 'fulfilled')
-            .map((r) => r.value);
-        if (initEndpoints.some((r) => r.status === 'rejected')) {
-            this.logger.warn(
-                `Failed to initialize some endpoints: ${initEndpoints
-                    .filter((r) => r.status === 'rejected')
-                    .map((r) => r.reason)
+        this.logger.debug(
+            `Set ${newEndpoints.length} endpoints split: ${endpointsToDisconnect.length} to disconnect, ` +
+                `${endpointsToConnect.length} to connect`,
+        );
+
+        if (endpointsToDisconnect.length) {
+            this.logger.debug(
+                `> Disconnecting endpoints: ${endpointsToDisconnect
+                    .map((e) => e.url)
                     .join(', ')}`,
             );
+            await Promise.allSettled(
+                endpointsToDisconnect.map((endpoint) =>
+                    this.smeSocketManager.close(endpoint.url),
+                ),
+            );
+        }
+
+        if (endpointsToConnect.length) {
+            this.logger.debug(
+                `> Connecting new endpoints: ${endpointsToConnect
+                    .map((e) => e.url)
+                    .join(', ')}`,
+            );
+
+            const initEndpoints = await Promise.allSettled(
+                endpointsToConnect.map((smeConfig) => {
+                    return this.smeSocketManager.initWithAuth(
+                        this.identity,
+                        {
+                            ...SME_DEFAULT_CONFIG,
+                            ...smeConfig,
+                            // TODO PreKeyPair Management
+                            preKeyPair: this.identity.signedPreKeys[0],
+                        },
+                        this.sessionManager,
+                    );
+                }),
+            );
+
+            const successfulConnections = initEndpoints
+                .filter((r) => r.status === 'fulfilled')
+                .map((r) => (r as PromiseFulfilledResult<SmashEndpoint>).value);
+
+            this.endpoints.push(...successfulConnections);
+
+            const failedConnections = initEndpoints.filter(
+                (r) => r.status === 'rejected',
+            );
+            if (failedConnections.length) {
+                this.logger.warn(
+                    `Failed to initialize endpoints: ${failedConnections
+                        .map((r) => (r as PromiseRejectedResult).reason)
+                        .join(', ')}`,
+                );
+            }
         }
     }
 
@@ -365,22 +430,40 @@ export class SmashMessaging extends EventEmitter {
         } as IMReceivedACKMessage);
     }
 
+    private deduplicateMessages(messages: EncapsulatedIMProtoMessage[]) {
+        const now = Date.now();
+        return messages.filter((msg) => {
+            if (this.processedMessages.has(msg.sha256)) {
+                return false;
+            }
+            this.processedMessages.set(msg.sha256, now);
+            return true;
+        });
+    }
+
     private async incomingMessagesHandler(
         peerIk: string,
         messages: EncapsulatedIMProtoMessage[],
     ) {
         const peer: SmashPeer | undefined = this.getPeerByIk(peerIk);
         if (peer) {
+            const uniqueMessages = this.deduplicateMessages(messages);
+            if (uniqueMessages.length === 0) {
+                this.logger.debug(
+                    'All messages were duplicates, skipping processing',
+                );
+                return;
+            }
             await Promise.allSettled([
                 // firehose incoming events to the library user
-                this.notifyNewMessages(peer.id, messages),
+                this.notifyNewMessages(peer.id, uniqueMessages),
                 // registered message handlers execute resolvers
-                this.incomingMessagesParser(peer, messages),
+                this.incomingMessagesParser(peer, uniqueMessages),
                 // send received ACKs to the sending peer
-                this.sendReceivedAcks(peer, messages),
+                this.sendReceivedAcks(peer, uniqueMessages),
             ]);
             this.logger.info(
-                `processed ${messages?.length} messages from ${peer.id}`,
+                `processed ${uniqueMessages?.length} unique messages from ${peer.id}`,
             );
         } else {
             this.pushToUnknownPeerIkDLQ(peerIk, messages);
@@ -643,5 +726,18 @@ export class SmashMessaging extends EventEmitter {
         } else {
             this.messageHandlers.set(messageType, filteredHandlers);
         }
+    }
+
+    private cleanupProcessedMessages() {
+        const expiryThreshold = Date.now() - SmashMessaging.cacheExpiryTime;
+        let count = 0;
+        for (const [hash, timestamp] of this.processedMessages) {
+            if (timestamp < expiryThreshold) {
+                this.processedMessages.delete(hash);
+                count++;
+            }
+        }
+        if (count > 0)
+            this.logger.debug(`Cleaned up ${count} processed messages (cache)`);
     }
 }
