@@ -10,8 +10,10 @@ module.exports = {
     testMatch: ['<rootDir>/tests/**/*.spec.ts'],
     testPathIgnorePatterns: ['node_modules'],
     moduleNameMapper: {
-        '^@src/(.*)\\.js$': '<rootDir>/src/$1.ts',
-        '^@tests/(.*)\\.js$': '<rootDir>/tests/$1.ts',
+        '^@src/(.*)\\.js$': '<rootDir>/src/$1',
+        '^@src/(.*)': '<rootDir>/src/$1',
+        '^@tests/(.*)\\.js$': '<rootDir>/tests/$1',
+        '^@tests/(.*)': '<rootDir>/tests/$1',
         'smash-node-lib': '<rootDir>/src/index.ts',
     },
     transform: {
@@ -19,10 +21,12 @@ module.exports = {
             'ts-jest',
             {
                 useESM: true,
+                tsconfig: 'tsconfig.json',
             },
         ],
     },
+    extensionsToTreatAsEsm: ['.ts'],
     setupFilesAfterEnv: ['<rootDir>/tests/jest.setup.ts'],
-    globalSetup: '<rootDir>/tests/jest.global.cjs',
-    globalTeardown: '<rootDir>/tests/jest.teardown.cjs',
+    globalSetup: '<rootDir>/tests/jest.global.ts',
+    globalTeardown: '<rootDir>/tests/jest.teardown.ts',
 };

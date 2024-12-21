@@ -1,4 +1,12 @@
 import {
+    SME_PUBLIC_KEY,
+    emptySocketServerUrl,
+    quietSocketServerUrl,
+    socketServerUrl,
+} from '@tests/jest.global.js';
+import { TEST_CONFIG, aliasWaitFor, delay } from '@tests/time.utils.js';
+import { TestPeer, createPeer } from '@tests/user.utils.js';
+import {
     DIDDocument,
     EncapsulatedIMProtoMessage,
     Logger,
@@ -6,19 +14,6 @@ import {
     SmashEndpoint,
     SmashMessaging,
 } from 'smash-node-lib';
-
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore
-import { emptySocketServerUrl, socketServerUrl } from './jest.global.cjs';
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore
-import { SME_PUBLIC_KEY, quietSocketServerUrl } from './jest.global.cjs';
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore
-import { TEST_CONFIG, aliasWaitFor, delay } from './time.utils';
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore
-import { TestPeer, createPeer } from './user.utils';
 
 /**
  * **************************************************************

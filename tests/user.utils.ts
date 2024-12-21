@@ -1,13 +1,10 @@
 import { Identity } from '2key-ratchet';
+import { SME_PUBLIC_KEY } from '@tests/jest.global.js';
 import {
     DIDDocument,
     SMEConfigJSONWithoutDefaults,
     SmashMessaging,
 } from 'smash-node-lib';
-
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore
-import { SME_PUBLIC_KEY } from './jest.global.cjs';
 
 // @deprecated
 export async function peerArgs(

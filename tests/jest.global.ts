@@ -1,10 +1,6 @@
-/* eslint-disable no-undef */
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const { createServer } = require('node:http');
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const { Server } = require('socket.io');
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const { URL: NodeURL } = require('node:url');
+import { createServer } from 'node:http';
+import { URL as NodeURL } from 'node:url';
+import { Server, Socket } from 'socket.io';
 
 const HOSTNAME = 'localhost';
 const PORT = 12345;
@@ -16,7 +12,8 @@ const EMPTY_PATH = 'empty';
 const QUIET_PATH = 'quiet';
 
 // const log = console.log;
-const log = () => {};
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const log = (..._args: unknown[]) => {};
 
 log(`Starting mock SME server on port ${PORT}`);
 log(`API path: /${API_PATH}`);
@@ -26,25 +23,28 @@ log(`Quiet WS path: /${QUIET_PATH}`);
 
 const subtle = globalThis.crypto.subtle;
 
-const ENCODING = 'base64';
-const EXPORTABLE = 'spki';
+const ENCODING = 'base64' as const;
+const EXPORTABLE = 'spki' as const;
 
-const SME_PUBLIC_KEY =
+export const SME_PUBLIC_KEY =
     'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEg6rwXUOg3N18rZlQRS8sCmKGuB4opGtTXvYi7DkXltVzK0rEVd91HgM7L9YEyTsM9ntJ8Ye+rHey0LiUZwFwAw==';
 const SME_PRIVATE_KEY =
     'MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgeDOtDxdjN36dlxG7Z2Rh3E41crFpQEse0xaxBlaVRRWhRANCAASDqvBdQ6Dc3XytmVBFLywKYoa4Hiika1Ne9iLsOReW1XMrSsRV33UeAzsv1gTJOwz2e0nxh76sd7LQuJRnAXAD';
-const SME_CONFIG = {
-    keyAlgorithm: { name: 'ECDH', namedCurve: 'P-256' },
-    encryptionAlgorithm: { name: 'AES-GCM', length: 256 },
-    challengeEncoding: 'base64',
-};
 const KEY_ALGORITHM = {
     name: 'ECDH',
     namedCurve: 'P-256',
+} as const;
+export const SME_CONFIG = {
+    keyAlgorithm: KEY_ALGORITHM,
+    encryptionAlgorithm: { name: 'AES-GCM', length: 256 },
+    challengeEncoding: ENCODING,
 };
-const KEY_USAGES = ['deriveBits', 'deriveKey'];
+const KEY_USAGES = ['deriveBits', 'deriveKey'] as never;
 
-const initChallengeEndpoint = async (clientPublicKey, socketClient) => {
+const initChallengeEndpoint = async (
+    clientPublicKey: CryptoKey,
+    socketClient: Socket,
+) => {
     log('Initializing challenge endpoint for client');
     try {
         const symKey = await subtle.deriveKey(
@@ -87,11 +87,14 @@ const initChallengeEndpoint = async (clientPublicKey, socketClient) => {
 
         const encryptedChallengeBuf = Buffer.from(encryptedChallenge);
 
-        socketClient.on('register', async (_, ack) => {
-            log('Client registration received');
-            ack();
-            log('Registration acknowledged');
-        });
+        socketClient.on(
+            'register',
+            async (_: unknown, ack: () => void | undefined) => {
+                log('Client registration received');
+                ack();
+                log('Registration acknowledged');
+            },
+        );
 
         socketClient.emit('challenge', {
             iv: ivBuf.toString(SME_CONFIG.challengeEncoding),
@@ -105,7 +108,7 @@ const initChallengeEndpoint = async (clientPublicKey, socketClient) => {
     }
 };
 
-const exportKey = async (key, encoding = ENCODING) => {
+const exportKey = async (key: CryptoKey, encoding = ENCODING) => {
     try {
         const exported = Buffer.from(
             await subtle.exportKey(EXPORTABLE, key),
@@ -119,12 +122,12 @@ const exportKey = async (key, encoding = ENCODING) => {
 };
 
 const importKey = async (
-    keyEncoded,
-    keyAlgorithm,
+    keyEncoded: string,
+    keyAlgorithm: KeyAlgorithm,
     exportable = true,
-    usages = [],
-    encoding = ENCODING,
-    format = EXPORTABLE,
+    usages: KeyUsage[] = [],
+    encoding: BufferEncoding = ENCODING,
+    format: Exclude<KeyFormat, 'jwk'> = EXPORTABLE,
 ) => {
     try {
         const imported = await subtle.importKey(
@@ -142,7 +145,7 @@ const importKey = async (
     }
 };
 
-const importClientPublicKey = async (socket) => {
+const importClientPublicKey = async (socket: Socket) => {
     log('Importing client public key');
     return await importKey(
         socket.handshake.auth.key,
@@ -150,22 +153,26 @@ const importClientPublicKey = async (socket) => {
     );
 };
 
-const getPeerIdFromUrl = (reqUrl) => {
+const getPeerIdFromUrl = (reqUrl: string) => {
     const url = new NodeURL(reqUrl, 'http://localhost');
     const peerId = url.searchParams.get('peerId');
     log(`Extracted peerId from URL: ${peerId}`);
     return peerId;
 };
 
-module.exports = async function () {
+export default async function setup(): Promise<void> {
     return new Promise((resolve) => {
-        const activeSockets = {};
-        const messagesToDelay = {};
-        const dataEvents = [];
+        const activeSockets: Record<string, Socket> = {};
+        const messagesToDelay: Record<string, number> = {};
+        const dataEvents: {
+            peerId: string;
+            sessionId: string;
+            data: unknown;
+        }[] = [];
 
         const initDataEndpoint = async (
-            clientPublicKey,
-            client,
+            clientPublicKey: CryptoKey | undefined,
+            client: Socket,
             shouldAck = true,
         ) => {
             const clientKeyId = clientPublicKey
@@ -185,29 +192,39 @@ module.exports = async function () {
                 log(`Anonymous client`);
             }
 
-            client.on('data', async (peerId, sessionId, data, acknowledge) => {
-                log(`>> data: ${clientKeyId} --> ${peerId} (${sessionId})`);
-                if (!activeSockets[peerId]) {
-                    log(`No active socket found for peer ${peerId}`);
-                    return;
-                }
-                let delayMs = 0;
-                if (messagesToDelay[peerId]) {
-                    delayMs = messagesToDelay[peerId] * 250;
-                    messagesToDelay[peerId] = messagesToDelay[peerId] - 1;
-                    log(`Delaying message to peer ${peerId} by ${delayMs}ms`);
-                }
-                dataEvents.push({ peerId, sessionId, data });
-                log(`Queued data event for peer ${peerId}`);
-                setTimeout(() => {
-                    log(`Emitting delayed data to peer ${peerId}`);
-                    activeSockets[peerId].emit('data', sessionId, data);
-                }, delayMs);
-                if (shouldAck) {
-                    acknowledge();
-                    log('Data acknowledged');
-                }
-            });
+            client.on(
+                'data',
+                async (
+                    peerId: string,
+                    sessionId: string,
+                    data: unknown,
+                    acknowledge: () => void | undefined,
+                ) => {
+                    log(`>> data: ${clientKeyId} --> ${peerId} (${sessionId})`);
+                    if (!activeSockets[peerId]) {
+                        log(`No active socket found for peer ${peerId}`);
+                        return;
+                    }
+                    let delayMs = 0;
+                    if (messagesToDelay[peerId]) {
+                        delayMs = messagesToDelay[peerId] * 250;
+                        messagesToDelay[peerId] = messagesToDelay[peerId] - 1;
+                        log(
+                            `Delaying message to peer ${peerId} by ${delayMs}ms`,
+                        );
+                    }
+                    dataEvents.push({ peerId, sessionId, data });
+                    log(`Queued data event for peer ${peerId}`);
+                    setTimeout(() => {
+                        log(`Emitting delayed data to peer ${peerId}`);
+                        activeSockets[peerId].emit('data', sessionId, data);
+                    }, delayMs);
+                    if (shouldAck) {
+                        acknowledge();
+                        log('Data acknowledged');
+                    }
+                },
+            );
         };
 
         const httpServer = createServer((req, res) => {
@@ -235,7 +252,7 @@ module.exports = async function () {
 
             if (
                 req.method === 'GET' &&
-                req.url.startsWith(`/${API_PATH}/delay-next-messages`)
+                req.url?.startsWith(`/${API_PATH}/delay-next-messages`)
             ) {
                 log('Handling GET /delay-next-messages request');
                 const peerId = getPeerIdFromUrl(req.url);
@@ -256,7 +273,7 @@ module.exports = async function () {
 
             if (
                 req.method === 'GET' &&
-                req.url.startsWith(`/${API_PATH}/data-events`)
+                req.url?.startsWith(`/${API_PATH}/data-events`)
             ) {
                 log('Handling GET /data-events request');
                 const peerId = getPeerIdFromUrl(req.url);
@@ -271,7 +288,7 @@ module.exports = async function () {
 
             if (
                 req.method === 'DELETE' &&
-                req.url.startsWith(`/${API_PATH}/data-events`)
+                req.url?.startsWith(`/${API_PATH}/data-events`)
             ) {
                 log('Handling DELETE /data-events request');
                 const peerId = getPeerIdFromUrl(req.url);
@@ -378,14 +395,15 @@ module.exports = async function () {
 
         httpServer.listen(PORT, () => {
             log(`HTTP server listening on port ${PORT}`);
-            globalThis.__socketServer = socketServer;
-            resolve(void 0);
+            (
+                globalThis as unknown as { __socketServer: Server }
+            ).__socketServer = socketServer;
+            resolve();
         });
     });
-};
+}
 
-module.exports.apiServerUrl = `http://${HOSTNAME}:${PORT}/${API_PATH}`;
-module.exports.socketServerUrl = `http://${HOSTNAME}:${PORT}/${VALID_PATH}`;
-module.exports.emptySocketServerUrl = `http://${HOSTNAME}:${PORT}/${EMPTY_PATH}`;
-module.exports.quietSocketServerUrl = `http://${HOSTNAME}:${PORT}/${QUIET_PATH}`;
-module.exports.SME_PUBLIC_KEY = SME_PUBLIC_KEY;
+export const apiServerUrl = `http://${HOSTNAME}:${PORT}/${API_PATH}`;
+export const socketServerUrl = `http://${HOSTNAME}:${PORT}/${VALID_PATH}`;
+export const emptySocketServerUrl = `http://${HOSTNAME}:${PORT}/${EMPTY_PATH}`;
+export const quietSocketServerUrl = `http://${HOSTNAME}:${PORT}/${QUIET_PATH}`;

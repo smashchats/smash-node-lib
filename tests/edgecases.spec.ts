@@ -1,3 +1,6 @@
+import { apiServerUrl, socketServerUrl } from '@tests/jest.global.js';
+import { TEST_CONFIG, aliasWaitFor, delay } from '@tests/time.utils.js';
+import { TestPeer, createPeer } from '@tests/user.utils.js';
 import {
     EncapsulatedIMProtoMessage,
     IMProtoMessage,
@@ -8,16 +11,6 @@ import {
     SmashMessaging,
     sortSmashMessages,
 } from 'smash-node-lib';
-
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore
-import { apiServerUrl, socketServerUrl } from './jest.global.cjs';
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore
-import { TEST_CONFIG, aliasWaitFor, delay } from './time.utils';
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore
-import { TestPeer, createPeer } from './user.utils';
 
 /**
  * **************************************************************

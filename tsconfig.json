@@ -15,7 +15,7 @@
         "strict": true,
         "baseUrl": ".",
         "paths": {
-            "smash-node-lib": ["src/index.js"],
+            "smash-node-lib": ["src/index.ts"],
             "@src/*": ["src/*"],
             "@tests/*": ["tests/*"]
         }

@@ -1,8 +1,5 @@
+import { TEST_CONFIG, delay } from '@tests/time.utils.js';
 import { Logger, SmashMessaging } from 'smash-node-lib';
-
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore
-import { TEST_CONFIG, delay } from './time.utils';
 
 const logger = new Logger('jest', 'INFO');
 jest.setTimeout(TEST_CONFIG.TEST_TIMEOUT_MS);

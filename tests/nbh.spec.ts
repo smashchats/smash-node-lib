@@ -1,4 +1,7 @@
 import { Identity } from '2key-ratchet';
+import { socketServerUrl } from '@tests/jest.global.js';
+import { TEST_CONFIG, aliasWaitFor, delay } from '@tests/time.utils.js';
+import { peerArgs } from '@tests/user.utils.js';
 import {
     DIDDocument,
     IMProtoMessage,
@@ -16,16 +19,6 @@ import {
     SmashProfileList,
     SmashUser,
 } from 'smash-node-lib';
-
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore
-import { socketServerUrl } from './jest.global.cjs';
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore
-import { TEST_CONFIG, aliasWaitFor, delay } from './time.utils';
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore
-import { peerArgs } from './user.utils';
 
 // TODO docs library interface (config, events, etc)
 // TODO docs neighborhood admin bot API and example
