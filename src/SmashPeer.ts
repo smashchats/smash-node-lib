@@ -19,7 +19,6 @@ import {
 import { Logger } from '@src/utils/Logger.js';
 import { CryptoUtils } from '@src/utils/index.js';
 import AsyncLock from 'async-lock';
-import { clearTimeout, setTimeout } from 'timers';
 
 export class SmashPeer {
     // TODO: default to use 'id' everywhere document is not needed
@@ -229,10 +228,16 @@ export class SmashPeer {
     }
 
     private async scheduleFlushQueue(attempt: number, delay: number) {
-        this.retryTimeout = setTimeout(
-            () => this.flushQueue(attempt, delay, true),
-            delay,
-        );
+        if (typeof globalThis.setTimeout !== 'undefined') {
+            this.retryTimeout = globalThis.setTimeout(
+                () => this.flushQueue(attempt, delay, true),
+                delay,
+            );
+        } else {
+            this.logger.warn(
+                'setTimeout not available: skipping flush queue scheduling.',
+            );
+        }
     }
 
     private preferredEndpoint: SmashPeerEndpoint | undefined;
@@ -298,7 +303,9 @@ export class SmashPeer {
     }
 
     private clearRetryTimeout() {
-        clearTimeout(this.retryTimeout);
+        if (typeof globalThis.clearTimeout !== 'undefined') {
+            globalThis.clearTimeout(this.retryTimeout);
+        }
         this.retryTimeout = undefined;
     }
 

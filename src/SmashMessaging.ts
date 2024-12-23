@@ -33,7 +33,6 @@ import {
 import type { LogLevel } from '@src/utils/index.js';
 import { CryptoUtils, Logger } from '@src/utils/index.js';
 import { EventEmitter } from 'events';
-import { setInterval } from 'timers';
 
 interface IJWKJson extends CryptoKey {
     jwk?: JsonWebKey;
@@ -257,10 +256,17 @@ export class SmashMessaging extends EventEmitter {
         this.logger.info(`Loaded Smash lib (log level: ${LOG_LEVEL})`);
 
         // Start cleanup interval
-        setInterval(
-            () => this.cleanupProcessedMessages(),
-            SmashMessaging.cacheCleanupInterval,
-        );
+        // TODO: clean it too!
+        if (typeof globalThis.setInterval !== 'undefined') {
+            globalThis.setInterval(
+                () => this.cleanupProcessedMessages(),
+                SmashMessaging.cacheCleanupInterval,
+            );
+        } else {
+            this.logger.warn(
+                'SetInterval not available: Cached messages wont clean.',
+            );
+        }
     }
 
     async close() {

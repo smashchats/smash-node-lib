@@ -41,8 +41,7 @@
         "async-lock": "^1.4.1",
         "buffer": "^6.0.3",
         "simple-peer": "^9.11.1",
-        "socket.io-client": "^4.8.1",
-        "timers": "^0.1.1"
+        "socket.io-client": "^4.8.1"
     },
     "devDependencies": {
         "@eslint/js": "^9.16.0",

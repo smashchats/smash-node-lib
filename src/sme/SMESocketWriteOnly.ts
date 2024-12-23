@@ -1,7 +1,6 @@
 import { onMessagesStatusFn } from '@src/types/index.js';
 import { Logger } from '@src/utils/index.js';
 import { type Socket, io } from 'socket.io-client';
-import { clearTimeout, setTimeout } from 'timers';
 
 type SMEAuthParams = {
     key: string;
@@ -24,25 +23,32 @@ export class SMESocketWriteOnly {
             if (!socket) {
                 return resolve();
             }
-            const timeout = setTimeout(() => {
-                this.logger.warn(
-                    `Timeout exceeded while closing socket (${TIMEOUT_MS}ms), forcing cleanup`,
-                );
-                this.forceCleanup();
-                resolve();
-            }, TIMEOUT_MS);
+            const timeout =
+                typeof globalThis.setTimeout !== 'undefined'
+                    ? globalThis.setTimeout(() => {
+                          this.logger.warn(
+                              `Timeout exceeded while closing socket (${TIMEOUT_MS}ms), forcing cleanup`,
+                          );
+                          this.forceCleanup();
+                          resolve();
+                      }, TIMEOUT_MS)
+                    : undefined;
 
             if (socket.connected) {
                 socket.once('disconnect', () => {
                     this.logger.info(`> Disconnected from SME ${this.url}`);
-                    clearTimeout(timeout);
+                    if (typeof globalThis.clearTimeout !== 'undefined') {
+                        globalThis.clearTimeout(timeout);
+                    }
                     this.forceCleanup();
                     resolve();
                 });
                 socket.disconnect();
             } else {
                 this.forceCleanup();
-                clearTimeout(timeout);
+                if (typeof globalThis.clearTimeout !== 'undefined') {
+                    globalThis.clearTimeout(timeout);
+                }
                 resolve();
             }
         });
@@ -92,16 +98,21 @@ export class SMESocketWriteOnly {
                     );
                 }
             }
-            const timeout = setTimeout(() => {
-                reject(
-                    new Error(
-                        `Timeout exceeded while sending data to ${this.url}`,
-                    ),
-                );
-            }, TIMEOUT_MS);
+            const timeout =
+                typeof globalThis.setTimeout !== 'undefined'
+                    ? globalThis.setTimeout(() => {
+                          reject(
+                              new Error(
+                                  `Timeout exceeded while sending data to ${this.url}`,
+                              ),
+                          );
+                      }, TIMEOUT_MS)
+                    : undefined;
             this.socket.emit('data', preKey, sessionId, buffer, () => {
                 this.onMessagesStatusCallback(messageIds, 'delivered');
-                clearTimeout(timeout);
+                if (typeof globalThis.clearTimeout !== 'undefined') {
+                    globalThis.clearTimeout(timeout);
+                }
                 resolve();
             });
         });
