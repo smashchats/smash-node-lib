@@ -45,7 +45,8 @@ export class PeerRegistry extends Map<DIDString, SmashPeer> {
                 ? new Date(lastMessageTimestamp).getTime()
                 : 0;
             const peer = await this.createNewPeer(peerDid, lastMessageTime);
-            await peer.queueMessage(this.cachedEncapsulatedUserProfile!);
+            if (this.cachedEncapsulatedUserProfile)
+                await peer.queueMessage(this.cachedEncapsulatedUserProfile);
             await peer.configureEndpoints();
             this.set(peer.id, peer);
             return peer;

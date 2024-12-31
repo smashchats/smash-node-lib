@@ -63,6 +63,7 @@ describe('Welcome to using the Smashchats library!', () => {
         // private messaging between peers.
         // the DID document is the publicly sharable crypto information
         didDocumentManager = new DIDDocManager();
+        SmashMessaging.use('doc', didDocumentManager);
         [bobDIDDocument, bobIdentity] = await didDocumentManager.generate();
     });
 
@@ -144,12 +145,18 @@ describe('Welcome to using the Smashchats library!', () => {
         let bob: SmashMessaging;
 
         beforeEach(async () => {
+            // Create a new SmashMessaging instance with Bob's generated identity
             bob = new SmashUser(
                 bobIdentity,
                 // the log ID (used to identify the source of the log) & level
                 'bob',
                 'INFO',
             );
+        });
+
+        afterEach(async () => {
+            // Close the SmashMessaging instance
+            await bob.close();
         });
 
         test('2.1. Configuring new IMProto Endpoints', async () => {
@@ -177,12 +184,14 @@ describe('Welcome to using the Smashchats library!', () => {
             expect(newDidDocument.endpoints.length).toBe(
                 bobDIDDocument.endpoints.length + 1,
             );
-            expect(newDidDocument.endpoints).toContain(
-                expect.objectContaining({
-                    url: socketServerUrl,
-                    preKey: addedEndpoint.preKey,
-                    signature: addedEndpoint.signature,
-                } as SmashEndpoint),
+            expect(newDidDocument.endpoints).toEqual(
+                expect.arrayContaining([
+                    expect.objectContaining({
+                        url: socketServerUrl,
+                        preKey: addedEndpoint.preKey,
+                        signature: addedEndpoint.signature,
+                    } as SmashEndpoint),
+                ]),
             );
         });
     });
@@ -195,13 +204,14 @@ describe('Welcome to using the Smashchats library!', () => {
             const initPeer = async (name: string) => {
                 const identity = (await didDocumentManager.generate())[1];
                 const messaging = new SmashUser(identity, name, 'INFO');
+                const preKeyPair = await identity.generateNewPreKeyPair();
                 // TODO: use reset (automatically, through provided identity & did doc) instead
                 await messaging.endpoints.connect(
                     {
                         url: socketServerUrl,
                         smePublicKey: SME_PUBLIC_KEY,
                     },
-                    bobIdentity.signedPreKeys[0],
+                    preKeyPair,
                 );
                 return messaging;
             };
@@ -209,6 +219,10 @@ describe('Welcome to using the Smashchats library!', () => {
                 initPeer('bob'),
                 initPeer('alice'),
             ]);
+        });
+
+        afterEach(async () => {
+            await Promise.allSettled([bob.close(), alice.close()]);
         });
 
         test('3.1. Sending a text message to a peer', async () => {

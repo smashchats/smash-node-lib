@@ -40,7 +40,9 @@ export class DIDDocManager extends DIDManager {
             endpoints: [],
         };
         this.set(didDocument);
-        return [didDocument, new IMPeerIdentity(did, ik, ek)];
+        const deepCopy = JSON.parse(JSON.stringify(didDocument));
+        const newIdentity = new IMPeerIdentity(did, ik, ek);
+        return [deepCopy, newIdentity];
     }
 
     set(didDocument: DIDDocument) {

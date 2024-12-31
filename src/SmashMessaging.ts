@@ -138,36 +138,36 @@ export class SmashMessaging extends EventEmitter {
         );
     }
 
-    // async close() {
-    //     const peersToClose = Object.values(this.peers).map((p) =>
-    //         p.cancelRetry(),
-    //     );
-    //     this.logger.debug(`>> closing (${peersToClose.length}) peers`);
-    //     const peersResult = await Promise.allSettled(peersToClose);
-    //     this.logger.debug(`>> closing (${this.endpoints.length}) endpoints`);
-    //     const socketsResult = await this.smeSocketManager.closeAllSockets();
-    //     this.endpoints = [];
-    //     const failedToClosePeers = peersResult.filter(
-    //         (r) => r.status === 'rejected',
-    //     );
-    //     const failedToCloseSockets = socketsResult.filter(
-    //         (r) => r.status === 'rejected',
-    //     );
-    //     if (failedToClosePeers.length || failedToCloseSockets.length) {
-    //         if (failedToClosePeers.length) {
-    //             this.logger.debug(
-    //                 `<< some peers failed to close: ${failedToClosePeers.map((r) => r.reason).join(', ')}`,
-    //             );
-    //         }
-    //         if (failedToCloseSockets.length) {
-    //             this.logger.debug(
-    //                 `<< some sockets failed to close: ${failedToCloseSockets.map((r) => r.reason).join(', ')}`,
-    //             );
-    //         }
-    //     } else {
-    //         this.logger.debug('<<< closed');
-    //     }
-    // }
+    async close() {
+        const peersToClose = Array.from(this.peers.values());
+        this.logger.debug(`>> closing (${peersToClose.length}) peers`);
+        const peersResult = await Promise.allSettled(
+            peersToClose.map((p) => p.cancelRetry()),
+        );
+        this.logger.debug(`>> closing (${this.endpoints.size}) endpoints`);
+        const socketsResult = await this.smeSocketManager.closeAllSockets();
+        this.endpoints.reset([]);
+        const failedToClosePeers = peersResult.filter(
+            (r) => r.status === 'rejected',
+        );
+        const failedToCloseSockets = socketsResult.filter(
+            (r) => r.status === 'rejected',
+        );
+        if (failedToClosePeers.length || failedToCloseSockets.length) {
+            if (failedToClosePeers.length) {
+                this.logger.warn(
+                    `<< some peers failed to close: ${failedToClosePeers.map((r) => r.reason).join(', ')}`,
+                );
+            }
+            if (failedToCloseSockets.length) {
+                this.logger.warn(
+                    `<< some sockets failed to close: ${failedToCloseSockets.map((r) => r.reason).join(', ')}`,
+                );
+            }
+        } else {
+            this.logger.info('<<< CLOSED');
+        }
+    }
 
     // // async initChats(chats: SmashChat[]) {
     // //     return Promise.all(
