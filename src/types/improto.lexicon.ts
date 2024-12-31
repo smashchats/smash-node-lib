@@ -4,6 +4,7 @@ import {
     IMProtoMessage,
     SmashEndpoint,
     sha256,
+    undefinedString,
 } from '@src/types/index.js';
 
 export const IM_CHAT_TEXT = 'org.improto.chat.text';
@@ -26,7 +27,7 @@ export class IMText implements IMTextMessage {
     public type = IM_CHAT_TEXT as typeof IM_CHAT_TEXT;
     constructor(
         public data: string,
-        public after: sha256 | undefined = undefined,
+        public after: sha256 | undefinedString = '',
     ) {}
 }
 
@@ -77,7 +78,7 @@ export interface IMSessionEndpointMessage extends IMProtoMessage {
 export interface IMReceivedACKMessage extends BaseIMProtoMessage {
     type: typeof IM_ACK_RECEIVED;
     data: sha256[];
-    after: undefined;
+    after: '';
 }
 
 export type MessageStatus = '' | 'delivered' | 'received';

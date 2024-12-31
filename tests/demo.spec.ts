@@ -1,15 +1,20 @@
 import { Crypto } from '@peculiar/webcrypto';
 import { SME_PUBLIC_KEY, socketServerUrl } from '@tests/jest.global.js';
+import { TEST_CONFIG, aliasWaitFor, delay } from '@tests/time.utils.js';
 import {
     CryptoUtils,
     DIDDocManager,
     DIDDocument,
+    EncapsulatedIMProtoMessage,
     IMPeerIdentity,
+    IMProtoMessage,
     IMText,
+    IMTextMessage,
     IM_CHAT_TEXT,
     Logger,
     SmashEndpoint,
     SmashMessaging,
+    SmashPeer,
     SmashUser,
 } from 'smash-node-lib';
 
@@ -35,6 +40,9 @@ import {
 
 describe('Welcome to using the Smashchats library!', () => {
     const logger = new Logger('tutorial', 'INFO');
+    const waitForEventCancelFns: (() => void)[] = [];
+    const waitFor = aliasWaitFor(waitForEventCancelFns, logger);
+
     let didDocumentManager: DIDDocManager;
 
     beforeAll(() => {
@@ -65,6 +73,15 @@ describe('Welcome to using the Smashchats library!', () => {
         didDocumentManager = new DIDDocManager();
         SmashMessaging.use('doc', didDocumentManager);
         [bobDIDDocument, bobIdentity] = await didDocumentManager.generate();
+    });
+
+    afterEach(async () => {
+        logger.debug('>> canceling all waiters');
+        await Promise.all(waitForEventCancelFns.map((cancel) => cancel()));
+        waitForEventCancelFns.length = 0;
+        logger.debug('>> resetting mocks');
+        jest.resetAllMocks();
+        await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
     });
 
     describe('1. Creating a new decentralized identity (DID)', () => {
@@ -180,7 +197,7 @@ describe('Welcome to using the Smashchats library!', () => {
                 },
                 preKeyPair,
             );
-            const newDidDocument = await bob.getDID();
+            const newDidDocument = await bob.getDIDDocument();
             expect(newDidDocument.endpoints.length).toBe(
                 bobDIDDocument.endpoints.length + 1,
             );
@@ -203,7 +220,8 @@ describe('Welcome to using the Smashchats library!', () => {
         beforeEach(async () => {
             const initPeer = async (name: string) => {
                 const identity = (await didDocumentManager.generate())[1];
-                const messaging = new SmashUser(identity, name, 'INFO');
+                const messaging = new SmashUser(identity, name, 'DEBUG');
+                await messaging.updateMeta({ title: name });
                 const preKeyPair = await identity.generateNewPreKeyPair();
                 // TODO: use reset (automatically, through provided identity & did doc) instead
                 await messaging.endpoints.connect(
@@ -231,7 +249,34 @@ describe('Welcome to using the Smashchats library!', () => {
             expect(sent.sha256).toBeDefined();
             expect(sent.type).toBe(IM_CHAT_TEXT);
             expect(sent.data).toBe('Hello, Alice!');
-            expect(sent.after).toBeUndefined();
+            expect(sent.after).toEqual('');
         });
+
+        test('3.2. Receiving a text message from a peer', async () => {
+            const bobDID = await bob.getDIDDocument();
+
+            const onBobMessage = jest.fn();
+            bob.on<IMTextMessage>('org.improto.chat.text', onBobMessage);
+
+            const bobReceivedMessage = waitFor(bob, IM_CHAT_TEXT);
+            const sent = await alice.send(bobDID, new IMText('Hello, Bob!'));
+            await bobReceivedMessage;
+
+            expect(onBobMessage).toHaveBeenCalledWith(
+                alice.did,
+                expect.objectContaining<IMProtoMessage>({
+                    type: 'org.improto.chat.text',
+                    data: sent.data,
+                    sha256: sent.sha256,
+                    timestamp: sent.timestamp,
+                    after: '',
+                }),
+                expect.any(SmashPeer),
+            );
+            expect(onBobMessage).toHaveBeenCalledTimes(1);
+        });
+
+        // TODO: firehose
+        // TODO: status updates: delivered, received, read
     });
 });

@@ -116,7 +116,7 @@ describe('SmashMessaging: Edge cases', () => {
                 logger.info('>> Try sending another message');
                 const message2 = 'message after session expiry';
                 const sent2 = await alice.messaging.sendTextMessage(
-                    await bob.messaging.getDID(),
+                    await bob.messaging.getDIDDocument(),
                     message2,
                     '0',
                 );

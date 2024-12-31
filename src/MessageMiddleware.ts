@@ -29,6 +29,9 @@ export class MessageMiddleware {
         peerIk: string,
         messages: EncapsulatedIMProtoMessage[],
     ): Promise<void> {
+        this.logger.debug(
+            `processing ${messages?.length} messages from Ik ${peerIk}`,
+        );
         const peer: SmashPeer | undefined = this.peers.getByIk(peerIk);
         if (peer) {
             const uniqueMessages = this.deduplicateMessages(messages);

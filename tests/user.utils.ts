@@ -48,7 +48,7 @@ export const createPeer = async (
     const messaging = new SmashMessaging(identity, undefined, 'DEBUG', name);
     await messaging.setEndpoints(config);
 
-    const did = await messaging.getDID();
+    const did = await messaging.getDIDDocument();
     const onData = jest.fn();
     const onStatus = jest.fn();
 

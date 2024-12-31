@@ -60,7 +60,7 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
         nab = new TestNAB(identity, undefined, 'DEBUG', 'TestNAB');
         await nab.setEndpoints(config);
         await delay(100);
-        nabDid = await nab.getDID();
+        nabDid = await nab.getDIDDocument();
     });
 
     afterEach(async () => {
@@ -183,10 +183,10 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
             // TODO check that updated config is shared with active peers
             // TODO ensure valid SME
             // TODO lib event (updated profile/SME config)
-            expect((await user.getDID()).endpoints.length).toBe(0);
+            expect((await user.getDIDDocument()).endpoints.length).toBe(0);
             await user.join(await nab.getJoinInfo(nabSMEConfig));
             await delay(1500);
-            expect((await user.getDID()).endpoints.length).toBe(1);
+            expect((await user.getDIDDocument()).endpoints.length).toBe(1);
         });
 
         const discovered: SmashProfileList = [
@@ -201,7 +201,7 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
             },
         ];
         const sendDiscoveredProfiles = async () => {
-            await nab.sendMessage(await user.getDID(), {
+            await nab.sendMessage(await user.getDIDDocument(), {
                 type: SMASH_PROFILE_LIST,
                 data: discovered,
                 after: '',
@@ -220,7 +220,7 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
 
             // TODO JOIN with data (eg, social graph ((oneway hash did only)), TOTP, etc)
             it('sends a JOIN message to the NAB', async () => {
-                const userDid = await user.getDID();
+                const userDid = await user.getDIDDocument();
                 await nabReceivedJoin;
                 expect(nab.onJoin).toHaveBeenCalledWith(
                     userDid.id,
@@ -284,7 +284,7 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
                         'DEBUG',
                         'targetUser',
                     );
-                    targetDid = await targetUser.getDID();
+                    targetDid = await targetUser.getDIDDocument();
                     counter = 0;
                     (nab.onRelationship as jest.Mock).mockClear();
                 });
@@ -310,7 +310,7 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
                     } else {
                         await nabReceivedAction;
                     }
-                    const userDid = await user.getDID();
+                    const userDid = await user.getDIDDocument();
                     if (!expectFailure) {
                         counter++;
                         expect(nab.onRelationship).toHaveBeenCalledWith(

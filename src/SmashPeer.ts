@@ -12,6 +12,7 @@ import {
     SMASH_NBH_RELATIONSHIP,
     SmashEndpoint,
     sha256,
+    undefinedString,
 } from '@src/types/index.js';
 import { Logger } from '@src/utils/Logger.js';
 import { CryptoUtils } from '@src/utils/index.js';
@@ -46,7 +47,7 @@ export class SmashPeer {
 
     // TODO allow loading relationship at lib initialization time
     private relationship: Relationship = 'clear';
-    private lastRelationshipSha256: sha256 | undefined;
+    private lastRelationshipSha256: sha256 | undefinedString = '';
 
     async setRelationship(relationship: Relationship, nabs: SmashPeer[]) {
         if (this.relationship === relationship) {

@@ -109,7 +109,7 @@ describe('[Sessions] Session Management', () => {
                 { url: socketServerUrl, smePublicKey: SME_PUBLIC_KEY },
                 { url: secondarySocketServerUrl, smePublicKey: SME_PUBLIC_KEY },
             ]);
-            alice.did = await alice.messaging.getDID();
+            alice.did = await alice.messaging.getDIDDocument();
             await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
         });
 

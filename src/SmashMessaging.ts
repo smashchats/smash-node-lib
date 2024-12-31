@@ -191,12 +191,21 @@ export class SmashMessaging extends EventEmitter {
         if (!messages?.length) return;
         this.logger.debug(`notifyNewMessages (${messages?.length})`);
         this.logger.debug(JSON.stringify(messages, null, 2));
-        messages.forEach((message) => this.emit('data', sender, message));
+        // TODO: firehose
+        messages.forEach((message) =>
+            this.emit(message.type, sender, message, this.peers.get(sender)),
+        );
     }
+
+    // emit(eventName: string, ...args: unknown[]): boolean {
+    //     this.logger.warn('emit', eventName, 'with args', ...args);
+    //     return super.emit(eventName, ...args);
+    // }
 
     private async messagesStatusHandler(status: string, messageIds: string[]) {
         this.logger.debug(`messagesStatusHandler "${status}" : ${messageIds}`);
-        this.emit('status', status, messageIds);
+        // TODO: use callbacks instead of event names (?)
+        // this.emit('status', status, messageIds);
     }
 
     // private async incomingMessageParser(
@@ -305,7 +314,7 @@ export class SmashMessaging extends EventEmitter {
         return peer.send(message);
     }
 
-    async getDID(): Promise<DIDDocument> {
+    async getDIDDocument(): Promise<DIDDocument> {
         return this.identity.getDID();
     }
 
@@ -326,9 +335,17 @@ export class SmashMessaging extends EventEmitter {
         };
     }
 
-    async updateMeta(meta: ProfileMeta) {
-        this.meta = meta;
+    async updateMeta(meta?: Partial<ProfileMeta>) {
+        this.meta = meta || {};
         await this.peers.updateUserProfile(this.getProfile());
+    }
+
+    // TODO: how to default T to IMProtoMessage type?
+    on<T extends IMProtoMessage>(
+        eventName: T['type'],
+        listener: (did: DIDString, message: T, peer?: SmashPeer) => void,
+    ): this {
+        return super.on(eventName, listener);
     }
 
     // TODO demo usage in test suite

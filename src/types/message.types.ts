@@ -2,7 +2,7 @@ export type ISO8601 =
     `${number}-${string}-${string}T${string}:${string}:${string}${string}${string}`;
 export type reverseDNS = `${string}.${string}.${string}`;
 export type sha256 = `${string & { length: 64 }}`;
-export type undefinedString = '' | '0' | undefined;
+export type undefinedString = '' | '0';
 
 /**
  * Base message interface

@@ -121,7 +121,7 @@ describe('[Message Delivery] Message delivery and acknowledgment', () => {
                         smePublicKey: SME_PUBLIC_KEY,
                     },
                 ]);
-                bob.did = await bob.messaging.getDID();
+                bob.did = await bob.messaging.getDIDDocument();
                 await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
                 await delay(TEST_CONFIG.MESSAGE_DELIVERY);
             });
@@ -235,7 +235,7 @@ describe('[Message Delivery] Message delivery and acknowledgment', () => {
                                 smePublicKey: SME_PUBLIC_KEY,
                             } as SMEConfigJSONWithoutDefaults,
                         ]);
-                        bob.did = await bob.messaging.getDID();
+                        bob.did = await bob.messaging.getDIDDocument();
                         await delay(2 * TEST_CONFIG.TEST_TIMEOUT_MS);
                         expect(bob.onData).toHaveBeenCalledWith(
                             alice?.did.id,
