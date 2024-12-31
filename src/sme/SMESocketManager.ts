@@ -3,12 +3,11 @@ import { SMESocketReadWrite } from '@src/sme/SMESocketReadWrite.js';
 import { SMESocketWriteOnly } from '@src/sme/SMESocketWriteOnly.js';
 import {
     EncapsulatedIMProtoMessage,
+    IECKeyPair,
     IMSessionEndpointMessage,
     IM_SESSION_ENDPOINT,
-    Identity,
-    SMEConfig,
+    SMEConfigJSONWithoutDefaults,
     SmashEndpoint,
-    onMessagesFn,
     onMessagesStatusFn,
 } from '@src/types/index.js';
 import { CryptoUtils, Logger } from '@src/utils/index.js';
@@ -17,9 +16,8 @@ export class SMESocketManager {
     private readonly smeSockets: Record<string, SMESocketWriteOnly>;
 
     constructor(
-        private readonly onMessagesCallback: onMessagesFn,
-        private readonly onMessagesStatusCallback: onMessagesStatusFn,
         private readonly logger: Logger,
+        private readonly onMessagesStatusCallback: onMessagesStatusFn,
     ) {
         this.smeSockets = {};
     }
@@ -28,9 +26,9 @@ export class SMESocketManager {
         if (!this.smeSockets[url]) {
             this.logger.debug(`Creating new SMESocketWriteOnly for ${url}`);
             this.smeSockets[url] = new SMESocketWriteOnly(
+                this.logger,
                 url,
                 this.onMessagesStatusCallback,
-                this.logger,
             );
         } else {
             this.logger.debug(`Reusing existing socket for ${url}`);
@@ -48,32 +46,34 @@ export class SMESocketManager {
      * @returns the configured endpoint
      */
     async initWithAuth(
-        identity: Identity,
-        smeConfig: SMEConfig,
+        url: string,
+        smeConfig: SMEConfigJSONWithoutDefaults,
+        signingKey: IECKeyPair,
+        preKeyPair: IECKeyPair,
         sessionManager: SessionManager,
     ): Promise<SmashEndpoint> {
         // let's create a new RW socket to hold the state of our new authd endpoint
         const smeSocket = new SMESocketReadWrite(
-            smeConfig.url,
-            sessionManager,
-            this.onMessagesCallback,
-            this.onMessagesStatusCallback,
             this.logger,
+            url,
+            this.onMessagesStatusCallback,
+            sessionManager,
         );
         // we attempt to initialize the socket with auth
         // in case of failure, this will throw an error
         const endpoint = await smeSocket.initSocketWithAuth(
-            identity,
+            signingKey,
+            preKeyPair,
             smeConfig,
         );
         // if no error has been thrown, we can safely store the new socket
-        // replacing the old one.
+        // replacing any potential existing one.
         const oldSocket = this.smeSockets[smeConfig.url];
         this.smeSockets[smeConfig.url] = smeSocket;
         await oldSocket?.close();
-        // and return the configured endpoint
+        // if no preferred endpoint has been set yet, set this one as preferred
+        // TODO dynamically select preferred based on metrics
         if (!this.cachedPEMessage) {
-            // TODO dynamically select preferred based on metrics
             this.logger.debug(
                 `Setting user's preferred endpoint to ${endpoint.url}`,
             );
@@ -83,6 +83,7 @@ export class SMESocketManager {
                     data: endpoint,
                 } as IMSessionEndpointMessage);
         }
+        // and return the configured endpoint
         return endpoint;
     }
 

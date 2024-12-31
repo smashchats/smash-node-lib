@@ -22,6 +22,14 @@ export interface IMTextMessage extends IMProtoMessage {
     data: string;
 }
 
+export class IMText implements IMTextMessage {
+    public type = IM_CHAT_TEXT as typeof IM_CHAT_TEXT;
+    constructor(
+        public data: string,
+        public after: sha256 | undefined = undefined,
+    ) {}
+}
+
 export interface IMProfile {
     version?: 1;
     // TODO: is it useful to have a DID here?

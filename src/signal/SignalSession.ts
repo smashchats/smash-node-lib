@@ -46,29 +46,37 @@ export class SignalSession {
             const bundle = new PreKeyBundleProtocol();
             bundle.registrationId = 0; // warning: using fixed value, unsure about usage!
 
+            const c = CryptoUtils.singleton;
+
             // IK
             bundle.identity.signingKey = await ECPublicKey.create(
-                await CryptoUtils.singleton.importKey(peerDidDocument.ik),
+                await c.importSigningPublicKey(peerDidDocument.ik),
             );
             // EK + signature
             bundle.identity.exchangeKey = await ECPublicKey.create(
-                await CryptoUtils.singleton.importKey(peerDidDocument.ek),
+                await c.importExchangePublicKey(peerDidDocument.ek),
             );
-            bundle.identity.signature = CryptoUtils.singleton.stringToBuffer(
+            bundle.identity.signature = c.stringToBuffer(
                 peerDidDocument.signature,
             );
             // PreKey + signature
             bundle.preKeySigned.id = 0; // warning: using fixed value, unsure about usage!
-            bundle.preKeySigned.key = await ECPublicKey.create(
-                await CryptoUtils.singleton.importKey(sme.preKey),
+
+            // TODO: more generic DID document parsing/manipulation
+            // Find more DID doc serviceendpoint examples
+            // Check if Bsky allow to edit DID doc with API?
+            // verif key, ek, pk + endpoint
+            const preKeyPublicKey = await ECPublicKey.create(
+                await c.importExchangePublicKey(sme.preKey),
             );
-            bundle.preKeySigned.signature =
-                CryptoUtils.singleton.stringToBuffer(sme.signature);
+
+            bundle.preKeySigned.key = preKeyPublicKey;
+            bundle.preKeySigned.signature = c.stringToBuffer(sme.signature);
 
             const protocol = await PreKeyBundleProtocol.importProto(bundle);
             const cipher = await AsymmetricRatchet.create(identity, protocol);
 
-            const sessionId = await CryptoUtils.singleton.keySha256(
+            const sessionId = await c.keySha256(
                 cipher.currentRatchetKey.publicKey.key,
             );
             const session = new SignalSession(

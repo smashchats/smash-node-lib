@@ -1,7 +1,7 @@
 import { SmashEndpoint } from '@src/types/index.js';
 
-export type DIDType = 'key' | 'web' | 'plc';
-export type DIDString = `did:${DIDType}:${string}`;
+export type DIDMethod = 'key' | 'web' | 'plc' | 'doc';
+export type DIDString = `did:${DIDMethod}:${string}`;
 export type DID = DIDString | DIDDocument;
 
 export interface DIDDocument {

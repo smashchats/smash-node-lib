@@ -1,5 +1,5 @@
+import { SmashMessaging } from '@src/SmashMessaging.js';
 import { IM_RESET_SESSION_MESSAGE } from '@src/const.js';
-import { DIDResolver } from '@src/did/index.js';
 import { SessionManager, SignalSession } from '@src/signal/index.js';
 import { SMESocketManager, SmashPeerEndpoint } from '@src/sme/index.js';
 import {
@@ -7,10 +7,7 @@ import {
     DIDDocument,
     DIDString,
     EncapsulatedIMProtoMessage,
-    IMProfile,
-    IMProfileMessage,
     IMProtoMessage,
-    IM_PROFILE,
     Relationship,
     SMASH_NBH_RELATIONSHIP,
     SmashEndpoint,
@@ -34,49 +31,17 @@ export class SmashPeer {
     private readonly mutex = new AsyncLock();
 
     constructor(
+        private readonly logger: Logger,
         private readonly did: DID,
         private readonly lastMessageTime: number,
-        public readonly sessionManager: SessionManager,
-        public readonly smeSocketManager: SMESocketManager,
-        public readonly logger: Logger,
+        private readonly sessionManager: SessionManager,
+        private readonly smeSocketManager: SMESocketManager,
     ) {
         this.id = typeof did === 'string' ? did : did.id;
     }
 
     getDID(): Promise<DIDDocument> {
-        return DIDResolver.resolve(this.did);
-    }
-
-    async sendUserProfile(profile: IMProfile) {
-        this.setUserProfile(profile);
-        this.logger.debug(`> sending user profile for ${this.id}`);
-        await this.queueAllEndpoints(
-            await this.getEncapsulatedProfileMessage(),
-        );
-        await this.flushQueue();
-    }
-
-    private cachedUserProfile: IMProfile | undefined;
-    setUserProfile(profile: IMProfile) {
-        this.cachedUserProfile = profile;
-        this.cachedEncapsulatedUserProfile = undefined;
-    }
-
-    private cachedEncapsulatedUserProfile:
-        | EncapsulatedIMProtoMessage
-        | undefined;
-    async getEncapsulatedProfileMessage(): Promise<EncapsulatedIMProtoMessage> {
-        if (!this.cachedUserProfile) {
-            throw new Error('User profile not set');
-        }
-        if (!this.cachedEncapsulatedUserProfile) {
-            this.cachedEncapsulatedUserProfile =
-                await CryptoUtils.singleton.encapsulateMessage({
-                    type: IM_PROFILE,
-                    data: this.cachedUserProfile,
-                } as IMProfileMessage);
-        }
-        return this.cachedEncapsulatedUserProfile;
+        return SmashMessaging.resolve(this.did);
     }
 
     // TODO allow loading relationship at lib initialization time
@@ -89,7 +54,7 @@ export class SmashPeer {
         }
         // ASSUMPTION#4: for now, we assume we only have one NAB to update
         const nab = nabs[0];
-        const updateNabMessage = await nab.sendMessage({
+        const updateNabMessage = await nab.send({
             type: SMASH_NBH_RELATIONSHIP,
             data: { target: this.id, action: relationship },
             after: this.lastRelationshipSha256,
@@ -120,7 +85,9 @@ export class SmashPeer {
             this.endpoints = did.endpoints.map(
                 (endpointConfig) =>
                     new SmashPeerEndpoint(
-                        this,
+                        this.logger,
+                        this.smeSocketManager,
+                        this.initNewSession.bind(this),
                         endpointConfig,
                         this.messageQueue,
                     ),
@@ -130,13 +97,61 @@ export class SmashPeer {
         });
     }
 
-    async sendMessage(
+    private async initNewSession(endpointConfig: SmashEndpoint) {
+        return this.sessionManager.initSession(
+            await this.getDID(),
+            endpointConfig,
+        );
+    }
+
+    async send(
+        message: IMProtoMessage | EncapsulatedIMProtoMessage,
+    ): Promise<EncapsulatedIMProtoMessage> {
+        const encapsulatedMessage =
+            'sha256' in message
+                ? (message as EncapsulatedIMProtoMessage)
+                : await this.encapsulateMessage(message);
+        await this.sendEncapsulatedMessage(encapsulatedMessage);
+        return encapsulatedMessage;
+    }
+
+    private async encapsulateMessage(
         message: IMProtoMessage,
     ): Promise<EncapsulatedIMProtoMessage> {
-        const sentMessage = await this.queueMessage(message);
-        this.logger.debug('> flushing ', JSON.stringify(sentMessage));
+        return CryptoUtils.singleton.encapsulateMessage(message);
+    }
+
+    private async sendEncapsulatedMessage(
+        encapsulatedMessage: EncapsulatedIMProtoMessage,
+    ) {
+        this.logger.debug('> sending ', JSON.stringify(encapsulatedMessage));
+        await this.queueMessage(encapsulatedMessage);
         await this.flushQueue();
-        return sentMessage;
+    }
+
+    async queueMessage(encapsulatedMessage: EncapsulatedIMProtoMessage) {
+        // mutex: wait dont queue and flush the same queues at the same time
+        return this.mutex.acquire(`flushQueue-${this.id}`, async () => {
+            await this.queueAllEndpoints(encapsulatedMessage);
+        });
+    }
+
+    // TODO: pick either P2P or all Endpoints
+    async flush() {
+        // mutex: wait for preferred endpoint to be set before flushing
+        return this.mutex.acquire(`preferredEndpoint-${this.id}`, async () => {
+            const session = this.sessionManager.getPreferredForPeerIk(
+                (await this.getDID()).ik,
+            );
+            if (session && this.preferredEndpoint) {
+                this.logger.debug(
+                    `> flushing current message queue (${this.messageQueue.size}) to preferred endpoint ${this.preferredEndpoint.config.url}`,
+                );
+                await this.preferredEndpoint.flush(session);
+            } else {
+                await this.flushAllEndpoints();
+            }
+        });
     }
 
     private async queueAllEndpoints(
@@ -153,18 +168,6 @@ export class SmashPeer {
         );
     }
 
-    private async queueMessage(
-        message: IMProtoMessage,
-    ): Promise<EncapsulatedIMProtoMessage> {
-        // mutex: wait dont queue and flush the same queues at the same time
-        return this.mutex.acquire(`flushQueue-${this.id}`, async () => {
-            const encapsulatedMessage =
-                await CryptoUtils.singleton.encapsulateMessage(message);
-            await this.queueAllEndpoints(encapsulatedMessage);
-            return encapsulatedMessage;
-        });
-    }
-
     async ack(messageIds: sha256[]) {
         // mutex: wait dont clear and flush the same queues at the same time
         return this.mutex.acquire(`flushQueue-${this.id}`, async () => {
@@ -178,7 +181,7 @@ export class SmashPeer {
     }
 
     private retryTimeout?: NodeJS.Timeout;
-    async flushQueue(
+    private async flushQueue(
         attempt: number = 0,
         delay: number = this.INITIAL_RETRY_DELAY_MS,
         recursiveCall: boolean = false,
@@ -247,30 +250,12 @@ export class SmashPeer {
             // TODO: if doesnt exist, create it
             this.preferredEndpoint = this.endpoints.find(
                 (e) =>
-                    e.endpointConfig.url === endpoint.url &&
-                    e.endpointConfig.preKey === endpoint.preKey,
+                    e.config.url === endpoint.url &&
+                    e.config.preKey === endpoint.preKey,
             );
             this.logger.debug(
-                `> setPreferredEndpoint for ${this.id} to ${this.preferredEndpoint?.endpointConfig.url}`,
+                `> setPreferredEndpoint for ${this.id} to ${this.preferredEndpoint?.config.url}`,
             );
-        });
-    }
-
-    // TODO: pick either P2P or all Endpoints
-    private flush(): Promise<void> {
-        // mutex: wait for preferred endpoint to be set before flushing
-        return this.mutex.acquire(`preferredEndpoint-${this.id}`, async () => {
-            const session = this.sessionManager.getPreferredForPeerIk(
-                (await this.getDID()).ik,
-            );
-            if (session && this.preferredEndpoint) {
-                this.logger.debug(
-                    `> flushing current message queue (${this.messageQueue.size}) to preferred endpoint ${this.preferredEndpoint.endpointConfig.url}`,
-                );
-                await this.preferredEndpoint.flush(session);
-            } else {
-                await this.flushAllEndpoints();
-            }
         });
     }
 
@@ -317,11 +302,14 @@ export class SmashPeer {
         );
     }
 
-    async triggerSessionResetByUser(): Promise<EncapsulatedIMProtoMessage> {
+    private async triggerSessionResetByUser() {
         this.logger.debug(`Triggering session reset for ${this.id}`);
         const deleteActiveSession = true;
         await this.resetSessions(deleteActiveSession);
-        return this.queueMessage(IM_RESET_SESSION_MESSAGE);
+        const encapsulatedMessage = await this.encapsulateMessage(
+            IM_RESET_SESSION_MESSAGE,
+        );
+        await this.queueMessage(encapsulatedMessage);
     }
 
     private readonly alreadyProcessedSessionReset: string[] = [];

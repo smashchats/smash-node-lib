@@ -11,9 +11,9 @@ export class SMESocketWriteOnly {
     protected socket?: Socket;
 
     constructor(
+        protected readonly logger: Logger,
         public readonly url: string,
         private readonly onMessagesStatusCallback: onMessagesStatusFn,
-        protected readonly logger: Logger,
     ) {}
 
     async close(TIMEOUT_MS = 3000): Promise<void> {
@@ -109,10 +109,10 @@ export class SMESocketWriteOnly {
                       }, TIMEOUT_MS)
                     : undefined;
             this.socket.emit('data', preKey, sessionId, buffer, () => {
-                this.onMessagesStatusCallback(messageIds, 'delivered');
                 if (typeof globalThis.clearTimeout !== 'undefined') {
                     globalThis.clearTimeout(timeout);
                 }
+                this.onMessagesStatusCallback('delivered', messageIds);
                 resolve();
             });
         });

@@ -1,46 +1,48 @@
-import { SessionManager, SignalSession } from '@src/signal/index.js';
+import { SME_DEFAULT_CONFIG } from '@src/const.js';
+import { SessionManager } from '@src/signal/index.js';
 import { SMESocketWriteOnly } from '@src/sme/SMESocketWriteOnly.js';
 import {
-    EncapsulatedIMProtoMessage,
-    Identity,
+    IECKeyPair,
     SMEConfig,
+    SMEConfigJSONWithoutDefaults,
     SmashEndpoint,
-    onMessagesFn,
     onMessagesStatusFn,
 } from '@src/types/index.js';
 import { CryptoUtils, Logger } from '@src/utils/index.js';
 
 export class SMESocketReadWrite extends SMESocketWriteOnly {
-    // TODO: limit DLQs size and number
-    private readonly dlq: Record<string, ArrayBuffer[]> = {};
-
     constructor(
-        url: string,
-        private readonly sessionManager: SessionManager,
-        private readonly onMessagesCallback: onMessagesFn,
-        onMessagesStatusCallback: onMessagesStatusFn,
         logger: Logger,
+        url: string,
+        onMessagesStatusCallback: onMessagesStatusFn,
+        private readonly sessionManager: SessionManager,
     ) {
-        super(url, onMessagesStatusCallback, logger);
+        super(logger, url, onMessagesStatusCallback);
     }
 
-    // TODO refactor
     public async initSocketWithAuth(
-        identity: Identity,
-        auth: SMEConfig,
+        signingKey: IECKeyPair,
+        preKeyPair: IECKeyPair,
+        smeConfig: SMEConfigJSONWithoutDefaults,
     ): Promise<SmashEndpoint> {
         this.logger.debug('SMESocketReadWrite::initSocketWithAuth');
+        const auth = {
+            ...SME_DEFAULT_CONFIG,
+            ...smeConfig,
+            preKeyPair,
+        } as SMEConfig;
         return new Promise<SmashEndpoint>((resolve, reject) => {
+            const preKeyPublicKey = auth.preKeyPair.publicKey;
             Promise.all([
-                CryptoUtils.singleton.exportKey(auth.preKeyPair.publicKey.key),
+                CryptoUtils.singleton.exportKey(preKeyPublicKey.key),
                 CryptoUtils.singleton.signAsString(
-                    identity.signingKey.privateKey,
+                    signingKey.privateKey,
                     auth.preKeyPair.publicKey.serialize(),
                 ),
-            ]).then(([preKey, signature]) => {
+            ]).then(([exportedPreKey, signature]) => {
                 // we initialize a new socket with given auth params
                 this.initSocket({
-                    key: preKey,
+                    key: exportedPreKey,
                     keyAlgorithm: auth.keyAlgorithm,
                 });
                 if (!this.socket) {
@@ -71,7 +73,7 @@ export class SMESocketReadWrite extends SMESocketWriteOnly {
                             this.logger.debug('> SME Challenge SOLVED');
                             resolve({
                                 url: auth.url,
-                                preKey,
+                                preKey: exportedPreKey,
                                 signature,
                             });
                         });
@@ -83,99 +85,13 @@ export class SMESocketReadWrite extends SMESocketWriteOnly {
                         reject(err);
                     }
                 });
-                this.socket.on('data', this.processMessages.bind(this));
+                this.socket.on(
+                    'data',
+                    (sessionId: string, data: ArrayBuffer) => {
+                        this.sessionManager.incomingData(sessionId, data);
+                    },
+                );
             });
         });
-    }
-
-    private async processMessages(sessionId: string, data: ArrayBuffer) {
-        this.logger.debug(
-            `SMESocketReadWrite::processMessages for session ${sessionId}`,
-        );
-        const session = this.sessionManager.getById(sessionId);
-        if (session) {
-            this.logger.info(`Incoming data for session ${sessionId}`);
-            const decryptedMessages = await session.decryptData(data);
-            this.sessionManager.setPreferred(session);
-            this.emitReceivedMessages(decryptedMessages, session.peerIk);
-            this.logger.info(`Incoming data for session ${sessionId}`);
-        } else {
-            await this.attemptNewSession(sessionId, data);
-        }
-    }
-
-    private async attemptNewSession(sessionId: string, data: ArrayBuffer) {
-        try {
-            const [parsedSession, firstMessages] =
-                await this.sessionManager.parseSession(sessionId, data);
-            this.logger.info(`New session ${sessionId}`);
-            this.sessionManager.setPreferred(parsedSession);
-            this.emitReceivedMessages(firstMessages, parsedSession.peerIk);
-            await this.processQueuedMessages(parsedSession);
-        } catch (err) {
-            if (
-                err instanceof Error &&
-                err.message.startsWith(
-                    'Cannot decode message for PreKeyMessage.',
-                )
-            ) {
-                this.logger.info(
-                    `Queuing data for session ${sessionId} (${err.message})`,
-                );
-                this.addToDlq(sessionId, data);
-            } else {
-                this.logger.warn(`Unprocessable data for session ${sessionId}`);
-                throw err;
-            }
-        }
-    }
-
-    private async processQueuedMessages(session: SignalSession) {
-        this.logger.debug(
-            `processQueuedMessages for ${session.id} (${this.dlq[session.id]?.length})`,
-        );
-        if (this.dlq[session.id]?.length) {
-            try {
-                const decryptedMessages = await Promise.all(
-                    this.dlq[session.id].map((message) =>
-                        session.decryptData(message),
-                    ),
-                );
-                delete this.dlq[session.id];
-                this.logger.debug(
-                    `> Cleared DLQ (${this.dlq[session.id]?.length})`,
-                );
-                this.logger.debug(`>> streams:= ${decryptedMessages.length}`);
-                for (const stream of decryptedMessages) {
-                    this.logger.debug(`>>> messages:= ${stream.length}`);
-                }
-                this.emitReceivedMessages(
-                    decryptedMessages.flat(),
-                    session.peerIk,
-                );
-            } catch {
-                this.logger.warn(
-                    `Cannot process queued messages for ${session.id}`,
-                );
-            }
-        }
-    }
-
-    private addToDlq(sessionId: string, data: ArrayBuffer) {
-        if (!this.dlq[sessionId]) {
-            this.dlq[sessionId] = [];
-        }
-        this.dlq[sessionId].push(data);
-        this.logger.debug(
-            `> Added message(s) to DLQ (${this.dlq[sessionId].length})`,
-        );
-    }
-
-    private emitReceivedMessages(
-        messages: EncapsulatedIMProtoMessage[],
-        peerIk: string,
-    ) {
-        this.logger.debug('SMESocketReadWrite::emitReceivedMessages');
-        this.onMessagesCallback(peerIk, messages);
     }
 }
