@@ -41,13 +41,13 @@ Tutorial = Covers entire product but HAPPY PATH ONLY
 - [x] generating a peer identity / DID
 - [x] exporting a peer identity / DID
 - [x] loading a peer identity into a SmashMessaging instance
-- [-] connecting to SME
-- [ ] sending a text message to a peer
+- [x] connecting to SME
+- [x] sending a text message to a peer
 - [ ] receiving a text message from a peer
 - [ ] handling message status updates
 - [ ] receiving a profile message from a peer
 - [ ] updating the peer's profile
-- [ ] clean peer shutdown
+- [x] clean peer shutdown
 - [ ] setting up a Neighborhood / NAB
 - [ ] joining the Neighborhood
 - [ ] discovering other peers in the neighborhood (NBH_PROFILES)
