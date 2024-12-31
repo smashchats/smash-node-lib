@@ -9,6 +9,8 @@ import {
     SmashChatJoinMessage,
 } from '@src/types/smashchats.lexicon.js';
 
+import { SMEConfigJSON } from './types/sme.types.js';
+
 export const EXPIRATION_TIME_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 export const IM_RESET_SESSION_MESSAGE = {
@@ -28,3 +30,9 @@ export const SMASH_NBH_DISCOVER_MESSAGE = {
     data: undefined,
     after: '0',
 } as SmashChatDiscoverMessage;
+
+export const SME_DEFAULT_CONFIG: Omit<SMEConfigJSON, 'url' | 'smePublicKey'> = {
+    keyAlgorithm: { name: 'ECDH', namedCurve: 'P-256' } as KeyAlgorithm,
+    encryptionAlgorithm: { name: 'AES-GCM', length: 256 },
+    challengeEncoding: 'base64' as const,
+};

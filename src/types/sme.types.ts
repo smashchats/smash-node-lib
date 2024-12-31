@@ -1,22 +1,26 @@
 import { IECKeyPair } from '@src/types/index.js';
 
-export interface SmashEndpoint {
+interface WithURL {
     url: string;
+}
+
+export interface SmashEndpoint extends WithURL {
     preKey: string;
     signature: string;
 }
 
-interface SMEConfigBase {
-    url: string;
+interface SMEConfigBase extends WithURL {
     smePublicKey: string;
+}
+
+export interface EncryptionAlgorithm {
+    name: string;
+    length: number;
 }
 
 export interface SMEConfigJSON extends SMEConfigBase {
     keyAlgorithm: KeyAlgorithm;
-    encryptionAlgorithm: {
-        name: string;
-        length: number;
-    };
+    encryptionAlgorithm: EncryptionAlgorithm;
     challengeEncoding: 'base64';
 }
 
@@ -25,13 +29,7 @@ export interface SMEConfig extends SMEConfigJSON {
 }
 
 export type SMEConfigJSONWithoutDefaults = Required<SMEConfigBase> &
-    Partial<SMEConfigJSON>;
+    Partial<Omit<SMEConfigJSON, keyof SMEConfigBase>>;
 
 export type SMEConfigWithoutDefaults = SMEConfigJSONWithoutDefaults &
-    Required<Pick<SMEConfig, 'preKeyPair'>>;
-
-export const SME_DEFAULT_CONFIG: Omit<SMEConfigJSON, 'url' | 'smePublicKey'> = {
-    keyAlgorithm: { name: 'ECDH', namedCurve: 'P-256' } as KeyAlgorithm,
-    encryptionAlgorithm: { name: 'AES-GCM', length: 256 },
-    challengeEncoding: 'base64' as const,
-};
+    Pick<SMEConfig, 'preKeyPair'>;

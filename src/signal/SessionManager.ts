@@ -1,3 +1,5 @@
+import { MessageMiddleware } from '@src/MessageMiddleware.js';
+import { DLQ } from '@src/signal/DLQ.js';
 import { SignalSession } from '@src/signal/SignalSession.js';
 import {
     DIDDocument,
@@ -8,15 +10,78 @@ import {
 import { Logger } from '@src/utils/index.js';
 
 export class SessionManager {
-    private sessions: SignalSession[] = [];
     // TODO handle dangling sessions
+    private sessions: SignalSession[] = [];
     private readonly sessionsByPeer: Record<string, SignalSession> = {};
     private readonly sessionsByID: Record<string, SignalSession> = {};
+    private readonly dlq: DLQ<string, ArrayBuffer> = new DLQ();
 
     constructor(
         private readonly identity: Identity,
         private readonly logger: Logger,
+        private readonly messageMiddleware: MessageMiddleware,
     ) {}
+
+    async incomingData(sessionId: string, data: ArrayBuffer) {
+        const session = this.getById(sessionId);
+        if (session) {
+            this.logger.info(`Incoming data for session ${sessionId}`);
+            const decryptedMessages = await session.decryptData(data);
+            this.setPreferred(session);
+            this.messageMiddleware.handle(session.peerIk, decryptedMessages);
+            this.logger.info(`Incoming data for session ${sessionId}`);
+        } else {
+            await this.attemptNewSession(sessionId, data);
+        }
+    }
+
+    private async attemptNewSession(sessionId: string, data: ArrayBuffer) {
+        try {
+            const [parsedSession, firstMessages] = await this.parseSession(
+                sessionId,
+                data,
+            );
+            this.logger.info(`New session ${sessionId}`);
+            this.setPreferred(parsedSession);
+            const dlqMessages = await this.processQueuedMessages(parsedSession);
+            const messages = [...firstMessages, ...dlqMessages];
+            const peerIk = parsedSession.peerIk;
+            this.messageMiddleware.handle(peerIk, messages);
+        } catch (err) {
+            if (
+                err instanceof Error &&
+                err.message.startsWith(
+                    'Cannot decode message for PreKeyMessage.',
+                )
+            ) {
+                this.logger.info(
+                    `Queuing data for session ${sessionId} (${err.message})`,
+                );
+                this.dlq.push(sessionId, data);
+            } else {
+                this.logger.warn(`Unprocessable data for session ${sessionId}`);
+                throw err;
+            }
+        }
+    }
+
+    private async processQueuedMessages(session: SignalSession) {
+        const dlqMessages = this.dlq.get(session.id);
+        this.logger.debug(
+            `processQueuedMessages for ${session.id} (${dlqMessages?.length})`,
+        );
+        if (!dlqMessages || !dlqMessages?.length) return [];
+        const decryptedMessages = (
+            await Promise.all(
+                dlqMessages.map((message) => session.decryptData(message)),
+            )
+        ).flat();
+        this.dlq.delete(session.id);
+        this.logger.debug(
+            `> Cleared DLQ (${decryptedMessages.length}/${dlqMessages.length})`,
+        );
+        return decryptedMessages;
+    }
 
     private getSessionAndClearIfExpired(
         session: SignalSession | undefined,
@@ -62,7 +127,7 @@ export class SessionManager {
         this.logger.debug(`Reset preferred session for ${peerIk}`);
     }
 
-    async parseSession(
+    private async parseSession(
         sessionId: string,
         data: ArrayBuffer,
     ): Promise<[SignalSession, EncapsulatedIMProtoMessage[]]> {

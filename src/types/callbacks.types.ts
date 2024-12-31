@@ -5,4 +5,4 @@ export type onMessagesFn = (
     messages: EncapsulatedIMProtoMessage[],
 ) => void;
 
-export type onMessagesStatusFn = (ids: string[], status: string) => void;
+export type onMessagesStatusFn = (status: string, ids: string[]) => void;

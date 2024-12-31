@@ -1,0 +1,71 @@
+- manual refactor while writing the happy path tutorial test suite (mainly splitting modules and restructuring code)
+
+- use AI to refactor file paths
+- use AI to extract more modules: more modular, decoupled, and loosely coupled
+
+- set everything private then resolve issues opening strict minimum as public APIs
+
+- use AI to refactor individual code files to be more readable, performant, maintainable, secure, efficient, etc
+- (?) use AI to generate unit .test files with mocks/spies for each module corresponding to the library API reference (**testing only publicly exported**)
+- use AI to refactor functional (.spec) tests files to be more readable, maintainable, comprehensive -> corresponding to the tutorial and how to
+  --> should have 100% functional coverage
+
+test suites combined should have 100% everywhere.
+
+- convert back and forth between tests and docs (GPT API?)
+- publish docs along with tests results and links to source code
+
+use respec for protocol specs repo
+
+DID resolvers / generators / managers, based on
+
+- with cache (use lib?)
+
+https://github.com/digitalbazaar/did-io
+https://www.npmjs.com/package/@digitalbazaar/did-method-key
+https://www.npmjs.com/package/did-resolver
+https://www.npmjs.com/package/@cef-ebsi/key-did-resolver
+
+for badges/endorsements?:
+https://www.npmjs.com/package/@cef-ebsi/verifiable-credential
+
+https://github.com/decentralized-identity/did-resolver
+
+---
+
+HAPPY PATH: refactoring from the public APIs PoV, exploring deep into the codebase
+(starting point is the public API, then refactoring the codebase to match)
+
+Tutorial = Covers entire product but HAPPY PATH ONLY
+
+- [x] generating a peer identity / DID
+- [x] exporting a peer identity / DID
+- [x] loading a peer identity into a SmashMessaging instance
+- [-] connecting to SME
+- [ ] sending a text message to a peer
+- [ ] receiving a text message from a peer
+- [ ] handling message status updates
+- [ ] receiving a profile message from a peer
+- [ ] updating the peer's profile
+- [ ] clean peer shutdown
+- [ ] setting up a Neighborhood / NAB
+- [ ] joining the Neighborhood
+- [ ] discovering other peers in the neighborhood (NBH_PROFILES)
+- [ ] smashing another user from the neighborhood
+- [ ] passing another user from the neighborhood
+- [ ] clearing another user from the neighborhood
+- [ ] blocking another peer
+- [ ] unblocking another peer
+
+retrieve the old TODO
+DIDcomm? https://identity.foundation/didcomm-messaging/spec/
+
+\_did DNS URI record
+eq to \_atproto TXT record
+https://www.ietf.org/archive/id/draft-mayrhofer-did-dns-05.txt
+
+--> write specs and get them accepted in IETF and/or W3C (referencing their own)
+
+Note: a DID is PII as per the GDPR.
+
+investigate JWE for the challenge

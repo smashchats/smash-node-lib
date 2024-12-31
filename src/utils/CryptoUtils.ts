@@ -1,4 +1,4 @@
-import { Curve } from '2key-ratchet';
+import { Curve, ECPublicKey } from '2key-ratchet';
 import {
     ENCODING,
     EncapsulatedIMProtoMessage,
@@ -10,8 +10,16 @@ import {
 import { Logger } from '@src/utils/Logger.js';
 import { Buffer } from 'buffer';
 
-const EXPORT = 'spki';
-const PK_ALG = { name: 'ECDH', namedCurve: 'P-256' };
+const ECDSA_ALG = {
+    name: 'ECDSA',
+    namedCurve: 'P-256',
+    hash: 'SHA-512',
+};
+
+const ECDH_ALG = {
+    name: 'ECDH',
+    namedCurve: 'P-256',
+};
 
 export class CryptoUtils {
     static setCryptoSubtle(subtle: globalThis.SubtleCrypto) {
@@ -50,15 +58,15 @@ export class CryptoUtils {
         return this.bufferToString(await this.sign(signingKey, message));
     }
 
-    async importKey(
+    private async importKey(
         keyEncoded: string,
-        keyAlgorithm: KeyAlgorithm = PK_ALG,
+        keyAlgorithm: KeyAlgorithm = ECDH_ALG,
         exportable: boolean = true,
         usages: KeyUsage[] = [],
         encoding: BufferEncoding = ENCODING,
     ): Promise<CryptoKey> {
         return await this.subtle.importKey(
-            EXPORT,
+            'spki',
             this.stringToBuffer(keyEncoded, encoding),
             keyAlgorithm,
             exportable,
@@ -66,12 +74,47 @@ export class CryptoUtils {
         );
     }
 
+    async importSigningPublicKey(
+        keyEncoded: string,
+        exportable: boolean = true,
+    ): Promise<CryptoKey> {
+        return this.importKey(keyEncoded, ECDSA_ALG, exportable, ['verify']);
+    }
+
+    async importSigningPrivateKey(
+        keyEncoded: string,
+        exportable: boolean = true,
+    ): Promise<CryptoKey> {
+        return this.importKey(keyEncoded, ECDSA_ALG, exportable, ['sign']);
+    }
+
+    async importExchangePublicKey(
+        keyEncoded: string,
+        exportable: boolean = true,
+    ): Promise<CryptoKey> {
+        return this.importKey(keyEncoded, ECDH_ALG, exportable, ['deriveBits']);
+    }
+
+    async importExchangePrivateKey(
+        keyEncoded: string,
+        exportable: boolean = true,
+    ): Promise<CryptoKey> {
+        return this.importKey(keyEncoded, ECDH_ALG, exportable, [
+            'deriveKey',
+            'deriveBits',
+        ]);
+    }
+
+    private async exportKeySPKI(key: CryptoKey): Promise<ArrayBuffer> {
+        return this.subtle.exportKey('spki', key);
+    }
+
     async exportKey(key: CryptoKey): Promise<string> {
-        return this.bufferToString(await this.subtle?.exportKey(EXPORT, key));
+        return this.bufferToString(await this.exportKeySPKI(key));
     }
 
     async keySha256(key: CryptoKey): Promise<sha256> {
-        return this.sha256(await this.subtle.exportKey(EXPORT, key));
+        return this.sha256(await this.exportKeySPKI(key));
     }
 
     async sha256fromObject(object: unknown): Promise<sha256> {
@@ -153,5 +196,41 @@ export class CryptoUtils {
             timestamp,
         });
         return { ...message, sha256, timestamp };
+    }
+
+    async verifyExportedKey(
+        exportedSigningKey: string,
+        exportedOwnedKey: string,
+        exportedSignature: string,
+    ): Promise<boolean> {
+        return this.verifyOwnedKey(
+            await ECPublicKey.create(
+                await this.importSigningPublicKey(exportedSigningKey),
+            ),
+            await ECPublicKey.create(
+                await this.importExchangePublicKey(exportedOwnedKey),
+            ),
+            this.stringToBuffer(exportedSignature),
+        );
+    }
+
+    async verifyOwnedKey(
+        signingKey: ECPublicKey,
+        ownedKey: ECPublicKey,
+        signature: ArrayBuffer,
+    ): Promise<boolean> {
+        return this.verifySignature(
+            signingKey,
+            ownedKey.serialize(),
+            signature,
+        );
+    }
+
+    private async verifySignature(
+        signingKey: ECPublicKey,
+        message: ArrayBuffer,
+        signature: ArrayBuffer,
+    ): Promise<boolean> {
+        return Curve.verify(signingKey, message, signature);
     }
 }
