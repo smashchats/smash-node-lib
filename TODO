@@ -1,21 +1,34 @@
+## Refactoring plan
+
+### BIG REFACTORING (with possible functional changes):
+
 - manual refactor while writing the happy path tutorial test suite (mainly splitting modules and restructuring code)
 
-- use AI to refactor file paths
+- use AI to refactor file paths / reorganise module file structure
 - use AI to extract more modules: more modular, decoupled, and loosely coupled
 
 - set everything private then resolve issues opening strict minimum as public APIs
 
+### CODE REFACTORING (with no functional changes):
+
 - use AI to refactor individual code files to be more readable, performant, maintainable, secure, efficient, etc
+
+### TESTS REFACTORING (keeping or increasing coverage):
+
 - (?) use AI to generate unit .test files with mocks/spies for each module corresponding to the library API reference (**testing only publicly exported**)
 - use AI to refactor functional (.spec) tests files to be more readable, maintainable, comprehensive -> corresponding to the tutorial and how to
   --> should have 100% functional coverage
 
 test suites combined should have 100% everywhere.
 
+### GENERATE DOCS FROM TESTS:
+
 - convert back and forth between tests and docs (GPT API?)
 - publish docs along with tests results and links to source code
 
-use respec for protocol specs repo
+use ReSpec for protocol specs repo
+
+## Random notes
 
 DID resolvers / generators / managers, based on
 
@@ -31,10 +44,10 @@ https://www.npmjs.com/package/@cef-ebsi/verifiable-credential
 
 https://github.com/decentralized-identity/did-resolver
 
----
+## HAPPY PATH
 
-HAPPY PATH: refactoring from the public APIs PoV, exploring deep into the codebase
-(starting point is the public API, then refactoring the codebase to match)
+> Refactoring from the public APIs PoV, exploring deep into the codebase
+> (starting point is the public API, then refactoring the codebase to match)
 
 Tutorial = Covers entire product but HAPPY PATH ONLY
 
@@ -57,6 +70,8 @@ Tutorial = Covers entire product but HAPPY PATH ONLY
 - [ ] clearing another user from the neighborhood
 - [ ] blocking another peer
 - [ ] unblocking another peer
+
+### TODO
 
 retrieve the old TODO
 DIDcomm? https://identity.foundation/didcomm-messaging/spec/
