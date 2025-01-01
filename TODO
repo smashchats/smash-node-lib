@@ -59,6 +59,7 @@ Tutorial = Covers entire product but HAPPY PATH ONLY
 - [x] receiving a text message from a peer
 - [x] handling message status updates
 - [x] FEAT: ack read messages
+- [x] firehose API
 - [ ] receiving a profile message from a peer
 - [ ] updating the peer's profile
 - [x] clean peer shutdown

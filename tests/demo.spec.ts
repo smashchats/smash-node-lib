@@ -320,7 +320,17 @@ describe('Welcome to using the Smashchats library!', () => {
             });
         });
 
-        // TODO: firehose
-        // TODO: status updates: delivered, received, read
+        test('3.4. Firehose', async () => {
+            // The SmashMessaging API provides a _firehose_ endpoint that
+            // allows to listen to all messages sent to the peer (including system messages).
+            const onData = jest.fn();
+            bob.on('data', onData);
+
+            await alice.send(bob.did, new IMText('Hello, Bob!'));
+            await delay(TEST_CONFIG.MESSAGE_DELIVERY * 3);
+
+            const expectedCalls = (1 + TEST_CONFIG.PROTOCOL_OVERHEAD_SIZE) * 2;
+            expect(onData).toHaveBeenCalledTimes(expectedCalls);
+        });
     });
 });

@@ -176,10 +176,10 @@ export class SmashMessaging extends EventEmitter {
         if (!messages?.length) return;
         this.logger.debug(`notifyNewMessages (${messages?.length})`);
         this.logger.debug(JSON.stringify(messages, null, 2));
-        // TODO: firehose
         messages.forEach((message) =>
             this.emit(message.type, sender, message, this.peers.get(sender)),
         );
+        messages.forEach((message) => this.emit('data', sender, message));
     }
 
     private registerAckHandlers() {
