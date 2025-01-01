@@ -1,4 +1,4 @@
-import { onMessagesStatusFn } from '@src/types/index.js';
+import { onMessagesStatusFn, sha256 } from '@src/types/index.js';
 import { Logger } from '@src/utils/index.js';
 import { type Socket, io } from 'socket.io-client';
 
@@ -81,7 +81,7 @@ export class SMESocketWriteOnly {
         preKey: string,
         sessionId: string,
         buffer: ArrayBuffer,
-        messageIds: string[],
+        messageIds: sha256[],
         TIMEOUT_MS: number = 3000,
     ): Promise<void> {
         return new Promise<void>((resolve, reject) => {

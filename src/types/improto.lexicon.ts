@@ -11,6 +11,7 @@ export const IM_CHAT_TEXT = 'org.improto.chat.text';
 export const IM_PROFILE = 'org.improto.profile';
 export const IM_SESSION_RESET = 'org.improto.session.reset';
 export const IM_ACK_RECEIVED = 'org.improto.ack.received';
+export const IM_ACK_READ = 'org.improto.ack.read';
 export const IM_SESSION_ENDPOINT = 'org.improto.session.endpoint';
 
 /**
@@ -70,15 +71,28 @@ export interface IMSessionEndpointMessage extends IMProtoMessage {
     data: SmashEndpoint;
 }
 
+interface IMACKMessage extends BaseIMProtoMessage {
+    type: typeof IM_ACK_RECEIVED | typeof IM_ACK_READ;
+    data: sha256[];
+    after: '';
+}
+
 /**
  * Received ACK message
  *
  * Used to acknowledge the receipt of a message.
  */
-export interface IMReceivedACKMessage extends BaseIMProtoMessage {
+export interface IMReceivedACKMessage extends IMACKMessage {
     type: typeof IM_ACK_RECEIVED;
-    data: sha256[];
-    after: '';
 }
 
-export type MessageStatus = '' | 'delivered' | 'received';
+export type MessageStatus = 'delivered' | 'received' | 'read';
+
+/**
+ * Read ACK message
+ *
+ * Used to acknowledge the reading of a message.
+ */
+export interface IMReadACKMessage extends IMACKMessage {
+    type: typeof IM_ACK_READ;
+}

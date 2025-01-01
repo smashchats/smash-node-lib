@@ -5,11 +5,9 @@ import {
     CryptoUtils,
     DIDDocManager,
     DIDDocument,
-    EncapsulatedIMProtoMessage,
     IMPeerIdentity,
     IMProtoMessage,
     IMText,
-    IMTextMessage,
     IM_CHAT_TEXT,
     Logger,
     SmashEndpoint,
@@ -231,6 +229,9 @@ describe('Welcome to using the Smashchats library!', () => {
                     },
                     preKeyPair,
                 );
+                // We're simulating DID document propagation by setting the
+                // DID document in the DIDDocManager.
+                didDocumentManager.set(await messaging.getDIDDocument());
                 return messaging;
             };
             [bob, alice] = await Promise.all([
@@ -240,6 +241,7 @@ describe('Welcome to using the Smashchats library!', () => {
         });
 
         afterEach(async () => {
+            await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
             await Promise.allSettled([bob.close(), alice.close()]);
         });
 
@@ -253,13 +255,12 @@ describe('Welcome to using the Smashchats library!', () => {
         });
 
         test('3.2. Receiving a text message from a peer', async () => {
-            const bobDID = await bob.getDIDDocument();
-
             const onBobMessage = jest.fn();
-            bob.on<IMTextMessage>('org.improto.chat.text', onBobMessage);
+            // NOTE: better to use the exported IM_CHAT_TEXT constant rather than hardcoded 'org.improto.chat.text'
+            bob.on(IM_CHAT_TEXT, onBobMessage);
 
             const bobReceivedMessage = waitFor(bob, IM_CHAT_TEXT);
-            const sent = await alice.send(bobDID, new IMText('Hello, Bob!'));
+            const sent = await alice.send(bob.did, new IMText('Hello, Bob!'));
             await bobReceivedMessage;
 
             expect(onBobMessage).toHaveBeenCalledWith(
@@ -274,6 +275,49 @@ describe('Welcome to using the Smashchats library!', () => {
                 expect.any(SmashPeer),
             );
             expect(onBobMessage).toHaveBeenCalledTimes(1);
+        });
+
+        describe('3.3 Status updates', () => {
+            const sendMessage = async (
+                from: SmashMessaging,
+                to: SmashMessaging,
+            ) => {
+                const did = await to.getDIDDocument();
+                const received = waitFor(to, IM_CHAT_TEXT);
+                const sent = await from.send(did, new IMText('hello world'));
+                await received;
+                return sent;
+            };
+
+            test('3.3.1 Message delivered', async () => {
+                const onStatus = jest.fn();
+                bob.on('status', onStatus);
+                const sent = await sendMessage(bob, alice);
+                expect(onStatus).toHaveBeenCalledWith('delivered', [
+                    sent.sha256,
+                ]);
+            });
+
+            test('3.3.2 Message received', async () => {
+                const onStatus = jest.fn();
+                bob.on('status', onStatus);
+                const sent = await sendMessage(bob, alice);
+                await delay(TEST_CONFIG.MESSAGE_DELIVERY);
+                expect(onStatus).toHaveBeenCalledWith('received', [
+                    sent.sha256,
+                ]);
+            });
+
+            test('3.3.3 Message read', async () => {
+                const bobAck = jest.fn();
+                bob.on('status', bobAck);
+                const sent = await sendMessage(bob, alice);
+                await delay(TEST_CONFIG.MESSAGE_DELIVERY);
+                expect(bobAck).not.toHaveBeenCalledWith('read', [sent.sha256]);
+                await alice.ackMessagesRead(bob.did, [sent.sha256]);
+                await delay(TEST_CONFIG.MESSAGE_DELIVERY);
+                expect(bobAck).toHaveBeenCalledWith('read', [sent.sha256]);
+            });
         });
 
         // TODO: firehose

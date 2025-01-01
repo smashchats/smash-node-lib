@@ -7,14 +7,20 @@ import { CryptoManager } from '@src/crypto/utils/CryptoManager.js';
 import { DIDManager } from '@src/did/DIDManager.js';
 import { SessionManager } from '@src/signal/SessionManager.js';
 import { SMESocketManager } from '@src/sme/SMESocketManager.js';
-import type {
-    DID,
-    DIDDocument,
-    DIDMethod,
-    DIDString,
-    EncapsulatedIMProtoMessage,
-    IMProfile,
-    IMProtoMessage,
+import { EventArgs } from '@src/types/events.js';
+import {
+    type DID,
+    type DIDDocument,
+    type DIDMethod,
+    type DIDString,
+    type EncapsulatedIMProtoMessage,
+    type IMProfile,
+    type IMProtoMessage,
+    IMReadACKMessage,
+    IM_ACK_READ,
+    IM_ACK_RECEIVED,
+    type MessageStatus,
+    type sha256,
 } from '@src/types/index.js';
 import type { LogLevel } from '@src/utils/index.js';
 import { Logger } from '@src/utils/index.js';
@@ -97,28 +103,7 @@ export class SmashMessaging extends EventEmitter {
             this.smeSocketManager,
             this.sessionManager,
         );
-        // this.superRegister(IM_PROFILE, new DataForwardingResolver(IM_PROFILE));
-        // this.superRegister(
-        //     IM_SESSION_RESET,
-        //     new SessionResetHandler(IM_SESSION_RESET),
-        // );
-        // this.superRegister(
-        //     IM_SESSION_ENDPOINT,
-        //     new PreferredEndpointHandler(IM_SESSION_ENDPOINT),
-        // );
-        // this.superRegister(
-        //     IM_ACK_RECEIVED,
-        //     new DataForwardingResolver(IM_ACK_RECEIVED),
-        // );
-        // this.on(IM_ACK_RECEIVED, (from: DIDString, messageIds: sha256[]) => {
-        //     this.logger.debug(`>> Received ACK for ${messageIds} from ${from}`);
-        //     this.emit('status', 'received', messageIds);
-        //     this.peers[from]?.ack(messageIds).then(() => {
-        //         this.logger.debug(
-        //             `> cleared ${messageIds} from sending queues`,
-        //         );
-        //     });
-        // });
+        this.registerAckHandlers();
         this.logger.info(
             `Loaded Smash lib (log level: ${LOG_LEVEL}, id: ${LOG_ID})`,
         );
@@ -169,17 +154,17 @@ export class SmashMessaging extends EventEmitter {
         }
     }
 
-    // // async initChats(chats: SmashChat[]) {
-    // //     return Promise.all(
-    // //         chats.map(async (chat) => {
-    // //             const peerDid = await DIDResolver.resolve(chat.with);
-    // //             this.peers[peerDid.id] = await this.getOrCreatePeer(
-    // //                 peerDid,
-    // //                 chat.lastMessageTimestamp,
-    // //             );
-    // //         }),
-    // //     );
-    // // }
+    // async initChats(chats: SmashChat[]) {
+    //     return Promise.all(
+    //         chats.map(async (chat) => {
+    //             const peerDid = await DIDResolver.resolve(chat.with);
+    //             this.peers[peerDid.id] = await this.getOrCreatePeer(
+    //                 peerDid,
+    //                 chat.lastMessageTimestamp,
+    //             );
+    //         }),
+    //     );
+    // }
 
     /**
      * Firehose incoming events to the library user
@@ -197,117 +182,45 @@ export class SmashMessaging extends EventEmitter {
         );
     }
 
-    // emit(eventName: string, ...args: unknown[]): boolean {
-    //     this.logger.warn('emit', eventName, 'with args', ...args);
-    //     return super.emit(eventName, ...args);
-    // }
+    private registerAckHandlers() {
+        const handleAck = (
+            status: MessageStatus,
+            from: DIDString,
+            messageIds: sha256[],
+        ) => {
+            this.messagesStatusHandler(status, messageIds);
+            this.peers
+                .get(from)
+                ?.ack(messageIds)
+                .then(() => {
+                    this.logger.debug(
+                        `> cleared ${messageIds} from sending queues`,
+                    );
+                });
+        };
 
-    private async messagesStatusHandler(status: string, messageIds: string[]) {
-        this.logger.debug(`messagesStatusHandler "${status}" : ${messageIds}`);
-        // TODO: use callbacks instead of event names (?)
-        // this.emit('status', status, messageIds);
+        this.on(IM_ACK_RECEIVED, (from, message) => {
+            handleAck('received', from, message.data);
+        });
+
+        this.on(IM_ACK_READ, (from, message) => {
+            handleAck('read', from, message.data);
+        });
     }
 
-    // private async incomingMessageParser(
-    //     peer: SmashPeer,
-    //     message: EncapsulatedIMProtoMessage,
-    // ) {
-    //     const handlers = this.messageHandlers.get(message.type);
-    //     if (!handlers?.length) return;
-    //     await Promise.allSettled(
-    //         handlers.map(({ eventName, resolver }) =>
-    //             resolver
-    //                 .resolve(peer, message)
-    //                 .then((result) =>
-    //                     this.emit(
-    //                         eventName,
-    //                         peer.id,
-    //                         result,
-    //                         message.sha256,
-    //                         message.timestamp,
-    //                     ),
-    //                 ),
-    //         ),
-    //     );
-    // }
+    private messagesStatusHandler(status: MessageStatus, messageIds: sha256[]) {
+        this.logger.debug(
+            `messagesStatusHandler ACK:${status} : ${messageIds.join(', ')}`,
+        );
+        this.emit('status', status, messageIds);
+    }
 
-    // private async incomingMessagesParser(
-    //     peer: SmashPeer,
-    //     messages: EncapsulatedIMProtoMessage[],
-    // ) {
-    //     await Promise.allSettled(
-    //         messages.map((message) =>
-    //             this.incomingMessageParser(peer, message),
-    //         ),
-    //     );
-    // }
-
-    // private readonly messageHandlers: Map<
-    //     string,
-    //     {
-    //         eventName: string;
-    //         resolver: BaseResolver<IMProtoMessage, unknown>;
-    //     }[]
-    // > = new Map();
-
-    // /**
-    //  * Register a resolver for a specific message type
-    //  * @param eventName Event name triggered by the library
-    //  * @param resolver Resolver instance that extends BaseResolver
-    //  * @typeparam T Type of messages to resolve
-    //  */
-    // public register(
-    //     eventName: `data.${string}`,
-    //     resolver: BaseResolver<IMProtoMessage, unknown>,
-    // ): void {
-    //     this.superRegister(eventName, resolver);
-    // }
-    // protected superRegister(
-    //     eventName: string,
-    //     resolver: BaseResolver<IMProtoMessage, unknown>,
-    // ): void {
-    //     const messageType = resolver.getMessageType();
-    //     if (!this.messageHandlers.has(messageType)) {
-    //         this.messageHandlers.set(messageType, []);
-    //     }
-    //     this.messageHandlers.get(messageType)!.push({ eventName, resolver });
-    // }
-
-    // /**
-    //  * Unregister a specific resolver for a message type
-    //  * @param eventName Event name to unregister
-    //  * @param resolver Resolver instance to unregister
-    //  */
-    // public unregister(
-    //     eventName: string,
-    //     resolver: BaseResolver<IMProtoMessage, unknown>,
-    // ): void {
-    //     const messageType = resolver.getMessageType();
-    //     const handlers = this.messageHandlers.get(messageType);
-    //     if (!handlers) return;
-    //     const filteredHandlers = handlers.filter(
-    //         (handler) =>
-    //             handler.eventName !== eventName ||
-    //             handler.resolver !== resolver,
-    //     );
-    //     if (filteredHandlers.length === 0) {
-    //         this.messageHandlers.delete(messageType);
-    //     } else {
-    //         this.messageHandlers.set(messageType, filteredHandlers);
-    //     }
-    // }
-
-    // sendTextMessage(
-    //     peerDid: DID,
-    //     text: string,
-    //     after: string,
-    // ): Promise<EncapsulatedIMProtoMessage> {
-    //     return this.sendMessage(peerDid, {
-    //         type: IM_CHAT_TEXT,
-    //         data: text,
-    //         after,
-    //     } as IMTextMessage);
-    // }
+    public async ackMessagesRead(did: DID, messageIds: sha256[]) {
+        return this.send(did, {
+            type: IM_ACK_READ,
+            data: messageIds,
+        } as IMReadACKMessage);
+    }
 
     async send(peerDid: DID, message: IMProtoMessage) {
         const peer = await this.peers.getOrCreate(peerDid);
@@ -340,12 +253,15 @@ export class SmashMessaging extends EventEmitter {
         await this.peers.updateUserProfile(this.getProfile());
     }
 
-    // TODO: how to default T to IMProtoMessage type?
-    on<T extends IMProtoMessage>(
-        eventName: T['type'],
-        listener: (did: DIDString, message: T, peer?: SmashPeer) => void,
+    on<T extends string>(
+        eventName: T,
+        listener: (...args: EventArgs<T>) => void,
     ): this {
         return super.on(eventName, listener);
+    }
+
+    emit<T extends string>(eventName: T, ...args: EventArgs<T>): boolean {
+        return super.emit(eventName, ...args);
     }
 
     // TODO demo usage in test suite
