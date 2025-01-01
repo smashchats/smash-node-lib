@@ -75,6 +75,8 @@ export class PeerRegistry extends Map<DIDString, SmashPeer> {
             await CryptoUtils.singleton.encapsulateMessage({
                 type: IM_PROFILE,
                 data: profile,
+                // TODO: profile differential updates (no need to send profile if already propagated)
+                after: '',
             } as IMProfileMessage);
     }
 }

@@ -3,6 +3,7 @@
 ### BIG REFACTORING (with possible functional changes):
 
 - manual refactor while writing the happy path tutorial test suite (mainly splitting modules and restructuring code)
+- make previous tests pass
 
 - use AI to refactor file paths / reorganise module file structure
 - use AI to extract more modules: more modular, decoupled, and loosely coupled
@@ -60,8 +61,8 @@ Tutorial = Covers entire product but HAPPY PATH ONLY
 - [x] handling message status updates
 - [x] FEAT: ack read messages
 - [x] firehose API
-- [ ] receiving a profile message from a peer
-- [ ] updating the peer's profile
+- [x] receiving a profile message from a peer
+- [x] updating the peer's profile
 - [x] clean peer shutdown
 - [ ] setting up a Neighborhood / NAB
 - [ ] joining the Neighborhood

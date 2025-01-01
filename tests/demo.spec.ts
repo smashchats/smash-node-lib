@@ -6,9 +6,11 @@ import {
     DIDDocManager,
     DIDDocument,
     IMPeerIdentity,
+    IMProfileMessage,
     IMProtoMessage,
     IMText,
     IM_CHAT_TEXT,
+    IM_PROFILE,
     Logger,
     SmashEndpoint,
     SmashMessaging,
@@ -270,7 +272,7 @@ describe('Welcome to using the Smashchats library!', () => {
                     data: sent.data,
                     sha256: sent.sha256,
                     timestamp: sent.timestamp,
-                    after: '',
+                    after: expect.any(String),
                 }),
                 expect.any(SmashPeer),
             );
@@ -302,7 +304,7 @@ describe('Welcome to using the Smashchats library!', () => {
                 const onStatus = jest.fn();
                 bob.on('status', onStatus);
                 const sent = await sendMessage(bob, alice);
-                await delay(TEST_CONFIG.MESSAGE_DELIVERY);
+                await delay(TEST_CONFIG.MESSAGE_DELIVERY * 2);
                 expect(onStatus).toHaveBeenCalledWith('received', [
                     sent.sha256,
                 ]);
@@ -331,6 +333,92 @@ describe('Welcome to using the Smashchats library!', () => {
 
             const expectedCalls = (1 + TEST_CONFIG.PROTOCOL_OVERHEAD_SIZE) * 2;
             expect(onData).toHaveBeenCalledTimes(expectedCalls);
+        });
+    });
+
+    describe('4. Exchanging peer profiles', () => {
+        let bob: SmashMessaging;
+        let alice: SmashMessaging;
+
+        beforeEach(async () => {
+            const initPeer = async (name: string) => {
+                const identity = (await didDocumentManager.generate())[1];
+                const messaging = new SmashUser(identity, name, 'DEBUG');
+                await messaging.updateMeta({ title: name });
+                const preKeyPair = await identity.generateNewPreKeyPair();
+                // TODO: use reset (automatically, through provided identity & did doc) instead
+                await messaging.endpoints.connect(
+                    {
+                        url: socketServerUrl,
+                        smePublicKey: SME_PUBLIC_KEY,
+                    },
+                    preKeyPair,
+                );
+                // We're simulating DID document propagation by setting the
+                // DID document in the DIDDocManager.
+                didDocumentManager.set(await messaging.getDIDDocument());
+                return messaging;
+            };
+            [bob, alice] = await Promise.all([
+                initPeer('bob'),
+                initPeer('alice'),
+            ]);
+        });
+
+        afterEach(async () => {
+            await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
+            await Promise.allSettled([bob.close(), alice.close()]);
+        });
+
+        test('4.1. Upon meeting a new peer, their profile should be shared', async () => {
+            const onProfile = jest.fn();
+            bob.on(IM_PROFILE, onProfile);
+            await bob.send(alice.did, new IMText('hello'));
+            await delay(TEST_CONFIG.MESSAGE_DELIVERY * 2);
+            expect(onProfile).toHaveBeenCalledWith(
+                alice.did,
+                expect.objectContaining<IMProfileMessage>({
+                    type: 'org.improto.profile',
+                    data: {
+                        did: alice.did,
+                        title: 'alice',
+                        description: '',
+                        avatar: '',
+                    },
+                    after: expect.any(String),
+                    sha256: expect.any(String),
+                    timestamp: expect.any(String),
+                }),
+                expect.any(SmashPeer),
+            );
+        });
+
+        test('4.2. Upon updating profile information, it should be shared with known peers', async () => {
+            const onProfile = jest.fn();
+            bob.on(IM_PROFILE, onProfile);
+            // send a message first to make bob and alice become known to each other
+            await bob.send(alice.did, new IMText('hello'));
+            await delay(TEST_CONFIG.MESSAGE_DELIVERY);
+            // then, when alice updates her profile
+            await alice.updateMeta({ title: 'alice2' });
+            await delay(TEST_CONFIG.MESSAGE_DELIVERY);
+            // bob should receive the updated profile
+            expect(onProfile).toHaveBeenCalledWith(
+                alice.did,
+                expect.objectContaining<IMProfileMessage>({
+                    type: 'org.improto.profile',
+                    data: {
+                        did: alice.did,
+                        title: 'alice2',
+                        description: '',
+                        avatar: '',
+                    },
+                    after: expect.any(String),
+                    sha256: expect.any(String),
+                    timestamp: expect.any(String),
+                }),
+                expect.any(SmashPeer),
+            );
         });
     });
 });
