@@ -235,7 +235,7 @@ export class SmashMessaging extends EventEmitter {
         return this.identity.did;
     }
 
-    getProfile(): IMProfile {
+    get profile(): IMProfile {
         return {
             ...{
                 title: '',
@@ -249,7 +249,7 @@ export class SmashMessaging extends EventEmitter {
 
     async updateMeta(meta?: Partial<ProfileMeta>) {
         this.meta = meta || {};
-        await this.peers.updateUserProfile(this.getProfile());
+        await this.peers.updateUserProfile(this.profile);
     }
 
     on<T extends string>(

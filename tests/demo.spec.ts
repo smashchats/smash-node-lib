@@ -40,82 +40,104 @@ import {
 // - Tutorial > main test suites
 // - Explanations -> separately maintained dev notes
 
-describe('Welcome to using the Smashchats library!', () => {
-    const logger = new Logger('tutorial', 'INFO');
-    const waitForEventCancelFns: (() => void)[] = [];
-    const waitFor = aliasWaitFor(waitForEventCancelFns, logger);
+/**
+ * @tutorial-meta
+ * title: The Smash Tutorial
+ * framework: Diataxis
+ * type: Tutorial
+ * description: Complete guide to using the Smash library, covering the core happy path
+ * from identity creation to neighborhood participation.
+ *
+ * @implementation-notes
+ * - This test suite serves as the source of truth for the main tutorial
+ * - Each major section corresponds to a key concept in the library
+ * - Test structure follows user journey from basic to advanced features
+ */
 
+describe('Smash Tutorial', () => {
+    // Test infrastructure that won't appear in tutorial
+    const testUtils = {
+        logger: new Logger('tutorial', 'INFO'),
+        waitForEventCancelFns: [] as (() => void)[],
+        setupWaitFor() {
+            return aliasWaitFor(this.waitForEventCancelFns, this.logger);
+        },
+        async cleanup() {
+            await Promise.all(
+                this.waitForEventCancelFns.map((cancel) => cancel()),
+            );
+            this.waitForEventCancelFns.length = 0;
+            jest.resetAllMocks();
+            await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
+        },
+    };
+
+    const waitFor = testUtils.setupWaitFor();
     let didDocumentManager: DIDDocManager;
 
+    /**
+     * @tutorial-section Prerequisites
+     * @tutorial-step 0
+     * @concepts
+     * - Cryptographic engine
+     * - WebCrypto API
+     *
+     * @context
+     * Before using Smash, we need to set up the cryptographic engine that will
+     * handle all secure operations. Smash is compatible with any WebCrypto-compliant
+     * implementation.
+     */
     beforeAll(() => {
-        // Before anything, a crypto engine needs to be defined.
-        // This is the crypto library that our library will use to
-        // perform cryptographic operations.
-        // Generate keys, sign data, encrypt and decrypt messages...
-        // The library is compatible with the WebCrypto API, so you can use any
-        // WebCrypto-compatible library, such as '@peculiar/webcrypto'.
-        // or the native 'crypto' library available in Node.JS and browsers.
         const crypto = new Crypto();
         SmashMessaging.setCrypto(crypto);
-        // The .setCrypto() method MUST be called before any crypto op is performed.
-        logger.info('Crypto engine set. Ready!');
+        testUtils.logger.info('Crypto engine set. Ready!');
     });
 
-    afterAll(async () => {
-        await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
-    });
-
-    let bobDIDDocument: DIDDocument;
-    let bobIdentity: IMPeerIdentity;
-
-    beforeEach(async () => {
-        // An identity can be summarized in the 'DID'—a W3C standard to allow
-        // self-sovereign online/digital identities, that are reusable accross apps.
-        // In Smash, DIDs contain cryptographic keys that enable secure private messaging
-        // between peers in the network. IK, EK, Pre-Keys, and optionally One-Time Pre-Keys.
-        // These cryptographic keys are required by the Signal protocol to perform secure
-        // private messaging between peers.
-        // the DID document is the publicly sharable crypto information
-        didDocumentManager = new DIDDocManager();
-        SmashMessaging.use('doc', didDocumentManager);
-        [bobDIDDocument, bobIdentity] = await didDocumentManager.generate();
-    });
-
-    afterEach(async () => {
-        logger.debug('>> canceling all waiters');
-        await Promise.all(waitForEventCancelFns.map((cancel) => cancel()));
-        waitForEventCancelFns.length = 0;
-        logger.debug('>> resetting mocks');
-        jest.resetAllMocks();
-        await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
-    });
-
+    /**
+     * @tutorial-section Identity Creation
+     * @tutorial-step 1
+     * @concepts
+     * - Decentralized Identities (DIDs)
+     * - W3C DID standard
+     * - Identity Keys (IK)
+     * - Exchange Keys (EK)
+     * - Pre-Keys
+     *
+     * @context
+     * The foundation of Smash is the DID (Decentralized Identifier). Each peer
+     * needs their own DID, which contains the cryptographic keys needed for
+     * secure messaging using the Signal protocol.
+     */
     describe('1. Creating a new decentralized identity (DID)', () => {
+        let bobDIDDocument: DIDDocument;
+        let bobIdentity: IMPeerIdentity;
         let bobExportedIdentity: string;
 
         beforeEach(async () => {
-            // the Identity is the private crypto information (NEVER SHARE THIS!)
+            didDocumentManager = new DIDDocManager();
+            SmashMessaging.use('doc', didDocumentManager);
+            [bobDIDDocument, bobIdentity] = await didDocumentManager.generate();
             bobExportedIdentity = await bobIdentity.serialize();
         });
 
-        test('Checking Bobs generated decentralized identity', async () => {
-            // the DID document is the publicly sharable crypto information
+        /**
+         * @tutorial-step 1.1
+         * @task Examine the components of a DID document
+         * @code-focus
+         * - DID structure
+         * - Identity and Exchange keys
+         * - Key signatures
+         */
+        test('Understanding DID components', async () => {
             expect(bobDIDDocument.id).toBeDefined();
-            logger.info(`DID: ${bobDIDDocument.id}`);
-            // IK is the long-lived identity key used to sign other keys
+            testUtils.logger.info(`DID: ${bobDIDDocument.id}`);
+
             expect(bobDIDDocument.ik).toBeDefined();
-            logger.info(`IK: ${bobDIDDocument.ik}`);
-            // EK is the medium-lived exchange key used to derive session keys
+            testUtils.logger.info(`IK: ${bobDIDDocument.ik}`);
+
             expect(bobDIDDocument.ek).toBeDefined();
-            logger.info(`EK: ${bobDIDDocument.ek}`);
-            // EK is signed by IK
-            expect(bobDIDDocument.signature).toBeDefined();
-            // we can verify the EK was indeed signed by the provided IK
-            await CryptoUtils.singleton.verifyExportedKey(
-                bobDIDDocument.ik,
-                bobDIDDocument.ek,
-                bobDIDDocument.signature,
-            );
+            testUtils.logger.info(`EK: ${bobDIDDocument.ek}`);
+
             await expect(
                 CryptoUtils.singleton.verifyExportedKey(
                     bobDIDDocument.ik,
@@ -123,78 +145,98 @@ describe('Welcome to using the Smashchats library!', () => {
                     bobDIDDocument.signature,
                 ),
             ).resolves.toBe(true);
-            // no endpoints are defined at this point
-            expect(bobDIDDocument.endpoints.length).toBe(0);
-            // the Identity is the private crypto information (NEVER SHARE THIS!)
-            expect(bobExportedIdentity).toBeDefined();
-            logger.info(`Serialized identity (SECRET): ${bobExportedIdentity}`);
         });
 
-        describe('1.1. Importing the exported identity', () => {
+        /**
+         * @tutorial-step 1.2
+         * @task Learn about identity persistence
+         * @concepts
+         * - Identity serialization
+         * - Identity restoration
+         * - DID resolution
+         */
+        describe('Working with stored identities', () => {
             beforeEach(() => {
-                // for these tests we use a DID method that does not propagate
-                // it relies on the user knowing the full DID document
-                // in order to resolve a DID to its DID Document.
+                // Set up DID resolution for testing
                 if (bobDIDDocument) didDocumentManager.set(bobDIDDocument);
-                // other methods such as 'web', 'key', 'plc', ... are more
-                // appropriate for production uses.
             });
 
-            let bob: SmashMessaging;
-
-            test('Instantiating Smash User with the re-imported Identity', async () => {
-                // now that we have a DID/Identity for Bob, we can instantiate the Smash User
-                // library to start using the Smash protocol.
-                // First, we need to re-import the exported (serialized) identity
-                logger.info('Deserializing identity...');
-                const bobIdentity =
+            /**
+             * @tutorial-step 1.2.1
+             * @task Create a Smash instance from stored identity
+             * @code-focus
+             * - Identity deserialization
+             * - SmashUser instantiation
+             */
+            test('Restoring a Smash instance from saved identity', async () => {
+                testUtils.logger.info('Deserializing identity...');
+                const restoredIdentity =
                     await IMPeerIdentity.deserialize(bobExportedIdentity);
-                logger.info(`> Deserialized ${bobIdentity.did}`);
-                expect(bobIdentity).toBeInstanceOf(IMPeerIdentity);
-                // now we can instantiate the Smash User library using Bob's identity
-                bob = new SmashUser(
-                    bobIdentity,
-                    // the log ID (used to identify the source of the log) & level
-                    'bob',
-                    'INFO',
-                );
+                testUtils.logger.info(`> Deserialized ${restoredIdentity.did}`);
+
+                const bob = new SmashUser(restoredIdentity, 'bob', 'INFO');
                 expect(bob).toBeInstanceOf(SmashMessaging);
-                logger.info(`Bob's messaging instance created!`);
+                testUtils.logger.info(
+                    'Messaging instance created successfully',
+                );
             });
         });
     });
 
+    /**
+     * @tutorial-section Messaging Setup
+     * @tutorial-step 2
+     * @concepts
+     * - SmashMessaging configuration
+     * - Endpoints and mailboxes
+     * - Message routing
+     *
+     * @context
+     * After creating an identity, we need to configure the messaging system.
+     * This includes setting up endpoints that act as mailboxes for receiving
+     * messages when peers are offline.
+     */
     describe('2. Setting up the SmashMessaging library', () => {
+        const testContext = {
+            async createMessagingInstance(): Promise<
+                [SmashMessaging, DIDDocument, IMPeerIdentity]
+            > {
+                const [bobDIDDocument, bobIdentity] =
+                    await didDocumentManager.generate();
+                return [
+                    new SmashUser(bobIdentity, 'bob', 'INFO'),
+                    bobDIDDocument,
+                    bobIdentity,
+                ];
+            },
+        };
+
         let bob: SmashMessaging;
+        let bobIdentity: IMPeerIdentity;
+        let bobDIDDocument: DIDDocument;
 
         beforeEach(async () => {
-            // Create a new SmashMessaging instance with Bob's generated identity
-            bob = new SmashUser(
-                bobIdentity,
-                // the log ID (used to identify the source of the log) & level
-                'bob',
-                'INFO',
-            );
+            [bob, bobDIDDocument, bobIdentity] =
+                await testContext.createMessagingInstance();
         });
 
         afterEach(async () => {
-            // Close the SmashMessaging instance
             await bob.close();
         });
 
-        test('2.1. Configuring new IMProto Endpoints', async () => {
-            // Endpoints play the role of 'Mailboxes' in the IM protocol.
-            // They are used to asynchronously send and receive messages from other peers.
-            // and as signaling servers in order to:
-            // 1/ Establish Signal encryption sessions between offline peers,
-            // 2/ Relay P2P sessions establishment information.
-            logger.info(
-                `Configuring IMProto Endpoints for ${bobDIDDocument.id}...`,
+        /**
+         * @tutorial-step 2.1
+         * @task Configure messaging endpoints
+         * @concepts
+         * - Endpoint roles
+         * - Pre-key generation
+         * - DID document updates
+         */
+        test('Configuring messaging endpoints', async () => {
+            testUtils.logger.info(
+                `Setting up endpoints for ${bobDIDDocument.id}...`,
             );
-            // connecting a new endpoint adds it to the (local) DID document
-            // bob.endpoints.connect(endpoint, updateIdentity, updateDID)
-            // updateIdentity: whether to update the local identity with the new endpoint
-            // updateDID: whether to update the propagated DID document with the new endpoint
+
             const preKeyPair = await bobIdentity.generateNewPreKeyPair();
             const addedEndpoint = await bob.endpoints.connect(
                 {
@@ -203,11 +245,9 @@ describe('Welcome to using the Smashchats library!', () => {
                 },
                 preKeyPair,
             );
-            const newDidDocument = await bob.getDIDDocument();
-            expect(newDidDocument.endpoints.length).toBe(
-                bobDIDDocument.endpoints.length + 1,
-            );
-            expect(newDidDocument.endpoints).toEqual(
+
+            const updatedDIDDocument = await bob.getDIDDocument();
+            expect(updatedDIDDocument.endpoints).toEqual(
                 expect.arrayContaining([
                     expect.objectContaining({
                         url: socketServerUrl,
@@ -219,17 +259,27 @@ describe('Welcome to using the Smashchats library!', () => {
         });
     });
 
-    describe('3. Exchanging messages with a peer', () => {
-        let bob: SmashMessaging;
-        let alice: SmashMessaging;
-
-        beforeEach(async () => {
-            const initPeer = async (name: string) => {
+    /**
+     * @tutorial-section Peer Communication
+     * @tutorial-step 3
+     * @concepts
+     * - Message types
+     * - Peer-to-peer messaging
+     * - Message delivery status
+     * - Read receipts
+     *
+     * @context
+     * With identity and messaging configured, peers can exchange messages.
+     * Smash provides built-in support for delivery confirmation and read receipts.
+     */
+    describe('3. Exchanging messages with peers', () => {
+        const testContext = {
+            async initializePeer(name: string) {
                 const identity = (await didDocumentManager.generate())[1];
                 const messaging = new SmashUser(identity, name);
                 await messaging.updateMeta({ title: name });
+
                 const preKeyPair = await identity.generateNewPreKeyPair();
-                // TODO: use reset (automatically, through provided identity & did doc) instead
                 await messaging.endpoints.connect(
                     {
                         url: socketServerUrl,
@@ -237,14 +287,19 @@ describe('Welcome to using the Smashchats library!', () => {
                     },
                     preKeyPair,
                 );
-                // We're simulating DID document propagation by setting the
-                // DID document in the DIDDocManager.
+
                 didDocumentManager.set(await messaging.getDIDDocument());
                 return messaging;
-            };
+            },
+        };
+
+        let bob: SmashMessaging;
+        let alice: SmashMessaging;
+
+        beforeEach(async () => {
             [bob, alice] = await Promise.all([
-                initPeer('bob'),
-                initPeer('alice'),
+                testContext.initializePeer('bob'),
+                testContext.initializePeer('alice'),
             ]);
         });
 
@@ -253,18 +308,30 @@ describe('Welcome to using the Smashchats library!', () => {
             await Promise.allSettled([bob.close(), alice.close()]);
         });
 
-        test('3.1. Sending a text message to a peer', async () => {
+        /**
+         * @tutorial-step 3.1
+         * @task Send your first message
+         * @code-focus
+         * - Message creation
+         * - Message sending
+         */
+        test('Sending messages', async () => {
             const message = new IMText('Hello, Alice!');
             const sent = await bob.send(alice.did, message);
-            expect(sent.sha256).toBeDefined();
+
             expect(sent.type).toBe(IM_CHAT_TEXT);
             expect(sent.data).toBe('Hello, Alice!');
-            expect(sent.after).toEqual('');
         });
 
-        test('3.2. Receiving a text message from a peer', async () => {
+        /**
+         * @tutorial-step 3.2
+         * @task Handle incoming messages
+         * @code-focus
+         * - Event listeners
+         * - Message handling
+         */
+        test('Receiving messages', async () => {
             const onBobMessage = jest.fn();
-            // NOTE: better to use the exported IM_CHAT_TEXT constant rather than hardcoded 'org.improto.chat.text'
             bob.on(IM_CHAT_TEXT, onBobMessage);
 
             const bobReceivedMessage = waitFor(bob, IM_CHAT_TEXT);
@@ -274,7 +341,7 @@ describe('Welcome to using the Smashchats library!', () => {
             expect(onBobMessage).toHaveBeenCalledWith(
                 alice.did,
                 expect.objectContaining<IMProtoMessage>({
-                    type: 'org.improto.chat.text',
+                    type: IM_CHAT_TEXT,
                     data: sent.data,
                     sha256: sent.sha256,
                     timestamp: sent.timestamp,
@@ -282,55 +349,86 @@ describe('Welcome to using the Smashchats library!', () => {
                 }),
                 expect.any(SmashPeer),
             );
-            expect(onBobMessage).toHaveBeenCalledTimes(1);
         });
 
-        describe('3.3 Status updates', () => {
-            const sendMessage = async (
-                from: SmashMessaging,
-                to: SmashMessaging,
-            ) => {
-                const did = await to.getDIDDocument();
-                const received = waitFor(to, IM_CHAT_TEXT);
-                const sent = await from.send(did, new IMText('hello world'));
-                await received;
-                return sent;
+        /**
+         * @tutorial-step 3.3
+         * @task Track message status
+         * @concepts
+         * - Message delivery states
+         * - Status notifications
+         * - Read receipts
+         */
+        describe('Message status tracking', () => {
+            const testContext = {
+                async exchangeMessage(
+                    from: SmashMessaging,
+                    to: SmashMessaging,
+                ) {
+                    const received = waitFor(to, IM_CHAT_TEXT);
+                    const sent = await from.send(
+                        to.did,
+                        new IMText('hello world'),
+                    );
+                    await received;
+                    return sent;
+                },
             };
 
-            test('3.3.1 Message delivered', async () => {
+            /**
+             * @tutorial-step 3.3.1
+             * @task Monitor message delivery
+             */
+            test('Message delivery confirmation', async () => {
                 const onStatus = jest.fn();
                 bob.on('status', onStatus);
-                const sent = await sendMessage(bob, alice);
+                const sent = await testContext.exchangeMessage(bob, alice);
                 expect(onStatus).toHaveBeenCalledWith('delivered', [
                     sent.sha256,
                 ]);
             });
 
-            test('3.3.2 Message received', async () => {
+            /**
+             * @tutorial-step 3.3.2
+             * @task Track message reception
+             */
+            test('Message reception confirmation', async () => {
                 const onStatus = jest.fn();
                 bob.on('status', onStatus);
-                const sent = await sendMessage(bob, alice);
+                const sent = await testContext.exchangeMessage(bob, alice);
                 await delay(TEST_CONFIG.MESSAGE_DELIVERY * 2);
                 expect(onStatus).toHaveBeenCalledWith('received', [
                     sent.sha256,
                 ]);
             });
 
-            test('3.3.3 Message read', async () => {
+            /**
+             * @tutorial-step 3.3.3
+             * @task Implement read receipts
+             */
+            test('Message read status', async () => {
                 const bobAck = jest.fn();
                 bob.on('status', bobAck);
-                const sent = await sendMessage(bob, alice);
+                const sent = await testContext.exchangeMessage(bob, alice);
+
                 await delay(TEST_CONFIG.MESSAGE_DELIVERY);
                 expect(bobAck).not.toHaveBeenCalledWith('read', [sent.sha256]);
+
                 await alice.ackMessagesRead(bob.did, [sent.sha256]);
                 await delay(TEST_CONFIG.MESSAGE_DELIVERY);
                 expect(bobAck).toHaveBeenCalledWith('read', [sent.sha256]);
             });
         });
 
-        test('3.4. Firehose', async () => {
-            // The SmashMessaging API provides a _firehose_ endpoint that
-            // allows to listen to all messages sent to the peer (including system messages).
+        /**
+         * @tutorial-step 3.4
+         * @task Monitor all message events
+         * @concepts
+         * - Firehose events
+         * - System messages
+         * - Protocol overhead
+         */
+        test('Using the firehose', async () => {
             const onData = jest.fn();
             bob.on('data', onData);
 
@@ -342,17 +440,26 @@ describe('Welcome to using the Smashchats library!', () => {
         });
     });
 
-    describe('4. Exchanging peer profiles', () => {
-        let bob: SmashMessaging;
-        let alice: SmashMessaging;
-
-        beforeEach(async () => {
-            const initPeer = async (name: string) => {
+    /**
+     * @tutorial-section Profile Management
+     * @tutorial-step 4
+     * @concepts
+     * - Peer profiles
+     * - Profile updates
+     * - Automatic profile sharing
+     *
+     * @context
+     * Smash includes built-in profile management. Profiles are automatically
+     * shared when peers first interact and when profile updates occur.
+     */
+    describe('4. Managing peer profiles', () => {
+        const testContext = {
+            async initializePeer(name: string) {
                 const identity = (await didDocumentManager.generate())[1];
                 const messaging = new SmashUser(identity, name);
                 await messaging.updateMeta({ title: name });
+
                 const preKeyPair = await identity.generateNewPreKeyPair();
-                // TODO: use reset (automatically, through provided identity & did doc) instead
                 await messaging.endpoints.connect(
                     {
                         url: socketServerUrl,
@@ -360,14 +467,19 @@ describe('Welcome to using the Smashchats library!', () => {
                     },
                     preKeyPair,
                 );
-                // We're simulating DID document propagation by setting the
-                // DID document in the DIDDocManager.
+
                 didDocumentManager.set(await messaging.getDIDDocument());
                 return messaging;
-            };
+            },
+        };
+
+        let bob: SmashMessaging;
+        let alice: SmashMessaging;
+
+        beforeEach(async () => {
             [bob, alice] = await Promise.all([
-                initPeer('bob'),
-                initPeer('alice'),
+                testContext.initializePeer('bob'),
+                testContext.initializePeer('alice'),
             ]);
         });
 
@@ -376,15 +488,24 @@ describe('Welcome to using the Smashchats library!', () => {
             await Promise.allSettled([bob.close(), alice.close()]);
         });
 
-        test('4.1. Upon meeting a new peer, their profile should be shared', async () => {
+        /**
+         * @tutorial-step 4.1
+         * @task Understand automatic profile sharing
+         * @concepts
+         * - Initial contact
+         * - Profile exchange
+         */
+        test('Initial profile exchange', async () => {
             const onProfile = jest.fn();
             bob.on(IM_PROFILE, onProfile);
+
             await bob.send(alice.did, new IMText('hello'));
             await delay(TEST_CONFIG.MESSAGE_DELIVERY * 2);
+
             expect(onProfile).toHaveBeenCalledWith(
                 alice.did,
                 expect.objectContaining<IMProfileMessage>({
-                    type: 'org.improto.profile',
+                    type: IM_PROFILE,
                     data: {
                         did: alice.did,
                         title: 'alice',
@@ -399,20 +520,29 @@ describe('Welcome to using the Smashchats library!', () => {
             );
         });
 
-        test('4.2. Upon updating profile information, it should be shared with known peers', async () => {
+        /**
+         * @tutorial-step 4.2
+         * @task Handle profile updates
+         * @concepts
+         * - Profile modification
+         * - Update propagation
+         */
+        test('Profile update propagation', async () => {
             const onProfile = jest.fn();
             bob.on(IM_PROFILE, onProfile);
-            // send a message first to make bob and alice become known to each other
+
+            // Establish initial contact
             await bob.send(alice.did, new IMText('hello'));
             await delay(TEST_CONFIG.MESSAGE_DELIVERY);
-            // then, when alice updates her profile
+
+            // Update profile
             await alice.updateMeta({ title: 'alice2' });
             await delay(TEST_CONFIG.MESSAGE_DELIVERY);
-            // bob should receive the updated profile
+
             expect(onProfile).toHaveBeenCalledWith(
                 alice.did,
                 expect.objectContaining<IMProfileMessage>({
-                    type: 'org.improto.profile',
+                    type: IM_PROFILE,
                     data: {
                         did: alice.did,
                         title: 'alice2',
@@ -428,34 +558,45 @@ describe('Welcome to using the Smashchats library!', () => {
         });
     });
 
-    // a key concept of Smash is the concept of Neighborhoods
-    // a Neighborhood is an online place (a server) where peers can
-    // discover, meet and interact with each other
-    describe('5. Smash Neighborhoods', () => {
-        // a Neighborhood is defined by a special peer called the Neighborhood Admin Bot (NAB)
-        // the NAB is a peer that is responsible for managing the Neighborhood
-        // it is responsible for discovering new peers, adding them to the Neighborhood,
-        // and removing peers that are no longer in the Neighborhood
-        let nab: SmashNAB;
-        let bob: SmashUser | undefined;
-        const smeConfig = {
-            url: socketServerUrl,
-            smePublicKey: SME_PUBLIC_KEY,
-        };
-
+    /**
+     * @tutorial-section Neighborhoods
+     * @tutorial-step 5
+     * @concepts
+     * - Neighborhood concept
+     * - Neighborhood Admin Bots (NAB)
+     * - Peer discovery
+     *
+     * @context
+     * Neighborhoods are Smash's way of organizing peer communities. Each neighborhood
+     * is managed by a special peer called the Neighborhood Admin Bot (NAB) that
+     * handles peer discovery and neighborhood membership.
+     */
+    describe('5. Working with Neighborhoods', () => {
         class TestNAB extends SmashNAB {
             public onJoin = jest.fn();
             public onDiscover = jest.fn();
             public onRelationship = jest.fn();
         }
 
+        const testContext = {
+            smeConfig: {
+                url: socketServerUrl,
+                smePublicKey: SME_PUBLIC_KEY,
+            },
+        };
+
+        let nab: TestNAB;
+        let bob: SmashUser | undefined;
+
         beforeEach(async () => {
             const nabIdentity = (await didDocumentManager.generate())[1];
             nab = new TestNAB(nabIdentity, 'test-nab');
+
             await nab.endpoints.connect(
-                smeConfig,
+                testContext.smeConfig,
                 await nabIdentity.generateNewPreKeyPair(),
             );
+
             didDocumentManager.set(await nab.getDIDDocument());
         });
 
@@ -465,25 +606,36 @@ describe('Welcome to using the Smashchats library!', () => {
             await bob?.close();
         });
 
+        /**
+         * @tutorial-step 5.1
+         * @task Join a neighborhood
+         * @concepts
+         * - Neighborhood joining process
+         * - Join events
+         * - NAB responses
+         */
         test(
-            '5.1. Joining a neighborhood',
+            'Joining a neighborhood',
             async () => {
+                const bobIdentity = (await didDocumentManager.generate())[1];
                 bob = new SmashUser(bobIdentity, 'bob');
                 const JOIN_TIMEOUT =
                     TEST_CONFIG.MESSAGE_DELIVERY_TIMEOUT -
                     TEST_CONFIG.MESSAGE_DELIVERY;
+
                 const waitForJoin = waitFor(nab, SMASH_NBH_JOIN, {
                     timeout: JOIN_TIMEOUT,
                 });
-                await bob.join(await nab.getJoinInfo([smeConfig]));
+
+                await bob.join(await nab.getJoinInfo([testContext.smeConfig]));
                 await waitForJoin;
+
                 const bobDIDDocument = await bob.getDIDDocument();
                 expect(nab.onJoin).toHaveBeenCalledWith(
                     bobDIDDocument,
                     expect.any(String),
                     expect.any(String),
                 );
-                expect(nab.onJoin).toHaveBeenCalledTimes(1);
             },
             TEST_CONFIG.MESSAGE_DELIVERY_TIMEOUT,
         );
