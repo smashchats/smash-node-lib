@@ -6,6 +6,6 @@ export class SenderDIDDocumentResolver<
     T extends IMProtoMessage,
 > extends BaseResolver<T, DIDDocument> {
     resolve(peer: SmashPeer): Promise<DIDDocument> {
-        return peer.getDID();
+        return peer.getDIDDocument();
     }
 }

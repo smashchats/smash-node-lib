@@ -7,9 +7,11 @@ import {
     DIDDocument,
     EncapsulatedIMProtoMessage,
     Firehose,
+    IMDIDDocumentMessage,
     IMProfileMessage,
     IMReceivedACKMessage,
     IM_ACK_RECEIVED,
+    IM_DID_DOCUMENT,
     IM_PROFILE,
 } from '@src/types/index.js';
 import { Logger } from '@src/utils/Logger.js';
@@ -63,39 +65,71 @@ export class MessageMiddleware {
     ): Promise<void> {
         // TODO: handle profile/DID updates (for now only handles IK updates)
         // TODO: split DID updates from profile updates
-        const results = await Promise.allSettled(
-            messages.map((message) =>
-                this.tryToCatchDIDFromProfile(peerIk, message),
-            ),
-        );
-        const did = results.find(
-            (result) => result.status === 'fulfilled',
-        )?.value;
+        const did = await this.tryToResolveDIDFromMessages(peerIk, messages);
         if (did) {
             await this.peers.getOrCreate(did);
             return this.flushPeerIkDLQ(peerIk);
         }
     }
 
-    private async tryToCatchDIDFromProfile(
+    private async tryToResolveDIDFromMessages(
         peerIk: string,
-        message: EncapsulatedIMProtoMessage,
-    ): Promise<DIDDocument> {
-        if (message.type !== IM_PROFILE) {
-            throw new Error('Received non-profile message type');
+        messages: EncapsulatedIMProtoMessage[],
+    ): Promise<DIDDocument | undefined> {
+        for (const message of messages) {
+            try {
+                if (message.type === IM_DID_DOCUMENT) {
+                    return await this.resolveDIDFromDIDMessage(
+                        peerIk,
+                        message as IMDIDDocumentMessage,
+                    );
+                }
+                if (message.type === IM_PROFILE) {
+                    return await this.resolveDIDFromProfile(
+                        peerIk,
+                        message as IMProfileMessage,
+                    );
+                }
+            } catch (err) {
+                this.logger.debug(
+                    `Failed to resolve DID from message: ${(err as Error).message}`,
+                );
+                continue;
+            }
         }
-        const did = await SmashMessaging.resolve(
-            (message as IMProfileMessage).data.did as DID,
-        );
+        return undefined;
+    }
+
+    private async resolveDIDFromDIDMessage(
+        peerIk: string,
+        message: IMDIDDocumentMessage,
+    ): Promise<DIDDocument> {
+        const did = await SmashMessaging.resolve(message.data as DIDDocument);
+        await this.validateDIDMatchesIk(did, peerIk);
+        this.logger.debug(`Received DID in DID message for ${did.id}`);
+        return did;
+    }
+
+    private async resolveDIDFromProfile(
+        peerIk: string,
+        message: IMProfileMessage,
+    ): Promise<DIDDocument> {
+        const did = await SmashMessaging.resolve(message.data.did as DID);
+        await this.validateDIDMatchesIk(did, peerIk);
+        this.logger.debug(`Received DID in profile for ${did.id}`);
+        return did;
+    }
+
+    private async validateDIDMatchesIk(
+        did: DIDDocument,
+        peerIk: string,
+    ): Promise<void> {
         if (peerIk !== did.ik) {
             // TODO: handle IK upgrades
             const err = 'Received IK doesnt match Signal Session data.';
             this.logger.error(err);
             throw new Error(err);
-        } else {
-            this.logger.debug(`Received DID in profile for ${did.id}`);
         }
-        return did;
     }
 
     private async flushPeerIkDLQ(peerIk: string): Promise<void> {

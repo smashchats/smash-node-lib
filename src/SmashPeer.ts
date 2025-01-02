@@ -41,7 +41,7 @@ export class SmashPeer {
         this.id = typeof did === 'string' ? did : did.id;
     }
 
-    getDID(): Promise<DIDDocument> {
+    getDIDDocument(): Promise<DIDDocument> {
         return SmashMessaging.resolve(this.did);
     }
 
@@ -69,7 +69,7 @@ export class SmashPeer {
 
     async configureEndpoints(): Promise<void> {
         return this.mutex.acquire(`configureEndpoints-${this.id}`, async () => {
-            const did = await this.getDID();
+            const did = await this.getDIDDocument();
             this.logger.debug(
                 `SmashPeer::configureEndpoints for peer ${this.id} (${did.endpoints.length})`,
             );
@@ -87,8 +87,9 @@ export class SmashPeer {
                 (endpointConfig) =>
                     new SmashPeerEndpoint(
                         this.logger,
+                        this,
                         this.smeSocketManager,
-                        this.initNewSession.bind(this),
+                        this.sessionManager,
                         endpointConfig,
                         this.messageQueue,
                     ),
@@ -96,13 +97,6 @@ export class SmashPeer {
             // flush message queues in the background on (re)-configure
             this.flushQueue().then();
         });
-    }
-
-    private async initNewSession(endpointConfig: SmashEndpoint) {
-        return this.sessionManager.initSession(
-            await this.getDID(),
-            endpointConfig,
-        );
     }
 
     async send(
@@ -142,7 +136,7 @@ export class SmashPeer {
         // mutex: wait for preferred endpoint to be set before flushing
         return this.mutex.acquire(`preferredEndpoint-${this.id}`, async () => {
             const session = this.sessionManager.getPreferredForPeerIk(
-                (await this.getDID()).ik,
+                (await this.getDIDDocument()).ik,
             );
             if (session && this.preferredEndpoint) {
                 this.logger.debug(
@@ -165,7 +159,7 @@ export class SmashPeer {
             ),
         );
         this.logger.debug(
-            `> queued ${encapsulatedMessage.sha256} (${this.messageQueue.size})`,
+            `> queued ${encapsulatedMessage.sha256} (${this.messageQueue.size}) for all endpoints (${this.endpoints.length})`,
         );
     }
 
@@ -226,7 +220,9 @@ export class SmashPeer {
                 `retry ${attempt + 1}/${this.MAX_RETRY_ATTEMPTS} failed, ` +
                     `retrying in ${newDelay}ms`,
             );
-            this.sessionManager.resetPreferredSession((await this.getDID()).ik);
+            this.sessionManager.resetPreferredSession(
+                (await this.getDIDDocument()).ik,
+            );
             await this.scheduleFlushQueue(attempt + 1, newDelay);
         }
     }
@@ -298,7 +294,7 @@ export class SmashPeer {
     private async resetSessions(deleteActiveSession: boolean = false) {
         this.endpoints.forEach((endpoint) => endpoint.resetSession());
         this.sessionManager.removeAllSessionsForPeerIK(
-            (await this.getDID()).ik,
+            (await this.getDIDDocument()).ik,
             deleteActiveSession,
         );
     }

@@ -37,11 +37,16 @@ export async function waitForEvent(
     logger: Logger,
     emitter: EventEmitter | Socket,
     eventName: string,
-    count: number = 1,
-    timeout: number = TIMEOUT_MS - 500,
+    params:
+        | {
+              count?: number;
+              timeout?: number;
+          }
+        | undefined = undefined,
 ): Promise<void> {
     const id = (eventWaiterId += 1);
     let eventsReceived = 0;
+    const { count = 1, timeout = TIMEOUT_MS - 500 } = params || {};
     const [timeoutPromise, cancelTimeout] = createCancellableDelay(timeout);
     cancellationFunctions.push(cancelTimeout);
     logger.info(
@@ -74,11 +79,12 @@ export async function waitForEvent(
 
 export function aliasWaitFor(fns: (() => void)[], logger: Logger) {
     return (
-        ...args: [
-            emitter: EventEmitter | Socket,
-            eventName: string,
-            count?: number,
-            timeout?: number,
+        ...args: Parameters<typeof waitForEvent> extends [
+            unknown,
+            unknown,
+            ...infer Rest,
         ]
+            ? Rest
+            : never
     ) => waitForEvent(fns, logger, ...args);
 }

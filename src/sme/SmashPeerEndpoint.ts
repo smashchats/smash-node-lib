@@ -1,4 +1,5 @@
-import { SignalSession } from '@src/signal/index.js';
+import { SmashPeer } from '@src/SmashPeer.js';
+import { SessionManager, SignalSession } from '@src/signal/index.js';
 import { SMESocketManager } from '@src/sme/SMESocketManager.js';
 import {
     EncapsulatedIMProtoMessage,
@@ -17,10 +18,9 @@ export class SmashPeerEndpoint {
 
     constructor(
         private readonly logger: Logger,
+        private readonly peer: SmashPeer,
         private readonly smeSocketManager: SMESocketManager,
-        private readonly initNewSession: (
-            config: SmashEndpoint,
-        ) => Promise<SignalSession>,
+        private readonly sessionManager: SessionManager,
         public readonly config: SmashEndpoint,
         historicalMessageQueue: Map<sha256, EncapsulatedIMProtoMessage>,
     ) {
@@ -38,7 +38,7 @@ export class SmashPeerEndpoint {
     private queueBypassingMutex(message: EncapsulatedIMProtoMessage) {
         this.messageQueue.set(message.sha256, message);
         this.logger.debug(
-            `> queued message ${message.sha256} for ${this.config.url} (${this.messageQueue.size})`,
+            `> queued ${message.sha256} for ${this.config.url} (${this.messageQueue.size})`,
         );
     }
 
@@ -99,23 +99,16 @@ export class SmashPeerEndpoint {
     private async init(session: SignalSession): Promise<void> {
         if (session.firstUse) {
             this.logger.debug(`> initializing first use session ${session.id}`);
-            await Promise.allSettled([
-                // TODO: send DID document instead of profile
-                // this.peer.getEncapsulatedProfileMessage().then((message) => {
-                //     this.logger.debug(
-                //         `> queueing profile message for ${this.endpointConfig.url}`,
-                //     );
-                //     this.queueBypassingMutex(message);
-                // }),
-                (async () => {
-                    const msg =
-                        this.smeSocketManager.getPreferredEndpointMessage();
-                    this.logger.debug(
-                        `> queueing preferred endpoint message for ${this.config.url}`,
-                    );
-                    this.queueBypassingMutex(msg);
-                })(),
+            const newSessionProtocolMessages = await Promise.all([
+                this.smeSocketManager.getPreferredEndpointMessage(),
+                this.sessionManager.getDIDMessage(),
             ]);
+            for (const message of newSessionProtocolMessages) {
+                this.logger.debug(
+                    `> queueing ${message.type} session message for ${this.config.url}`,
+                );
+                this.queueBypassingMutex(message);
+            }
             session.firstUse = false;
         }
     }
@@ -123,7 +116,10 @@ export class SmashPeerEndpoint {
     private session?: SignalSession;
     private async thisSession(): Promise<SignalSession> {
         if (!this.session || this.session.isExpired()) {
-            this.session = await this.initNewSession(this.config);
+            this.session = await this.sessionManager.initSession(
+                await this.peer.getDIDDocument(),
+                this.config,
+            );
         }
         return this.session;
     }

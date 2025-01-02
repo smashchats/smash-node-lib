@@ -108,11 +108,18 @@ export class IMPeerIdentity extends Identity {
         );
     }
 
-    async getDID(): Promise<DIDDocument> {
+    async getDIDDocument(): Promise<DIDDocument> {
         const doc = await SmashMessaging.resolve(this.did);
         if (!doc) throw new Error(`Could not resolve (${this.did}) for export`);
-        // adding local endpoints
-        doc.endpoints.push(...this.endpoints);
+        // adding local endpoints on top of the resolved DID document
+        const localEndpoints = this.endpoints.filter((endpoint) => {
+            return !doc.endpoints.some(
+                (docEndpoint) =>
+                    docEndpoint.url === endpoint.url &&
+                    docEndpoint.preKey === endpoint.preKey,
+            );
+        });
+        doc.endpoints.push(...localEndpoints);
         return doc;
     }
 

@@ -1,13 +1,14 @@
+import { IMPeerIdentity } from '@src/IMPeerIdentity.js';
 import { MessageMiddleware } from '@src/MessageMiddleware.js';
 import { DLQ } from '@src/signal/DLQ.js';
 import { SignalSession } from '@src/signal/SignalSession.js';
 import {
     DIDDocument,
     EncapsulatedIMProtoMessage,
-    Identity,
+    IM_DID_DOCUMENT,
     SmashEndpoint,
 } from '@src/types/index.js';
-import { Logger } from '@src/utils/index.js';
+import { CryptoUtils, Logger } from '@src/utils/index.js';
 
 export class SessionManager {
     // TODO handle dangling sessions
@@ -16,8 +17,22 @@ export class SessionManager {
     private readonly sessionsByID: Record<string, SignalSession> = {};
     private readonly dlq: DLQ<string, ArrayBuffer> = new DLQ();
 
+    private cachedDIDMessage: EncapsulatedIMProtoMessage | undefined;
+    public async getDIDMessage(): Promise<EncapsulatedIMProtoMessage> {
+        if (!this.cachedDIDMessage) {
+            const didDocument = await this.identity.getDIDDocument();
+            this.cachedDIDMessage =
+                await CryptoUtils.singleton.encapsulateMessage({
+                    type: IM_DID_DOCUMENT,
+                    data: didDocument,
+                    after: '',
+                });
+        }
+        return this.cachedDIDMessage;
+    }
+
     constructor(
-        private readonly identity: Identity,
+        private readonly identity: IMPeerIdentity,
         private readonly logger: Logger,
         private readonly messageMiddleware: MessageMiddleware,
     ) {}

@@ -1,6 +1,7 @@
 import {
     BaseIMProtoMessage,
     DID,
+    DIDDocument,
     IMProtoMessage,
     SmashEndpoint,
     sha256,
@@ -9,6 +10,7 @@ import {
 
 export const IM_CHAT_TEXT = 'org.improto.chat.text';
 export const IM_PROFILE = 'org.improto.profile';
+export const IM_DID_DOCUMENT = 'org.improto.did.document';
 export const IM_SESSION_RESET = 'org.improto.session.reset';
 export const IM_ACK_RECEIVED = 'org.improto.ack.received';
 export const IM_ACK_READ = 'org.improto.ack.read';
@@ -49,6 +51,16 @@ export interface IMProfile {
 export interface IMProfileMessage extends IMProtoMessage {
     type: typeof IM_PROFILE;
     data: IMProfile;
+}
+
+/**
+ * DID document message
+ *
+ * Used to trustfully share the fully-resolved DID document from peer to peer.
+ */
+export interface IMDIDDocumentMessage extends IMProtoMessage {
+    type: typeof IM_DID_DOCUMENT;
+    data: DIDDocument;
 }
 
 /**

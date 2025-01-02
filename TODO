@@ -64,8 +64,8 @@ Tutorial = Covers entire product but HAPPY PATH ONLY
 - [x] receiving a profile message from a peer
 - [x] updating the peer's profile
 - [x] clean peer shutdown
-- [ ] setting up a Neighborhood / NAB
-- [ ] joining the Neighborhood
+- [x] setting up a Neighborhood / NAB
+- [x] joining the Neighborhood
 - [ ] discovering other peers in the neighborhood (NBH_PROFILES)
 - [ ] smashing another user from the neighborhood
 - [ ] passing another user from the neighborhood

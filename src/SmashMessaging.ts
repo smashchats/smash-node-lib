@@ -67,15 +67,15 @@ export class SmashMessaging extends EventEmitter {
     protected readonly logger: Logger;
 
     public readonly endpoints: EndpointManager;
-    private readonly peers: PeerRegistry;
+    protected readonly peers: PeerRegistry;
     private readonly sessionManager: SessionManager;
     private readonly smeSocketManager: SMESocketManager;
     private meta: Partial<ProfileMeta> = {};
 
     constructor(
-        private readonly identity: IMPeerIdentity,
+        protected readonly identity: IMPeerIdentity,
         LOG_ID: string = 'SmashMessaging',
-        LOG_LEVEL: LogLevel = 'INFO',
+        LOG_LEVEL: LogLevel = 'DEBUG',
     ) {
         super();
         this.logger = new Logger(LOG_ID, LOG_LEVEL);
@@ -228,14 +228,13 @@ export class SmashMessaging extends EventEmitter {
     }
 
     async getDIDDocument(): Promise<DIDDocument> {
-        return this.identity.getDID();
+        return this.identity.getDIDDocument();
     }
 
     get did(): DIDString {
         return this.identity.did;
     }
 
-    // TODO: get DID from separate system message
     getProfile(): IMProfile {
         return {
             ...{

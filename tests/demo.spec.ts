@@ -12,8 +12,10 @@ import {
     IM_CHAT_TEXT,
     IM_PROFILE,
     Logger,
+    SMASH_NBH_JOIN,
     SmashEndpoint,
     SmashMessaging,
+    SmashNAB,
     SmashPeer,
     SmashUser,
 } from 'smash-node-lib';
@@ -57,6 +59,10 @@ describe('Welcome to using the Smashchats library!', () => {
         SmashMessaging.setCrypto(crypto);
         // The .setCrypto() method MUST be called before any crypto op is performed.
         logger.info('Crypto engine set. Ready!');
+    });
+
+    afterAll(async () => {
+        await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
     });
 
     let bobDIDDocument: DIDDocument;
@@ -220,7 +226,7 @@ describe('Welcome to using the Smashchats library!', () => {
         beforeEach(async () => {
             const initPeer = async (name: string) => {
                 const identity = (await didDocumentManager.generate())[1];
-                const messaging = new SmashUser(identity, name, 'DEBUG');
+                const messaging = new SmashUser(identity, name);
                 await messaging.updateMeta({ title: name });
                 const preKeyPair = await identity.generateNewPreKeyPair();
                 // TODO: use reset (automatically, through provided identity & did doc) instead
@@ -343,7 +349,7 @@ describe('Welcome to using the Smashchats library!', () => {
         beforeEach(async () => {
             const initPeer = async (name: string) => {
                 const identity = (await didDocumentManager.generate())[1];
-                const messaging = new SmashUser(identity, name, 'DEBUG');
+                const messaging = new SmashUser(identity, name);
                 await messaging.updateMeta({ title: name });
                 const preKeyPair = await identity.generateNewPreKeyPair();
                 // TODO: use reset (automatically, through provided identity & did doc) instead
@@ -420,5 +426,66 @@ describe('Welcome to using the Smashchats library!', () => {
                 expect.any(SmashPeer),
             );
         });
+    });
+
+    // a key concept of Smash is the concept of Neighborhoods
+    // a Neighborhood is an online place (a server) where peers can
+    // discover, meet and interact with each other
+    describe('5. Smash Neighborhoods', () => {
+        // a Neighborhood is defined by a special peer called the Neighborhood Admin Bot (NAB)
+        // the NAB is a peer that is responsible for managing the Neighborhood
+        // it is responsible for discovering new peers, adding them to the Neighborhood,
+        // and removing peers that are no longer in the Neighborhood
+        let nab: SmashNAB;
+        let bob: SmashUser | undefined;
+        const smeConfig = {
+            url: socketServerUrl,
+            smePublicKey: SME_PUBLIC_KEY,
+        };
+
+        class TestNAB extends SmashNAB {
+            public onJoin = jest.fn();
+            public onDiscover = jest.fn();
+            public onRelationship = jest.fn();
+        }
+
+        beforeEach(async () => {
+            const nabIdentity = (await didDocumentManager.generate())[1];
+            nab = new TestNAB(nabIdentity, 'test-nab');
+            await nab.endpoints.connect(
+                smeConfig,
+                await nabIdentity.generateNewPreKeyPair(),
+            );
+            didDocumentManager.set(await nab.getDIDDocument());
+        });
+
+        afterEach(async () => {
+            await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
+            await nab.close();
+            await bob?.close();
+        });
+
+        test(
+            '5.1. Joining a neighborhood',
+            async () => {
+                bob = new SmashUser(bobIdentity, 'bob');
+                const JOIN_TIMEOUT =
+                    TEST_CONFIG.MESSAGE_DELIVERY_TIMEOUT -
+                    TEST_CONFIG.MESSAGE_DELIVERY;
+                const waitForJoin = waitFor(nab, SMASH_NBH_JOIN, {
+                    timeout: JOIN_TIMEOUT,
+                });
+                await bob.join(await nab.getJoinInfo([smeConfig]));
+                await waitForJoin;
+                const bobDIDDocument = await bob.getDIDDocument();
+                expect(nab.onJoin).toHaveBeenCalledWith(
+                    bobDIDDocument,
+                    expect.any(String),
+                    expect.any(String),
+                );
+                expect(nab.onJoin).toHaveBeenCalledTimes(1);
+            },
+            TEST_CONFIG.MESSAGE_DELIVERY_TIMEOUT,
+        );
     });
 });

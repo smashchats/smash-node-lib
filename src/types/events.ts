@@ -1,6 +1,7 @@
 import { SmashPeer } from '@src/SmashPeer.js';
 import { DIDString } from '@src/types/did.types.js';
 import {
+    IMDIDDocumentMessage,
     IMProfileMessage,
     IMReadACKMessage,
     IMReceivedACKMessage,
@@ -10,6 +11,7 @@ import {
     IM_ACK_READ,
     IM_ACK_RECEIVED,
     IM_CHAT_TEXT,
+    IM_DID_DOCUMENT,
     IM_PROFILE,
     IM_SESSION_ENDPOINT,
     IM_SESSION_RESET,
@@ -32,6 +34,7 @@ import {
 export type IMProtoEventMap = {
     [IM_CHAT_TEXT]: IMTextMessage;
     [IM_PROFILE]: IMProfileMessage;
+    [IM_DID_DOCUMENT]: IMDIDDocumentMessage;
     [IM_SESSION_RESET]: IMSessionResetMessage;
     [IM_SESSION_ENDPOINT]: IMSessionEndpointMessage;
     [IM_ACK_RECEIVED]: IMReceivedACKMessage;
@@ -55,9 +58,9 @@ export type IMProtoEventType<T extends string> = T extends keyof IMProtoEventMap
     : IMProtoMessage;
 
 // Custom events map their names to tuple types of their arguments
-export type CustomEventMap = {
+export interface CustomEventMap {
     status: [MessageStatus, sha256[]];
-};
+}
 // Allow extending this type
 // declare module './events' {
 //     interface CustomEventMap {
