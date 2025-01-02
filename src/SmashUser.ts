@@ -35,7 +35,7 @@ export class SmashUser extends SmashMessaging {
     public async join(joinAction: SmashActionJson) {
         // Initialize endpoints if SME config is provided
         if (joinAction.config?.sme?.length) {
-            await Promise.allSettled([
+            await Promise.all(
                 joinAction.config?.sme?.map((smeConfig) =>
                     this.identity
                         .generateNewPreKeyPair()
@@ -43,7 +43,10 @@ export class SmashUser extends SmashMessaging {
                             this.endpoints.connect(smeConfig, preKeyPair),
                         ),
                 ),
-            ]);
+            );
+            this.logger.debug(
+                `Connected to ${joinAction.config?.sme?.length} endpoints configured by join action config.`,
+            );
         }
         const nabPeer = await this.peers.getOrCreate(joinAction.did);
         await nabPeer.send(SMASH_NBH_JOIN_MESSAGE);

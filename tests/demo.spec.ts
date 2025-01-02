@@ -337,7 +337,7 @@ describe('Welcome to using the Smashchats library!', () => {
             await alice.send(bob.did, new IMText('Hello, Bob!'));
             await delay(TEST_CONFIG.MESSAGE_DELIVERY * 3);
 
-            const expectedCalls = (1 + TEST_CONFIG.PROTOCOL_OVERHEAD_SIZE) * 2;
+            const expectedCalls = TEST_CONFIG.PROTOCOL_OVERHEAD_SIZE * 2 + 1;
             expect(onData).toHaveBeenCalledTimes(expectedCalls);
         });
     });

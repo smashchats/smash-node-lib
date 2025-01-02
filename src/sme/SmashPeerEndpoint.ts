@@ -99,10 +99,19 @@ export class SmashPeerEndpoint {
     private async init(session: SignalSession): Promise<void> {
         if (session.firstUse) {
             this.logger.debug(`> initializing first use session ${session.id}`);
-            const newSessionProtocolMessages = await Promise.all([
-                this.smeSocketManager.getPreferredEndpointMessage(),
-                this.sessionManager.getDIDMessage(),
-            ]);
+            const newSessionProtocolMessages = [];
+            try {
+                newSessionProtocolMessages.push(
+                    this.smeSocketManager.getPreferredEndpointMessage(),
+                );
+            } catch (error) {
+                this.logger.debug(
+                    `> skipping preferred endpoint message: ${(error as Error).message}`,
+                );
+            }
+            newSessionProtocolMessages.push(
+                await this.sessionManager.getDIDMessage(),
+            );
             for (const message of newSessionProtocolMessages) {
                 this.logger.debug(
                     `> queueing ${message.type} session message for ${this.config.url}`,

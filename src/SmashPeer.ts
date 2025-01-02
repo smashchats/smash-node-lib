@@ -213,11 +213,11 @@ export class SmashPeer {
             );
             await this.flush();
             this.clearRetryTimeout();
-        } catch {
+        } catch (err) {
             // FAILURE, exponential backoff
             const newDelay = Math.min(delay * 2, this.MAX_RETRY_DELAY_MS);
             this.logger.debug(
-                `retry ${attempt + 1}/${this.MAX_RETRY_ATTEMPTS} failed, ` +
+                `retry ${attempt + 1}/${this.MAX_RETRY_ATTEMPTS} failed (${(err as Error).message}), ` +
                     `retrying in ${newDelay}ms`,
             );
             this.sessionManager.resetPreferredSession(
@@ -263,9 +263,16 @@ export class SmashPeer {
         const results = await Promise.allSettled(
             this.endpoints.map((endpoint) => endpoint.flush(undefined)),
         );
-        const failed = results.find((r) => r.status === 'rejected');
-        if (failed) {
-            throw new Error('Flush failed for some endpoints');
+        const failures = results.filter(
+            (r) => r.status === 'rejected',
+        ) as PromiseRejectedResult[];
+        if (failures.length > 0) {
+            const failureReasons = failures
+                .map((f) => f.reason?.message || 'Unknown error')
+                .join('; ');
+            throw new Error(
+                `Flush failed for ${failures.length} endpoint(s): ${failureReasons}`,
+            );
         }
     }
 
