@@ -67,8 +67,8 @@ Tutorial = Covers entire product but HAPPY PATH ONLY
 - [x] joining the Neighborhood
 - [x] discovering other peers in the neighborhood (NBH_PROFILE_LIST)
 - [x] smashing another user from the neighborhood
-- [-] passing another user from the neighborhood
-- [-] clearing another user from the neighborhood
+- [x] passing another user from the neighborhood
+- [x] clearing another user from the neighborhood
 - [ ] loading the library with existing peers/chats
 
 then, next feats

@@ -654,7 +654,11 @@ describe('Smash Tutorial', () => {
                     if (!this.relationships.has(from)) {
                         this.relationships.set(from, new Map());
                     }
-                    this.relationships.get(from)?.set(to, relationship);
+                    if (relationship === 'clear') {
+                        this.relationships.get(from)?.delete(to);
+                    } else {
+                        this.relationships.get(from)?.set(to, relationship);
+                    }
                 },
             );
             // trivial users graph data model
@@ -674,7 +678,8 @@ describe('Smash Tutorial', () => {
                 }
 
                 // Initialize distance as default
-                let minDistance = this.DEFAULT_DISTANCE;
+                let totalDistance = this.DEFAULT_DISTANCE;
+                let pathCount = 0;
 
                 // Check for indirect relationships through intermediaries
                 const visited = new Set<DIDString>();
@@ -683,29 +688,28 @@ describe('Smash Tutorial', () => {
                 while (queue.length > 0) {
                     const [current, depth] = queue.shift()!;
 
-                    if (visited.has(current)) continue;
-                    visited.add(current);
-
                     const relationships = this.relationships.get(current);
                     if (!relationships) continue;
 
                     for (const [nextPeer, rel] of relationships.entries()) {
-                        if (rel === 'pass') continue;
+                        if (rel !== 'smash') continue;
 
                         if (nextPeer === to) {
-                            // Found a path to target, calculate contribution
+                            // Each path contributes to decreasing the total distance
                             const pathContribution =
                                 this.DEFAULT_DISTANCE / (depth + 2);
-                            minDistance = Math.min(
-                                minDistance,
-                                pathContribution,
-                            );
+                            totalDistance =
+                                (totalDistance * pathCount + pathContribution) /
+                                (pathCount + 1);
+                            pathCount++;
                         } else if (!visited.has(nextPeer)) {
+                            visited.add(nextPeer);
                             queue.push([nextPeer, depth + 1]);
                         }
                     }
                 }
-                return minDistance;
+
+                return totalDistance;
             }
 
             /**
@@ -813,6 +817,7 @@ describe('Smash Tutorial', () => {
 
                 const allThreeHaveJoined = waitFor(nab, SMASH_NBH_JOIN, {
                     count: 3,
+                    timeout: 2 * TEST_CONFIG.TEST_TIMEOUT_MS,
                 });
                 const joinInfo = await nab.getJoinInfo([testContext.smeConfig]);
                 await Promise.all([
@@ -820,21 +825,30 @@ describe('Smash Tutorial', () => {
                     alice.join(joinInfo),
                     darcy.join(joinInfo),
                 ]);
+
                 await allThreeHaveJoined;
+                await delay(TEST_CONFIG.MESSAGE_DELIVERY);
 
                 const profilesUpdated = waitFor(nab, IM_PROFILE, {
                     count: 3,
+                    timeout: 2 * TEST_CONFIG.TEST_TIMEOUT_MS,
                 });
                 await bob.updateMeta({ title: 'bob' });
                 await alice.updateMeta({ title: 'alice' });
                 await darcy.updateMeta({ title: 'darcy' });
+
                 await profilesUpdated;
+                await delay(TEST_CONFIG.MESSAGE_DELIVERY);
 
                 await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
-            }, TEST_CONFIG.TEST_TIMEOUT_MS * 2);
+            }, TEST_CONFIG.TEST_TIMEOUT_MS * 5);
 
             afterEach(async () => {
-                await Promise.all([alice?.close(), darcy?.close()]);
+                await Promise.all([
+                    alice?.close(),
+                    darcy?.close(),
+                    bob?.close(),
+                ]);
             });
 
             /**
@@ -893,6 +907,31 @@ describe('Smash Tutorial', () => {
              * - Social graph
              */
             describe('Building a social graph', () => {
+                const getDistanceFromBobToAlice = () =>
+                    new Promise<number>((resolve, reject) => {
+                        const timeout = setTimeout(() => {
+                            reject(new Error('Timeout'));
+                        }, TEST_CONFIG.TEST_TIMEOUT_MS);
+                        bob.once(NBH_PROFILE_LIST, (_, profiles) => {
+                            const aliceProfile = profiles.find(
+                                (profile) => profile.did.id === alice.did,
+                            );
+                            clearTimeout(timeout);
+                            resolve(aliceProfile?.scores?.distance ?? Infinity);
+                        });
+                        bob.discover();
+                    });
+                let initialDistance: number;
+                let nabReceivedRelationship: Promise<void>;
+
+                beforeEach(async () => {
+                    initialDistance = await getDistanceFromBobToAlice();
+                    nabReceivedRelationship = waitFor(
+                        nab,
+                        SMASH_NBH_RELATIONSHIP,
+                    );
+                });
+
                 /**
                  * @tutorial-step 5.4.1
                  * @task Smashing another peer
@@ -903,35 +942,8 @@ describe('Smash Tutorial', () => {
                 test(
                     'Bob smashing Alice',
                     async () => {
-                        const getDistanceFromBobToAlice = () =>
-                            new Promise<number>((resolve, reject) => {
-                                const timeout = setTimeout(() => {
-                                    reject(new Error('Timeout'));
-                                }, TEST_CONFIG.TEST_TIMEOUT_MS);
-                                bob.once(NBH_PROFILE_LIST, (_, profiles) => {
-                                    const aliceProfile = profiles.find(
-                                        (profile) =>
-                                            profile.did.id === alice.did,
-                                    );
-                                    clearTimeout(timeout);
-                                    resolve(
-                                        aliceProfile?.scores?.distance || 0,
-                                    );
-                                });
-                                bob.discover();
-                            });
-                        const initialDistance =
-                            await getDistanceFromBobToAlice();
-
                         await bob.smash(alice.did);
-
-                        const nabReceivedSmash = waitFor(
-                            nab,
-                            SMASH_NBH_RELATIONSHIP,
-                        );
-                        await nabReceivedSmash;
-                        await delay(TEST_CONFIG.MESSAGE_DELIVERY);
-
+                        await nabReceivedRelationship;
                         expect(nab.onRelationship).toHaveBeenCalledWith(
                             bob.did,
                             alice.did,
@@ -939,14 +951,59 @@ describe('Smash Tutorial', () => {
                             expect.any(String),
                             expect.any(String),
                         );
-
-                        const afterSmashDistance =
-                            await getDistanceFromBobToAlice();
-                        expect(afterSmashDistance).toBeLessThan(
-                            initialDistance,
-                        );
+                        const newDistance = await getDistanceFromBobToAlice();
+                        expect(newDistance).toBeLessThan(initialDistance);
                     },
-                    TEST_CONFIG.TEST_TIMEOUT_MS * 3,
+                    TEST_CONFIG.TEST_TIMEOUT_MS * 2,
+                );
+
+                /**
+                 * @tutorial-step 5.4.2
+                 * @task Passing another peer
+                 * @concepts
+                 * - Pass
+                 * - Social graph
+                 */
+                test(
+                    'Bob passing Alice',
+                    async () => {
+                        await bob.pass(alice.did);
+                        await nabReceivedRelationship;
+                        expect(nab.onRelationship).toHaveBeenCalledWith(
+                            bob.did,
+                            alice.did,
+                            'pass',
+                            expect.any(String),
+                            expect.any(String),
+                        );
+                        const newDistance = await getDistanceFromBobToAlice();
+                        expect(newDistance).toBeGreaterThan(initialDistance);
+                    },
+                    TEST_CONFIG.TEST_TIMEOUT_MS * 2,
+                );
+
+                /**
+                 * @tutorial-step 5.4.3
+                 * @task Clearing any previous relationship
+                 * @concepts
+                 * - Social graph
+                 */
+                test(
+                    'Bob clearing Alice',
+                    async () => {
+                        await bob.smash(alice.did);
+                        await delay(TEST_CONFIG.MESSAGE_DELIVERY);
+                        await bob.clear(alice.did);
+                        await delay(TEST_CONFIG.MESSAGE_DELIVERY);
+                        await bob.pass(alice.did);
+                        await delay(TEST_CONFIG.MESSAGE_DELIVERY);
+                        await bob.clear(alice.did);
+                        await delay(TEST_CONFIG.MESSAGE_DELIVERY);
+                        await nabReceivedRelationship;
+                        const newDistance = await getDistanceFromBobToAlice();
+                        expect(newDistance).toEqual(initialDistance);
+                    },
+                    TEST_CONFIG.TEST_TIMEOUT_MS * 4,
                 );
             });
         });

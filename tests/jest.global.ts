@@ -266,6 +266,12 @@ export default async function setup(): Promise<void> {
                         `Queued data event for peer ${peerId} (total events: ${dataEvents.length})`,
                     );
                     setTimeout(() => {
+                        if (!activeSockets[peerId]) {
+                            log(
+                                `No active socket found for peer ${peerId} (total active sockets: ${Object.keys(activeSockets).length})`,
+                            );
+                            return;
+                        }
                         log(
                             `Emitting data to peer ${peerId} (delay: ${delayMs}ms, session: ${sessionId})`,
                         );

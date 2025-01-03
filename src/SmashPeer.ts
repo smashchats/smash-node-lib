@@ -202,7 +202,7 @@ export class SmashPeer {
                     await this.attemptFlushOrRetry(attempt, delay);
                 }
             },
-            { maxOccupationTime: 4000 },
+            { maxOccupationTime: 20000 },
         );
     }
 

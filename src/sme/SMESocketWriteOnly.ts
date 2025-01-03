@@ -16,7 +16,7 @@ export class SMESocketWriteOnly {
         private readonly onMessagesStatusCallback: onMessagesStatusFn,
     ) {}
 
-    async close(TIMEOUT_MS = 3000): Promise<void> {
+    async close(TIMEOUT_MS = 5000): Promise<void> {
         return new Promise((resolve) => {
             this.logger.debug(`> Disconnecting from SME ${this.url}`);
             const socket = this.socket;
@@ -82,7 +82,7 @@ export class SMESocketWriteOnly {
         sessionId: string,
         buffer: ArrayBuffer,
         messageIds: sha256[],
-        TIMEOUT_MS: number = 3000,
+        TIMEOUT_MS: number = 10000,
     ): Promise<void> {
         return new Promise<void>((resolve, reject) => {
             if (!messageIds.length) {
