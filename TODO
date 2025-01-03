@@ -2,13 +2,13 @@
 
 ### BIG REFACTORING (with possible functional changes):
 
-- manual refactor while writing the happy path tutorial test suite (mainly splitting modules and restructuring code)
-- make previous tests pass
+- [-] manual refactor while writing the happy path tutorial test suite (mainly splitting modules and restructuring code)
+- [ ] make previous test suites pass again
 
-- use AI to refactor file paths / reorganise module file structure
-- use AI to extract more modules: more modular, decoupled, and loosely coupled
+- [ ] use AI to refactor file paths / reorganise module file structure
+- [ ] use AI to extract more modules: more modular, decoupled, and loosely coupled
 
-- set everything private then resolve issues opening strict minimum as public APIs
+- [ ] set everything private then resolve issues opening strict minimum as public APIs
 
 ### CODE REFACTORING (with no functional changes):
 

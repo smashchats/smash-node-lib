@@ -26,19 +26,18 @@ import {
  * **************************************************************
  */
 
-// TODO converge all tests into a single tutorial with suite = main step
-// 'THE' tutorial as per Diataxis framework should be the one and only
-// tutorial for the product , and contains all a user needs to know
-// in order to perform the 'happy path'. then, other docs will complement:
-// - How To: solving specific complex/occasional use cases
-// - Reference: under the hood / user manual
-// - Explanations: the why and how of the library
-// TODO we should find a way to keep in sync test suites and docs
-// in particular:
-// - Reference -> unit tests & code blocks + comments
-// - How Tos -> specific test suites (covering edge cases)
-// - Tutorial > main test suites
-// - Explanations -> separately maintained dev notes
+// TODO docs
+// - Reference -> unit tests (storybook type) + TSdoc blocks
+// - How Tos -> specific (.spec.ts) test suites (covering edge cases and specific scenarios)
+// - Tutorial > main test suite (tutorial.spec.ts) covering the happy path to fully explore the product
+// - Explanations -> separately-maintained dev notes covering the why and how (dev.smashchats.com)
+// TODO coverage rules
+// - Reference -> 100% functions coverage (public APIs)
+// - How Tos + Tutorial -> 100% lines coverage
+// TODO cross link between docs and tests
+// - Generate docs from tests
+// - Showcase tests results in docs
+// - Link relevant source code in docs
 
 /**
  * @tutorial-meta
