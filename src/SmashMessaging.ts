@@ -20,6 +20,7 @@ import {
     IM_ACK_READ,
     IM_ACK_RECEIVED,
     type MessageStatus,
+    reverseDNSRegex,
     type sha256,
 } from '@src/types/index.js';
 import type { LogLevel } from '@src/utils/index.js';
@@ -176,10 +177,20 @@ export class SmashMessaging extends EventEmitter {
         if (!messages?.length) return;
         this.logger.debug(`notifyNewMessages (${messages?.length})`);
         this.logger.debug(JSON.stringify(messages, null, 2));
-        // TODO: assess risk of emitting arbitrary event names
-        messages.forEach((message) =>
-            this.emit(message.type, sender, message, this.peers.get(sender)),
-        );
+        messages.forEach((message) => {
+            if (reverseDNSRegex.test(message.type)) {
+                this.emit(
+                    message.type,
+                    sender,
+                    message,
+                    this.peers.get(sender),
+                );
+            } else {
+                this.logger.warn(
+                    `Invalid message type format received: ${message.type}`,
+                );
+            }
+        });
         messages.forEach((message) => this.emit('data', sender, message));
     }
 

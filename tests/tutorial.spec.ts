@@ -727,30 +727,36 @@ describe('Smash Tutorial', () => {
             let darcy: SmashUser;
 
             beforeEach(async () => {
-                // Set up test users
                 const bobIdentity = (await didDocumentManager.generate())[1];
                 const aliceIdentity = (await didDocumentManager.generate())[1];
                 const darcyIdentity = (await didDocumentManager.generate())[1];
+                await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
 
                 bob = new SmashUser(bobIdentity, 'bob');
                 alice = new SmashUser(aliceIdentity, 'alice');
                 darcy = new SmashUser(darcyIdentity, 'darcy');
 
+                const allThreeHaveJoined = waitFor(nab, SMASH_NBH_JOIN, {
+                    count: 3,
+                });
                 const joinInfo = await nab.getJoinInfo([testContext.smeConfig]);
                 await Promise.all([
                     bob.join(joinInfo),
                     alice.join(joinInfo),
                     darcy.join(joinInfo),
                 ]);
+                await allThreeHaveJoined;
 
-                await delay(TEST_CONFIG.MESSAGE_DELIVERY);
-
+                const profilesUpdated = waitFor(nab, IM_PROFILE, {
+                    count: 3,
+                });
                 await bob.updateMeta({ title: 'bob' });
                 await alice.updateMeta({ title: 'alice' });
                 await darcy.updateMeta({ title: 'darcy' });
+                await profilesUpdated;
 
-                await delay(TEST_CONFIG.MESSAGE_DELIVERY);
-            });
+                await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
+            }, TEST_CONFIG.TEST_TIMEOUT_MS * 2);
 
             afterEach(async () => {
                 await Promise.all([alice?.close(), darcy?.close()]);

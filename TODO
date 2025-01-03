@@ -70,8 +70,7 @@ Tutorial = Covers entire product but HAPPY PATH ONLY
 - [ ] smashing another user from the neighborhood
 - [ ] passing another user from the neighborhood
 - [ ] clearing another user from the neighborhood
-- [ ] blocking another peer
-- [ ] unblocking another peer
+- [ ] loading the library with existing peers/chats
 
 ### TODO
 
