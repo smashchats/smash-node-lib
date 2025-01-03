@@ -75,7 +75,7 @@ export class SmashMessaging extends EventEmitter {
     constructor(
         protected readonly identity: IMPeerIdentity,
         LOG_ID: string = 'SmashMessaging',
-        LOG_LEVEL: LogLevel = 'DEBUG',
+        LOG_LEVEL: LogLevel = 'INFO',
     ) {
         super();
         this.logger = new Logger(LOG_ID, LOG_LEVEL);
