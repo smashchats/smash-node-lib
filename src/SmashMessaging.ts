@@ -108,6 +108,11 @@ export class SmashMessaging extends EventEmitter {
         this.logger.info(
             `Loaded Smash lib (log level: ${LOG_LEVEL}, id: ${LOG_ID})`,
         );
+        if (LOG_LEVEL === 'DEBUG') {
+            this.getDIDDocument().then((didDoc) => {
+                this.logger.debug(JSON.stringify(didDoc, null, 2));
+            });
+        }
     }
 
     static setCrypto(c: globalThis.Crypto) {
@@ -269,6 +274,13 @@ export class SmashMessaging extends EventEmitter {
         listener: (...args: EventArgs<T>) => void,
     ): this {
         return super.on(eventName, listener);
+    }
+
+    once<T extends string>(
+        eventName: T,
+        listener: (...args: EventArgs<T>) => void,
+    ): this {
+        return super.once(eventName, listener);
     }
 
     emit<T extends string>(eventName: T, ...args: EventArgs<T>): boolean {

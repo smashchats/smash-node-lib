@@ -5,11 +5,12 @@ import {
     SMASH_NBH_JOIN_MESSAGE,
 } from '@src/const.js';
 import { SmashActionJson } from '@src/types/action.types.js';
-import { DIDString } from '@src/types/did.types.js';
+import { DID, DIDString } from '@src/types/did.types.js';
 import { SmashProfileList } from '@src/types/smash.types.js';
 import {
     NBH_ADDED,
     NBH_PROFILE_LIST,
+    Relationship,
     SMASH_PROFILE_LIST,
 } from '@src/types/smashchats.lexicon.js';
 
@@ -48,21 +49,24 @@ export class SmashUser extends SmashMessaging {
         this.emit(NBH_ADDED, nabPeer.id);
     }
 
-    //     private async setRelationship(userDid: DID, action: Relationship) {
-    //         (await this.getOrCreatePeer(userDid)).setRelationship(
-    //             action,
-    //             this.neighborhoodAdmins,
-    //         );
-    //     }
-    //     public smash(userDid: DID) {
-    //         return this.setRelationship(userDid, 'smash');
-    //     }
-    //     public pass(userDid: DID) {
-    //         return this.setRelationship(userDid, 'pass');
-    //     }
-    //     public clear(userDid: DID) {
-    //         return this.setRelationship(userDid, 'clear');
-    //     }
+    private async setRelationship(userDid: DID, action: Relationship) {
+        (await this.peers.getOrCreate(userDid)).setRelationship(
+            action,
+            this.neighborhoodAdmins,
+        );
+    }
+
+    public smash(userDid: DID) {
+        return this.setRelationship(userDid, 'smash');
+    }
+
+    public pass(userDid: DID) {
+        return this.setRelationship(userDid, 'pass');
+    }
+
+    public clear(userDid: DID) {
+        return this.setRelationship(userDid, 'clear');
+    }
 
     public async discover() {
         // TODO: handle for multiple NABs

@@ -112,6 +112,9 @@ export class EndpointManager extends Map<string, SmashEndpoint> {
         if (updateIdentity) {
             this.identity.pushEndpoint(connectedEndpoint);
         }
+        this.logger.debug(
+            `Connected to endpoint ${connectedEndpoint.url} with preKey ${connectedEndpoint.preKey} (${connectedEndpoint.signature})`,
+        );
         return connectedEndpoint;
     }
 

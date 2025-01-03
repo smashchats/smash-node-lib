@@ -17,7 +17,9 @@ import {
     Logger,
     NBH_ADDED,
     NBH_PROFILE_LIST,
+    Relationship,
     SMASH_NBH_JOIN,
+    SMASH_NBH_RELATIONSHIP,
     SmashEndpoint,
     SmashMessaging,
     SmashNAB,
@@ -583,7 +585,7 @@ describe('Smash Tutorial', () => {
      */
     describe('5. Working with Neighborhoods', () => {
         let nab: TestNAB;
-        let bob: SmashUser | undefined;
+        let bob: SmashUser;
 
         const testContext = {
             smeConfig: {
@@ -637,6 +639,77 @@ describe('Smash Tutorial', () => {
 
             /**
              * @tutorial-step 5.1.3
+             * @task Building a social graph
+             * @concepts
+             * - Smash
+             * - Pass
+             * - Social graph
+             */
+            public onRelationship = jest.fn(
+                async (
+                    from: DIDString,
+                    to: DIDString,
+                    relationship: Relationship,
+                ) => {
+                    if (!this.relationships.has(from)) {
+                        this.relationships.set(from, new Map());
+                    }
+                    this.relationships.get(from)?.set(to, relationship);
+                },
+            );
+            // trivial users graph data model
+            private relationships: Map<
+                DIDString,
+                Map<DIDString, Relationship>
+            > = new Map();
+
+            private readonly DEFAULT_DISTANCE = 10;
+
+            // Calculate distance based on direct and indirect relationships
+            private getDistance(from: DIDString, to: DIDString): number {
+                // Direct relationship check
+                const directRel = this.relationships.get(from)?.get(to);
+                if (directRel) {
+                    return directRel === 'smash' ? 0 : Infinity;
+                }
+
+                // Initialize distance as default
+                let minDistance = this.DEFAULT_DISTANCE;
+
+                // Check for indirect relationships through intermediaries
+                const visited = new Set<DIDString>();
+                const queue: Array<[DIDString, number]> = [[from, 0]];
+
+                while (queue.length > 0) {
+                    const [current, depth] = queue.shift()!;
+
+                    if (visited.has(current)) continue;
+                    visited.add(current);
+
+                    const relationships = this.relationships.get(current);
+                    if (!relationships) continue;
+
+                    for (const [nextPeer, rel] of relationships.entries()) {
+                        if (rel === 'pass') continue;
+
+                        if (nextPeer === to) {
+                            // Found a path to target, calculate contribution
+                            const pathContribution =
+                                this.DEFAULT_DISTANCE / (depth + 2);
+                            minDistance = Math.min(
+                                minDistance,
+                                pathContribution,
+                            );
+                        } else if (!visited.has(nextPeer)) {
+                            queue.push([nextPeer, depth + 1]);
+                        }
+                    }
+                }
+                return minDistance;
+            }
+
+            /**
+             * @tutorial-step 5.1.4
              * @task Processing discover requests
              * @concepts
              * - Peer discovery
@@ -644,17 +717,19 @@ describe('Smash Tutorial', () => {
              * - NAB-mediated discovery
              */
             public onDiscover = jest.fn(async (from: DIDString) => {
+                const otherMembers = this.members.filter(
+                    (member) => member !== from,
+                );
                 return (await Promise.all(
-                    this.members
-                        .filter((member) => member !== from)
-                        .map(async (member) => ({
-                            did: await SmashMessaging.resolve(member),
-                            meta: this.metadata.get(member),
-                        })),
+                    otherMembers.map(async (member) => ({
+                        did: await SmashMessaging.resolve(member),
+                        meta: this.metadata.get(member),
+                        scores: {
+                            distance: this.getDistance(from, member),
+                        },
+                    })),
                 )) as SmashProfileList;
             });
-
-            public onRelationship = jest.fn();
         }
 
         beforeEach(async () => {
@@ -771,8 +846,6 @@ describe('Smash Tutorial', () => {
              * - NAB-mediated discovery
              */
             test('Discovering neighborhood peers', async () => {
-                if (!bob) throw new Error('Bob is not initialized');
-
                 const onNeighborhoodProfiles = jest.fn();
                 bob.on(NBH_PROFILE_LIST, onNeighborhoodProfiles);
                 const waitForDiscovery = waitFor(bob, NBH_PROFILE_LIST);
@@ -808,6 +881,72 @@ describe('Smash Tutorial', () => {
                             expectedDiscoveredProfile(darcy),
                         ]),
                     ) as SmashProfileList,
+                );
+            });
+
+            /**
+             * @tutorial-step 5.4
+             * @task Building a social graph by setting interaction preferences
+             * @concepts
+             * - Smash
+             * - Pass
+             * - Social graph
+             */
+            describe('Building a social graph', () => {
+                /**
+                 * @tutorial-step 5.4.1
+                 * @task Smashing another peer
+                 * @concepts
+                 * - Smash
+                 * - Social graph
+                 */
+                test(
+                    'Bob smashing Alice',
+                    async () => {
+                        const getDistanceFromBobToAlice = () =>
+                            new Promise<number>((resolve, reject) => {
+                                const timeout = setTimeout(() => {
+                                    reject(new Error('Timeout'));
+                                }, TEST_CONFIG.TEST_TIMEOUT_MS);
+                                bob.once(NBH_PROFILE_LIST, (_, profiles) => {
+                                    const aliceProfile = profiles.find(
+                                        (profile) =>
+                                            profile.did.id === alice.did,
+                                    );
+                                    clearTimeout(timeout);
+                                    resolve(
+                                        aliceProfile?.scores?.distance || 0,
+                                    );
+                                });
+                                bob.discover();
+                            });
+                        const initialDistance =
+                            await getDistanceFromBobToAlice();
+
+                        await bob.smash(alice.did);
+
+                        const nabReceivedSmash = waitFor(
+                            nab,
+                            SMASH_NBH_RELATIONSHIP,
+                        );
+                        await nabReceivedSmash;
+                        await delay(TEST_CONFIG.MESSAGE_DELIVERY);
+
+                        expect(nab.onRelationship).toHaveBeenCalledWith(
+                            bob.did,
+                            alice.did,
+                            'smash',
+                            expect.any(String),
+                            expect.any(String),
+                        );
+
+                        const afterSmashDistance =
+                            await getDistanceFromBobToAlice();
+                        expect(afterSmashDistance).toBeLessThan(
+                            initialDistance,
+                        );
+                    },
+                    TEST_CONFIG.TEST_TIMEOUT_MS * 3,
                 );
             });
         });

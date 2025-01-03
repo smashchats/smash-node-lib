@@ -25,12 +25,17 @@ export class SMESocketReadWrite extends SMESocketWriteOnly {
         preKeyPair: IECKeyPair,
         smeConfig: SMEConfigJSONWithoutDefaults,
     ): Promise<SmashEndpoint> {
-        this.logger.debug('SMESocketReadWrite::initSocketWithAuth');
-        const auth = {
+        this.logger.debug(`SMESocketReadWrite::initSocketWithAuth with auth`);
+        const auth: SMEConfig = {
             ...SME_DEFAULT_CONFIG,
-            ...smeConfig,
+            ...Object.fromEntries(
+                Object.entries(smeConfig).filter(([, v]) => v !== undefined),
+            ),
+            smePublicKey: smeConfig.smePublicKey,
+            url: smeConfig.url,
             preKeyPair,
-        } as SMEConfig;
+        };
+        this.logger.debug('auth', JSON.stringify(auth, null, 2));
         return new Promise<SmashEndpoint>((resolve, reject) => {
             const preKeyPublicKey = auth.preKeyPair.publicKey;
             Promise.all([
@@ -41,10 +46,15 @@ export class SMESocketReadWrite extends SMESocketWriteOnly {
                 ),
             ]).then(([exportedPreKey, signature]) => {
                 // we initialize a new socket with given auth params
-                this.initSocket({
+                const authParams = {
                     key: exportedPreKey,
                     keyAlgorithm: auth.keyAlgorithm,
-                });
+                };
+                this.logger.debug(
+                    'authParams',
+                    JSON.stringify(authParams, null, 2),
+                );
+                this.initSocket(authParams);
                 if (!this.socket) {
                     this.logger.error('> SME socket not initialized');
                     throw new Error('> SME socket not initialized');

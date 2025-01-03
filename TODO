@@ -8,14 +8,13 @@
 - [ ] use AI to refactor file paths / reorganise module file structure
 - [ ] use AI to extract more modules: more modular, decoupled, and loosely coupled
 
-- [ ] set everything private then resolve issues opening strict minimum as public APIs
-
 ### CODE REFACTORING (with no functional changes):
 
-- use AI to refactor individual code files to be more readable, performant, maintainable, secure, efficient, etc
+- [ ] use AI to refactor individual code files to be more readable, performant, maintainable, secure, efficient, etc
 
 ### TESTS REFACTORING (keeping or increasing coverage):
 
+- [ ] set everything private then resolve issues opening strict minimum as public APIs
 - (?) use AI to generate unit .test files with mocks/spies for each module corresponding to the library API reference (**testing only publicly exported**)
 - use AI to refactor functional (.spec) tests files to be more readable, maintainable, comprehensive -> corresponding to the tutorial and how to
   --> should have 100% functional coverage
@@ -67,10 +66,15 @@ Tutorial = Covers entire product but HAPPY PATH ONLY
 - [x] setting up a Neighborhood / NAB
 - [x] joining the Neighborhood
 - [x] discovering other peers in the neighborhood (NBH_PROFILE_LIST)
-- [ ] smashing another user from the neighborhood
-- [ ] passing another user from the neighborhood
-- [ ] clearing another user from the neighborhood
+- [x] smashing another user from the neighborhood
+- [-] passing another user from the neighborhood
+- [-] clearing another user from the neighborhood
 - [ ] loading the library with existing peers/chats
+
+then, next feats
+
+- [ ] loading the library with existing _data_ (tbd)
+- [ ] (un)blocking another peer
 
 ### TODO
 
