@@ -17,7 +17,11 @@ import {
     IM_SESSION_RESET,
     MessageStatus,
 } from '@src/types/improto.lexicon.js';
-import { IMProtoMessage, sha256 } from '@src/types/message.types.js';
+import {
+    IMProtoMessage,
+    reverseDNS,
+    sha256,
+} from '@src/types/message.types.js';
 import {
     SMASH_NBH_DISCOVER,
     SMASH_NBH_JOIN,
@@ -43,32 +47,25 @@ export type IMProtoEventMap = {
     [SMASH_NBH_RELATIONSHIP]: SmashChatRelationshipMessage;
     [SMASH_PROFILE_LIST]: SmashChatProfileListMessage;
 };
-// Allow extending this type
-// declare module './events' {
-//     interface IMProtoEventMap {
-//         'reverse.dns.event': IMProtoMessageSubType;
-//     }
-// }
 
-// Type helper to get the message type for an event, defaulting to IMProtoMessage
-export type IMProtoEventType<T extends string> = T extends keyof IMProtoEventMap
-    ? IMProtoEventMap[T]
-    : IMProtoMessage;
+export type IMProtoEventType<T extends reverseDNS> =
+    T extends keyof IMProtoEventMap ? IMProtoEventMap[T] : IMProtoMessage;
 
 // Custom events map their names to tuple types of their arguments
-export interface CustomEventMap {
+export interface MessagingEventMap {
     status: [MessageStatus, sha256[]];
+    data: [DIDString, IMProtoMessage];
 }
 // Allow extending this type
 // declare module './events' {
-//     interface CustomEventMap {
+//     interface MessagingEventMap {
 //         'peer': { peerId: string; timestamp: number };
 //     }
 // }
 
 // Helper type to get event args type, defaulting to IMProto signature
-export type EventArgs<T extends string> = T extends keyof CustomEventMap
-    ? CustomEventMap[T]
-    : T extends string
+export type EventArgs<T extends string> = T extends keyof MessagingEventMap
+    ? MessagingEventMap[T]
+    : T extends reverseDNS
       ? [did: DIDString, message: IMProtoEventType<T>, peer?: SmashPeer]
       : never;

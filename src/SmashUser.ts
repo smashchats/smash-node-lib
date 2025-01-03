@@ -14,7 +14,7 @@ import {
 } from '@src/types/smashchats.lexicon.js';
 
 declare module '@src/types/events.js' {
-    interface CustomEventMap {
+    interface MessagingEventMap {
         [NBH_ADDED]: [DIDString];
         [NBH_PROFILE_LIST]: [DIDString, SmashProfileList];
     }
