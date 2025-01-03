@@ -1,8 +1,8 @@
 import { Crypto } from '@peculiar/webcrypto';
-import { TestMessage, TestUtils } from '@tests/how-to/events.utils.js';
-import { TestPeer, createPeer } from '@tests/how-to/user.utils.js';
 import { socketServerUrl } from '@tests/jest.global.js';
-import { TEST_CONFIG, delay } from '@tests/time.utils.js';
+import { TestMessage, TestUtils } from '@tests/utils/events.utils.js';
+import { TEST_CONFIG, delay } from '@tests/utils/time.utils.js';
+import { TestPeer, createPeer } from '@tests/utils/user.utils.js';
 import {
     EncapsulatedIMProtoMessage,
     IMProfile,

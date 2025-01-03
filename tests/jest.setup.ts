@@ -1,4 +1,4 @@
-import { TEST_CONFIG, delay } from '@tests/time.utils.js';
+import { TEST_CONFIG, delay } from '@tests/utils/time.utils.js';
 import { Logger, SmashMessaging } from 'smash-node-lib';
 
 const logger = new Logger('jest', 'INFO');

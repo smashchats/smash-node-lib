@@ -1,6 +1,6 @@
 import { Crypto } from '@peculiar/webcrypto';
 import { SME_PUBLIC_KEY, socketServerUrl } from '@tests/jest.global.js';
-import { TEST_CONFIG, aliasWaitFor, delay } from '@tests/time.utils.js';
+import { TEST_CONFIG, aliasWaitFor, delay } from '@tests/utils/time.utils.js';
 import {
     CryptoUtils,
     DID,

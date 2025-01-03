@@ -2,6 +2,7 @@ import { SME_PUBLIC_KEY } from '@tests/jest.global.js';
 import {
     DIDDocManager,
     DIDDocument,
+    DIDManager,
     IMPeerIdentity,
     SmashMessaging,
 } from 'smash-node-lib';
@@ -16,13 +17,19 @@ export interface TestPeer {
 const defaultDidManager = new DIDDocManager();
 SmashMessaging.use('doc', defaultDidManager);
 
+export const generateIdentity = async (
+    didManager: DIDManager = defaultDidManager,
+) => {
+    return await didManager.generate();
+};
+
 export const createPeer = async (
     name: string,
     serverUrl?: string | string[],
     loadIdentity?: IMPeerIdentity,
-    didManager = defaultDidManager,
+    didManager?: DIDManager,
 ): Promise<TestPeer> => {
-    const identity = loadIdentity ?? (await didManager.generate());
+    const identity = loadIdentity ?? (await generateIdentity(didManager));
     const config = serverUrl
         ? (Array.isArray(serverUrl) ? serverUrl : [serverUrl]).map((url) => ({
               url,

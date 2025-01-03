@@ -1,4 +1,3 @@
-import { TestPeer, createPeer } from '@tests/how-to/user.utils.js';
 import {
     SME_PUBLIC_KEY,
     emptySocketServerUrl,
@@ -6,6 +5,7 @@ import {
     socketServerUrl,
 } from '@tests/jest.global.js';
 import { TEST_CONFIG, aliasWaitFor, delay } from '@tests/time.utils.js';
+import { TestPeer, createPeer } from '@tests/utils/user.utils.js';
 import {
     DIDDocument,
     EncapsulatedIMProtoMessage,
