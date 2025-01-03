@@ -1,12 +1,13 @@
+import { Crypto } from '@peculiar/webcrypto';
 import {
     SME_PUBLIC_KEY,
     secondarySocketServerUrl,
     socketServerUrl,
 } from '@tests/jest.global.js';
-import { TEST_CONFIG, delay } from '@tests/time.utils.js';
 import { TestUtils } from '@tests/utils/events.utils.js';
+import { TEST_CONFIG, delay } from '@tests/utils/time.utils.js';
 import { TestPeer, createPeer } from '@tests/utils/user.utils.js';
-import { Logger, SmashMessaging } from 'smash-node-lib';
+import { IMText, Logger, SmashMessaging } from 'smash-node-lib';
 
 describe('[Sessions] Session Management', () => {
     const logger = new Logger('sessions.spec', 'DEBUG');
@@ -16,6 +17,7 @@ describe('[Sessions] Session Management', () => {
 
     beforeAll(async () => {
         logger.info('Setting up crypto for tests');
+        const crypto = new Crypto();
         SmashMessaging.setCrypto(crypto);
         await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
     });
@@ -52,10 +54,9 @@ describe('[Sessions] Session Management', () => {
 
             // Send first message to establish session
             logger.debug('Sending Alice->Bob message to establish session');
-            const msg1 = await alice.messaging.sendTextMessage(
+            const msg1 = await alice.messaging.send(
                 bob.did,
-                'msg1',
-                '',
+                new IMText('msg1'),
             );
             await delay(10 * TEST_CONFIG.MESSAGE_DELIVERY);
 
@@ -83,7 +84,10 @@ describe('[Sessions] Session Management', () => {
 
             // Send second message
             logger.debug('Sending Bob->Alice message');
-            await bob.messaging.sendTextMessage(alice.did, 'msg2', msg1.sha256);
+            await bob.messaging.send(
+                alice.did,
+                new IMText('msg2', msg1.sha256),
+            );
             await delay(2 * TEST_CONFIG.MESSAGE_DELIVERY);
 
             // Get events for second message
@@ -128,7 +132,7 @@ describe('[Sessions] Session Management', () => {
             logger.debug(
                 'Sending initial message to establish preferred endpoints',
             );
-            await alice.messaging.sendTextMessage(bob.did, 'initial', '');
+            await alice.messaging.send(bob.did, new IMText('initial'));
             await delay(TEST_CONFIG.MESSAGE_DELIVERY);
 
             // Verify Bob received through his endpoint
@@ -141,7 +145,7 @@ describe('[Sessions] Session Management', () => {
             // Bob sends reply
             logger.debug('Bob sending reply through preferred endpoint');
             const reply = 'reply through preferred endpoint';
-            await bob.messaging.sendTextMessage(alice.did, reply, '');
+            await bob.messaging.send(alice.did, new IMText(reply));
             await delay(TEST_CONFIG.MESSAGE_DELIVERY);
 
             // Verify Alice received through her preferred endpoint

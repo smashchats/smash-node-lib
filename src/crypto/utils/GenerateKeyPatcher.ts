@@ -74,10 +74,12 @@ export class GenerateKeyPatcher extends CryptoManager {
                 identityJSON.exchangeKey,
             ),
             preKeys: await Promise.all(
-                identityJSON.preKeys.map(this.reconstituteKeyPair),
+                identityJSON.preKeys.map(this.reconstituteKeyPair.bind(this)),
             ),
             signedPreKeys: await Promise.all(
-                identityJSON.signedPreKeys.map(this.reconstituteKeyPair),
+                identityJSON.signedPreKeys.map(
+                    this.reconstituteKeyPair.bind(this),
+                ),
             ),
         };
     }

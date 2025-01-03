@@ -1,14 +1,16 @@
+import { Crypto } from '@peculiar/webcrypto';
 import {
     SME_PUBLIC_KEY,
     emptySocketServerUrl,
     quietSocketServerUrl,
     socketServerUrl,
 } from '@tests/jest.global.js';
-import { TEST_CONFIG, aliasWaitFor, delay } from '@tests/time.utils.js';
+import { TEST_CONFIG, aliasWaitFor, delay } from '@tests/utils/time.utils.js';
 import { TestPeer, createPeer } from '@tests/utils/user.utils.js';
 import {
     DIDDocument,
     EncapsulatedIMProtoMessage,
+    IMText,
     Logger,
     SMEConfigJSONWithoutDefaults,
     SmashEndpoint,
@@ -26,6 +28,7 @@ describe('[Message Delivery] Message delivery and acknowledgment', () => {
     const waitFor = aliasWaitFor(waitForEventCancelFns, logger);
 
     beforeAll(async () => {
+        const crypto = new Crypto();
         SmashMessaging.setCrypto(crypto);
         await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
     });
@@ -48,10 +51,9 @@ describe('[Message Delivery] Message delivery and acknowledgment', () => {
         let bob: TestPeer;
 
         const sendMsgToBob = async (message: string = 'test message') =>
-            alice?.messaging.sendTextMessage(
+            alice?.messaging.send(
                 bob.did,
-                message,
-                '',
+                new IMText(message),
             ) as Promise<EncapsulatedIMProtoMessage>;
 
         beforeEach(async () => {
@@ -66,17 +68,14 @@ describe('[Message Delivery] Message delivery and acknowledgment', () => {
 
         describe('sends a message to Bob on a valid SME', () => {
             beforeEach(async () => {
-                // create bob with 2 prekeys for endpoint renewal
-                bob = await createPeer('bob', socketServerUrl, undefined, 2);
+                bob = await createPeer('bob', socketServerUrl);
             });
 
             it('should receive a DELIVERED ack on SME delivery', async () => {
-                const waitForStatus = waitFor(
-                    alice?.messaging,
-                    'status',
-                    1,
-                    TEST_CONFIG.TEST_TIMEOUT_MS / 2,
-                );
+                const waitForStatus = waitFor(alice?.messaging, 'status', {
+                    count: 1,
+                    timeout: TEST_CONFIG.TEST_TIMEOUT_MS / 2,
+                });
                 const sent = await sendMsgToBob();
                 await waitForStatus;
                 await delay(TEST_CONFIG.MESSAGE_DELIVERY);
@@ -146,7 +145,7 @@ describe('[Message Delivery] Message delivery and acknowledgment', () => {
 
                     logger.info('>> Alice sends a message to Bob');
                     alice?.messaging
-                        .sendTextMessage(bob.did, 'test message', '')
+                        .send(bob.did, new IMText('test message'))
                         .then(
                             (sentMessage: EncapsulatedIMProtoMessage) =>
                                 (sent = sentMessage),

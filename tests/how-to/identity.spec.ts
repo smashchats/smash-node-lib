@@ -3,6 +3,9 @@ import { SmashMessaging } from 'smash-node-lib';
 
 describe('SmashMessaging: Identity utilities', () => {
     beforeAll(() => {
+        // THERES AN ISSUE WHEN USING NODE'S CRYPTO
+        // ECDH KEY BEING USED FOR NOT ALLOWED BLABLABLA
+        // TODO FIX THIS IN THIS DOC (WITHOUT USING @peculiar/webcrypto)
         SmashMessaging.setCrypto(crypto);
     });
 

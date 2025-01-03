@@ -41,20 +41,8 @@ type ProfileMeta = Omit<IMProfile, 'did'>;
 // TODO: split beteen IMProto and Smash Messaging
 
 export class SmashMessaging extends EventEmitter {
-    private static didDocManagers: Map<DIDMethod, DIDManager> = new Map();
-    public static use(method: DIDMethod, manager: DIDManager) {
-        this.didDocManagers.set(method, manager);
-    }
-    public static resolve(did: DID) {
-        const didString = typeof did === 'string' ? did : did.id;
-        const method = DIDManager.parseMethod(didString);
-        const resolver = this.didDocManagers.get(method);
-        if (!resolver) throw new Error(`No resolver found for ${didString}`);
-        return resolver.resolve(didString);
-    }
-
+    private static readonly didDocManagers = new Map<DIDMethod, DIDManager>();
     protected readonly logger: Logger;
-
     public readonly endpoints: EndpointManager;
     protected readonly peers: PeerRegistry;
     private readonly sessionManager: SessionManager;
@@ -63,52 +51,113 @@ export class SmashMessaging extends EventEmitter {
 
     constructor(
         protected readonly identity: IMPeerIdentity,
-        LOG_ID: string = 'SmashMessaging',
-        LOG_LEVEL: LogLevel = 'INFO',
+        logId: string = 'SmashMessaging',
+        logLevel: LogLevel = 'INFO',
     ) {
         super();
-        this.logger = new Logger(LOG_ID, LOG_LEVEL);
+        this.logger = new Logger(logId, logLevel);
         this.smeSocketManager = new SMESocketManager(
             this.logger,
             this.messagesStatusHandler.bind(this),
         );
+
         this.peers = new PeerRegistry(
             this.logger,
             this.createNewPeer.bind(this),
         );
+
         const messageMiddleware = new MessageMiddleware(
             this.logger,
             this.peers,
             this.notifyNewMessages.bind(this),
         );
+
         this.sessionManager = new SessionManager(
-            identity,
+            this.identity,
             this.logger,
             messageMiddleware,
         );
+
         this.endpoints = new EndpointManager(
             this.logger,
             this.identity,
             this.smeSocketManager,
             this.sessionManager,
         );
-        this.registerAckHandlers();
-        this.on(IM_SESSION_ENDPOINT, (did, message) => {
-            return this.peers.get(did)?.setPreferredEndpoint(message.data);
-        });
-        this.on(IM_SESSION_RESET, (did, message) => {
-            return this.peers.get(did)?.incomingSessionReset(message.sha256!);
-        });
+        this.registerEventHandlers();
         this.logger.info(
-            `SmashMessaging (log level: ${LOG_LEVEL}, id: ${LOG_ID}, did: ${this.identity.did})`,
+            `SmashMessaging (log level: ${logLevel}, id: ${logId}, did: ${this.identity.did})`,
         );
     }
 
-    static setCrypto(c: globalThis.Crypto) {
+    private registerEventHandlers(): void {
+        this.registerAckHandlers();
+        this.registerSessionHandlers();
+    }
+
+    private registerSessionHandlers(): void {
+        this.on(IM_SESSION_ENDPOINT, (did, message) => {
+            return this.peers.get(did)?.setPreferredEndpoint(message.data);
+        });
+
+        this.on(IM_SESSION_RESET, (did, message) => {
+            return this.peers.get(did)?.incomingSessionReset(message.sha256!);
+        });
+    }
+
+    public static use(method: DIDMethod, manager: DIDManager): void {
+        this.didDocManagers.set(method, manager);
+    }
+
+    public static resolve(did: DID): Promise<DIDDocument> {
+        const didString = typeof did === 'string' ? did : did.id;
+        const method = DIDManager.parseMethod(didString);
+        const resolver = this.didDocManagers.get(method);
+
+        if (!resolver) {
+            throw new Error(`No resolver found for ${didString}`);
+        }
+
+        return resolver.resolve(didString);
+    }
+
+    public static setCrypto(c: globalThis.Crypto): void {
         CryptoManager.setCrypto(c);
     }
 
-    private async createNewPeer(peerDid: DID, lastMessageTime: number) {
+    public static async importIdentity(json: string): Promise<IMPeerIdentity> {
+        return IMPeerIdentity.deserialize(json);
+    }
+
+    public static handleError(
+        reason: unknown,
+        promise: Promise<unknown>,
+        logger: Logger,
+    ): void {
+        if (isOperationError(reason)) {
+            logger.warn(
+                '[SmashMessaging] Decryption OperationError: Possible key mismatch or corrupted data.',
+            );
+            logger.debug(
+                'Detailed cause:',
+                (reason as { cause?: string }).cause ||
+                    'No additional error cause found',
+            );
+            return;
+        }
+
+        logger.error(
+            '[SmashMessaging] Unhandled rejection at:',
+            promise,
+            'reason:',
+            reason,
+        );
+    }
+
+    private async createNewPeer(
+        peerDid: DID,
+        lastMessageTime: number,
+    ): Promise<SmashPeer> {
         return new SmashPeer(
             this.logger,
             peerDid,
@@ -118,64 +167,15 @@ export class SmashMessaging extends EventEmitter {
         );
     }
 
-    async close() {
-        const peersToClose = Array.from(this.peers.values());
-        this.logger.debug(`>> closing (${peersToClose.length}) peers`);
-        const peersResult = await Promise.allSettled(
-            peersToClose.map((p) => p.cancelRetry()),
-        );
-        this.logger.debug(`>> closing (${this.endpoints.size}) endpoints`);
-        const socketsResult = await this.smeSocketManager.closeAllSockets();
-        this.endpoints.reset([]);
-        const failedToClosePeers = peersResult.filter(
-            (r) => r.status === 'rejected',
-        );
-        const failedToCloseSockets = socketsResult.filter(
-            (r) => r.status === 'rejected',
-        );
-        if (failedToClosePeers.length || failedToCloseSockets.length) {
-            if (failedToClosePeers.length) {
-                this.logger.warn(
-                    `<< some peers failed to close: ${failedToClosePeers.map((r) => r.reason).join(', ')}`,
-                );
-            }
-            if (failedToCloseSockets.length) {
-                this.logger.warn(
-                    `<< some sockets failed to close: ${failedToCloseSockets.map((r) => r.reason).join(', ')}`,
-                );
-            }
-        } else {
-            this.logger.info('<<< CLOSED');
-        }
-    }
-
-    async initChats(chats: SmashChat[]) {
-        return Promise.all(
-            chats.map(async (chat) => {
-                const peerDid = await SmashMessaging.resolve(chat.with);
-                this.peers.set(
-                    peerDid.id,
-                    await this.createNewPeer(
-                        peerDid,
-                        new Date(
-                            chat.lastMessageTimestamp as ISO8601,
-                        ).getTime(),
-                    ),
-                );
-            }),
-        );
-    }
-
-    /**
-     * Firehose incoming events to the library user
-     */
     private async notifyNewMessages(
         sender: DIDString,
         messages: EncapsulatedIMProtoMessage[],
-    ) {
+    ): Promise<void> {
         if (!messages?.length) return;
+
         this.logger.debug(`notifyNewMessages (${messages?.length})`);
         this.logger.debug(JSON.stringify(messages, null, 2));
+
         messages.forEach((message) => {
             if (reverseDNSRegex.test(message.type)) {
                 this.emit(message.type, sender, message);
@@ -184,25 +184,24 @@ export class SmashMessaging extends EventEmitter {
                     `Invalid message type format received: ${message.type}`,
                 );
             }
+            this.emit('data', sender, message);
         });
-        messages.forEach((message) => this.emit('data', sender, message));
     }
 
-    private registerAckHandlers() {
-        const handleAck = (
+    private registerAckHandlers(): void {
+        const handleAck = async (
             status: MessageStatus,
             from: DIDString,
             messageIds: sha256[],
         ) => {
             this.messagesStatusHandler(status, messageIds);
-            this.peers
-                .get(from)
-                ?.ack(messageIds)
-                .then(() => {
-                    this.logger.debug(
-                        `> cleared ${messageIds} from sending queues`,
-                    );
-                });
+            const peer = this.peers.get(from);
+            if (peer) {
+                await peer.ack(messageIds);
+                this.logger.debug(
+                    `> cleared ${messageIds} from sending queues`,
+                );
+            }
         };
 
         this.on(IM_ACK_RECEIVED, (from, message) => {
@@ -214,95 +213,150 @@ export class SmashMessaging extends EventEmitter {
         });
     }
 
-    private messagesStatusHandler(status: MessageStatus, messageIds: sha256[]) {
+    private messagesStatusHandler(
+        status: MessageStatus,
+        messageIds: sha256[],
+    ): void {
         this.logger.debug(
             `messagesStatusHandler ACK:${status} : ${messageIds.join(', ')}`,
         );
         this.emit('status', status, messageIds);
     }
 
-    public async ackMessagesRead(did: DID, messageIds: sha256[]) {
+    public async close(): Promise<void> {
+        const peersToClose = Array.from(this.peers.values());
+        this.logger.debug(`>> closing (${peersToClose.length}) peers`);
+
+        const [peersResult, socketsResult] = await Promise.all([
+            Promise.allSettled(peersToClose.map((p) => p.cancelRetry())),
+            this.smeSocketManager.closeAllSockets(),
+        ]);
+
+        this.endpoints.reset([]);
+
+        this.handleCloseResults(peersResult, socketsResult);
+    }
+
+    private handleCloseResults(
+        peersResult: PromiseSettledResult<void>[],
+        socketsResult: PromiseSettledResult<void>[],
+    ): void {
+        const failedToClosePeers = peersResult.filter(
+            (r) => r.status === 'rejected',
+        );
+        const failedToCloseSockets = socketsResult.filter(
+            (r) => r.status === 'rejected',
+        );
+
+        if (failedToClosePeers.length || failedToCloseSockets.length) {
+            this.logCloseFailures(failedToClosePeers, failedToCloseSockets);
+        } else {
+            this.logger.info('<<< CLOSED');
+        }
+    }
+
+    private logCloseFailures(
+        failedPeers: PromiseRejectedResult[],
+        failedSockets: PromiseRejectedResult[],
+    ): void {
+        if (failedPeers.length) {
+            this.logger.warn(
+                `<< some peers failed to close: ${failedPeers.map((r) => r.reason).join(', ')}`,
+            );
+        }
+        if (failedSockets.length) {
+            this.logger.warn(
+                `<< some sockets failed to close: ${failedSockets.map((r) => r.reason).join(', ')}`,
+            );
+        }
+    }
+
+    public async initChats(chats: SmashChat[]): Promise<void> {
+        await Promise.all(
+            chats.map(async (chat) => {
+                const peerDid = await SmashMessaging.resolve(chat.with);
+                const lastMessageTime = new Date(
+                    chat.lastMessageTimestamp as ISO8601,
+                ).getTime();
+                const peer = await this.createNewPeer(peerDid, lastMessageTime);
+                this.peers.set(peerDid.id, peer);
+            }),
+        );
+    }
+
+    public async ackMessagesRead(
+        did: DID,
+        messageIds: sha256[],
+    ): Promise<EncapsulatedIMProtoMessage> {
         return this.send(did, {
             type: IM_ACK_READ,
             data: messageIds,
         } as IMReadACKMessage);
     }
 
-    async send(peerDid: DID, message: IMProtoMessage) {
+    public async send(
+        peerDid: DID,
+        message: IMProtoMessage,
+    ): Promise<EncapsulatedIMProtoMessage> {
         const peer = await this.peers.getOrCreate(peerDid);
         return peer.send(message);
     }
 
-    async getDIDDocument(): Promise<DIDDocument> {
+    public async exportIdentity(): Promise<string> {
+        this.logger.warn('EXPORTED IDENTITY CONTAINS SECRETS: DO NOT SHARE!');
+        return this.identity.serialize();
+    }
+
+    public async getDIDDocument(): Promise<DIDDocument> {
         return this.identity.getDIDDocument();
     }
 
-    get did(): DIDString {
+    public async updateMeta(meta?: Partial<ProfileMeta>): Promise<void> {
+        this.meta = meta || {};
+        await this.peers.updateUserProfile(this.profile);
+    }
+
+    public get did(): DIDString {
         return this.identity.did;
     }
 
-    get profile(): IMProfile {
+    public get profile(): IMProfile {
         return {
-            ...{
-                title: '',
-                description: '',
-                avatar: '',
-            },
+            title: '',
+            description: '',
+            avatar: '',
             ...this.meta,
             did: this.did,
         };
     }
 
-    async updateMeta(meta?: Partial<ProfileMeta>) {
-        this.meta = meta || {};
-        await this.peers.updateUserProfile(this.profile);
-    }
-
-    on<T extends string>(
+    public on<T extends string>(
         eventName: T,
         listener: (...args: EventArgs<T>) => void,
     ): this {
         return super.on(eventName, listener);
     }
 
-    once<T extends string>(
+    public once<T extends string>(
         eventName: T,
         listener: (...args: EventArgs<T>) => void,
     ): this {
         return super.once(eventName, listener);
     }
 
-    emit<T extends string>(eventName: T, ...args: EventArgs<T>): boolean {
+    public emit<T extends string>(
+        eventName: T,
+        ...args: EventArgs<T>
+    ): boolean {
         return super.emit(eventName, ...args);
     }
+}
 
-    // TODO demo usage in test suite
-    static handleError(
-        reason: unknown,
-        promise: Promise<unknown>,
-        logger: Logger,
-    ) {
-        if (
-            typeof reason === 'object' &&
-            reason !== null &&
-            'name' in reason &&
-            reason.name === 'OperationError'
-        ) {
-            logger.warn(
-                '[SmashMessaging] Decryption OperationError: Possible key mismatch or corrupted data.',
-            );
-            logger.debug(
-                'Detailed cause:',
-                (reason as { cause?: string }).cause ||
-                    'No additional error cause found',
-            );
-        } else {
-            logger.error(
-                '[SmashMessaging] Unhandled rejection at:',
-                promise,
-                'reason:',
-                reason,
-            );
-        }
-    }
+function isOperationError(error: unknown): boolean {
+    return (
+        typeof error === 'object' &&
+        error !== null &&
+        'name' in error &&
+        error.name === 'OperationError'
+    );
 }

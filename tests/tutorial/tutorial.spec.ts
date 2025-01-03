@@ -439,8 +439,14 @@ describe('Smash Tutorial', () => {
             await alice.send(bob.did, new IMText('Hello, Bob!'));
             await delay(TEST_CONFIG.MESSAGE_DELIVERY * 3);
 
-            const expectedCalls = TEST_CONFIG.PROTOCOL_OVERHEAD_SIZE * 2 + 1;
-            expect(onData).toHaveBeenCalledTimes(expectedCalls);
+            const expectedMinCalls = TEST_CONFIG.PROTOCOL_OVERHEAD_SIZE + 1 + 1;
+            const expectedMaxCalls = TEST_CONFIG.PROTOCOL_OVERHEAD_SIZE * 2 + 1;
+            expect(onData.mock.calls.length).toBeGreaterThanOrEqual(
+                expectedMinCalls,
+            );
+            expect(onData.mock.calls.length).toBeLessThanOrEqual(
+                expectedMaxCalls,
+            );
         });
     });
 

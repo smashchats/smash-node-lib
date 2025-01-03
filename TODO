@@ -7,12 +7,16 @@ KEY USAGE ISSUE WHEN USING NODE Crypto OBJECT
 - [x] manual refactor while writing the happy path tutorial test suite (mainly splitting modules and restructuring code)
 - [-] make previous test suites pass again
 
-- [ ] use AI to refactor file paths / reorganise module file structure
-- [ ] use AI to extract more modules: more modular, decoupled, and loosely coupled
+    - [-] tests/how-to/index.spec.ts
+    - [-] tests/how-to/nbh.spec.ts
+    - [ ] tests/how-to/sessions.spec.ts
+    - [ ] tests/how-to/edgecases.spec.ts
+    - [ ] tests/how-to/delivery.spec.ts
+    - [ ] tests/how-to/identity.spec.ts
 
-### CODE REFACTORING (with no functional changes):
-
-- [ ] use AI to refactor individual code files to be more readable, performant, maintainable, secure, efficient, etc
+- [ ] use AI to refactor all individual code files (to be more readable, performant, maintainable, secure, efficient, etc)
+- [ ] use AI to refactor module file paths structure (make sure all tests pass)
+- [ ] use AI to extract more submodules: more modular, decoupled, and loosely coupled (make sure all tests pass)
 
 ### TESTS REFACTORING (keeping or increasing coverage):
 

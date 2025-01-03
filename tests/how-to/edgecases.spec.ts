@@ -1,14 +1,17 @@
+import { Crypto } from '@peculiar/webcrypto';
 import { apiServerUrl, socketServerUrl } from '@tests/jest.global.js';
-import { TEST_CONFIG, aliasWaitFor, delay } from '@tests/time.utils.js';
+import { TEST_CONFIG, aliasWaitFor, delay } from '@tests/utils/time.utils.js';
 import { TestPeer, createPeer } from '@tests/utils/user.utils.js';
 import {
     EncapsulatedIMProtoMessage,
     IMProtoMessage,
+    IMText,
     IMTextMessage,
     IM_CHAT_TEXT,
     Logger,
     SignalSession,
     SmashMessaging,
+    sha256,
     sortSmashMessages,
 } from 'smash-node-lib';
 
@@ -26,6 +29,7 @@ describe('SmashMessaging: Edge cases', () => {
     let dateSpy: jest.SpyInstance;
 
     beforeAll(async () => {
+        const crypto = new Crypto();
         SmashMessaging.setCrypto(crypto);
         await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
     });
@@ -56,10 +60,9 @@ describe('SmashMessaging: Edge cases', () => {
                 // 1. Alice sends a message to Bob
                 logger.info('>> Alice sends a message to Bob');
                 const message1 = 'initial message';
-                const sent = await alice.messaging.sendTextMessage(
+                const sent = await alice.messaging.send(
                     bob.did,
-                    message1,
-                    '0',
+                    new IMText(message1),
                 );
                 await delay(2 * TEST_CONFIG.MESSAGE_DELIVERY);
 
@@ -93,15 +96,13 @@ describe('SmashMessaging: Edge cases', () => {
                 );
                 logger.debug('>> Exporting Bob identity');
                 const bobExportedIdentity =
-                    await bob.messaging.exportIdentityToJSON();
+                    await bob.messaging.exportIdentity();
                 logger.debug('>> Closing Bob messaging');
                 await bob.messaging.close();
                 await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
                 logger.debug('>> Importing Bob identity');
                 const bobIdentity =
-                    await SmashMessaging.deserializeIdentity(
-                        bobExportedIdentity,
-                    );
+                    await SmashMessaging.importIdentity(bobExportedIdentity);
                 logger.debug('>> Creating new Bob peer');
                 bob = await createPeer(
                     'bob (after restart)',
@@ -115,10 +116,9 @@ describe('SmashMessaging: Edge cases', () => {
                 // 4. Try sending another message
                 logger.info('>> Try sending another message');
                 const message2 = 'message after session expiry';
-                const sent2 = await alice.messaging.sendTextMessage(
+                const sent2 = await alice.messaging.send(
                     await bob.messaging.getDIDDocument(),
-                    message2,
-                    '0',
+                    new IMText(message2),
                 );
                 await delay(2 * TEST_CONFIG.MESSAGE_DELIVERY);
 
@@ -151,10 +151,9 @@ describe('SmashMessaging: Edge cases', () => {
 
                 // 1. Initial communication
                 logger.info('>> Alice sends a first message to Bob');
-                const sent1 = await alice.messaging.sendTextMessage(
+                const sent1 = await alice.messaging.send(
                     bob.did,
-                    'hello',
-                    '',
+                    new IMText('hello'),
                 );
                 await delay(TEST_CONFIG.MESSAGE_DELIVERY);
 
@@ -168,15 +167,13 @@ describe('SmashMessaging: Edge cases', () => {
                 // 2. Simulate Bob restart - create new instance with same identity
                 logger.info('>> Simulate Bob restart: export identity');
                 const bobExportedIdentity =
-                    await bob.messaging.exportIdentityToJSON();
+                    await bob.messaging.exportIdentity();
                 await bob.messaging.close();
                 await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
 
                 logger.info('>> Simulate Bob restart: import identity');
                 const bobIdentity =
-                    await SmashMessaging.deserializeIdentity(
-                        bobExportedIdentity,
-                    );
+                    await SmashMessaging.importIdentity(bobExportedIdentity);
                 bob = await createPeer(
                     'bob (after restart)',
                     socketServerUrl,
@@ -200,10 +197,9 @@ describe('SmashMessaging: Edge cases', () => {
                 // 3. Alice tries to send another message
                 logger.info('>> Alice tries to send another message to Bob');
                 const message2 = 'are you there?';
-                const sent2 = await alice.messaging.sendTextMessage(
+                const sent2 = await alice.messaging.send(
                     bob.did,
-                    message2,
-                    '',
+                    new IMText(message2),
                 );
 
                 await delay(2 * TEST_CONFIG.MESSAGE_DELIVERY);
@@ -217,10 +213,9 @@ describe('SmashMessaging: Edge cases', () => {
                 // 4. Bob tries to send another message to Alice
                 logger.info('>> Bob tries to send a reply message to Alice');
                 const message3 = 'I am here!';
-                const sent3 = await bob.messaging.sendTextMessage(
+                const sent3 = await bob.messaging.send(
                     alice.did,
-                    message3,
-                    '',
+                    new IMText(message3),
                 );
                 await delay(2 * TEST_CONFIG.MESSAGE_DELIVERY);
 
@@ -255,10 +250,9 @@ describe('SmashMessaging: Edge cases', () => {
                     // - Alice's ACK of Bob's profile message
                     const firstMessageCount =
                         1 + 2 * TEST_CONFIG.PROTOCOL_OVERHEAD_SIZE;
-                    const sent1 = await alice.messaging.sendTextMessage(
+                    const sent1 = await alice.messaging.send(
                         bob.did,
-                        message1,
-                        '0',
+                        new IMText(message1),
                     );
                     await delay(TEST_CONFIG.MESSAGE_DELIVERY);
 
@@ -292,9 +286,9 @@ describe('SmashMessaging: Edge cases', () => {
                     // 3a. Close both peers
                     logger.info('>> Closing both peers');
                     const bobExportedIdentity =
-                        await bob.messaging.exportIdentityToJSON();
+                        await bob.messaging.exportIdentity();
                     const aliceExportedIdentity =
-                        await alice.messaging.exportIdentityToJSON();
+                        await alice.messaging.exportIdentity();
 
                     await bob.messaging.close();
                     await alice.messaging.close();
@@ -305,13 +299,12 @@ describe('SmashMessaging: Edge cases', () => {
                     // 3b. Restart both peers
                     logger.info('>> Restarting both peers');
                     const bobIdentity =
-                        await SmashMessaging.deserializeIdentity(
+                        await SmashMessaging.importIdentity(
                             bobExportedIdentity,
                         );
-                    const aliceIdentity =
-                        await SmashMessaging.deserializeIdentity(
-                            aliceExportedIdentity,
-                        );
+                    const aliceIdentity = await SmashMessaging.importIdentity(
+                        aliceExportedIdentity,
+                    );
                     bob = await createPeer(
                         'bob (after restart)',
                         socketServerUrl,
@@ -371,10 +364,9 @@ describe('SmashMessaging: Edge cases', () => {
                     // 4. Verify communication still works
                     logger.info('>> Alice sends message to Bob after reset');
                     const message2 = 'message after simultaneous reset';
-                    const sent2 = await alice.messaging.sendTextMessage(
+                    const sent2 = await alice.messaging.send(
                         bob.did,
-                        message2,
-                        '0',
+                        new IMText(message2),
                     );
 
                     await delay(10 * TEST_CONFIG.MESSAGE_DELIVERY);
@@ -434,21 +426,18 @@ describe('SmashMessaging: Edge cases', () => {
 
             const originalOrder = ['1', '2', '3', '4', '5'];
             const messageCount = originalOrder.length;
-            const waitForMessages = waitFor(
-                bob.messaging,
-                'data',
-                messageCount + TEST_CONFIG.PROTOCOL_OVERHEAD_SIZE,
-                TEST_CONFIG.MESSAGE_DELIVERY_TIMEOUT,
-            );
+            const waitForMessages = waitFor(bob.messaging, 'data', {
+                count: messageCount + TEST_CONFIG.PROTOCOL_OVERHEAD_SIZE,
+                timeout: TEST_CONFIG.MESSAGE_DELIVERY_TIMEOUT,
+            });
 
             logger.info(`>> Alice sends ${messageCount} messages to Bob`);
             let prevSha256: string = '0';
             for (let i = 0; i < messageCount; i++) {
                 prevSha256 = (
-                    await alice.messaging.sendTextMessage(
+                    await alice.messaging.send(
                         bob.did,
-                        originalOrder[i],
-                        prevSha256,
+                        new IMText(originalOrder[i], prevSha256 as sha256),
                     )
                 ).sha256;
                 await delay(100);
