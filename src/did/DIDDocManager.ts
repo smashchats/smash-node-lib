@@ -19,7 +19,7 @@ export class DIDDocManager extends DIDManager {
         return Promise.resolve(did);
     }
 
-    async generate(): Promise<[DIDDocument, IMPeerIdentity]> {
+    async generate(): Promise<IMPeerIdentity> {
         const cryptoSingleton = CryptoUtils.singleton;
         const [ik, ek] = await Promise.all([
             IMPeerIdentity.generateIdentityKeys(),
@@ -40,9 +40,8 @@ export class DIDDocManager extends DIDManager {
             endpoints: [],
         };
         this.set(didDocument);
-        const deepCopy = JSON.parse(JSON.stringify(didDocument));
         const newIdentity = new IMPeerIdentity(did, ik, ek);
-        return [deepCopy, newIdentity];
+        return newIdentity;
     }
 
     set(didDocument: DIDDocument) {

@@ -23,7 +23,6 @@ import {
     SmashEndpoint,
     SmashMessaging,
     SmashNAB,
-    SmashPeer,
     SmashProfile,
     SmashProfileList,
     SmashUser,
@@ -123,12 +122,11 @@ describe('Smash Tutorial', () => {
      * secure messaging using the Signal protocol.
      */
     describe('1. Creating a new decentralized identity (DID)', () => {
-        let bobDIDDocument: DIDDocument;
         let bobIdentity: IMPeerIdentity;
         let bobExportedIdentity: string;
 
         beforeEach(async () => {
-            [bobDIDDocument, bobIdentity] = await didDocumentManager.generate();
+            bobIdentity = await didDocumentManager.generate();
             bobExportedIdentity = await bobIdentity.serialize();
         });
 
@@ -141,6 +139,8 @@ describe('Smash Tutorial', () => {
          * - Key signatures
          */
         test('Understanding DID components', async () => {
+            const bobDIDDocument = await bobIdentity.getDIDDocument();
+
             expect(bobDIDDocument.id).toBeDefined();
             testUtils.logger.info(`DID: ${bobDIDDocument.id}`);
 
@@ -168,9 +168,9 @@ describe('Smash Tutorial', () => {
          * - DID resolution
          */
         describe('Working with stored identities', () => {
-            beforeEach(() => {
+            beforeEach(async () => {
                 // Set up DID resolution for testing
-                if (bobDIDDocument) didDocumentManager.set(bobDIDDocument);
+                didDocumentManager.set(await bobIdentity.getDIDDocument());
             });
 
             /**
@@ -211,25 +211,18 @@ describe('Smash Tutorial', () => {
     describe('2. Setting up the SmashMessaging library', () => {
         const testContext = {
             async createMessagingInstance(): Promise<
-                [SmashMessaging, DIDDocument, IMPeerIdentity]
+                [SmashMessaging, IMPeerIdentity]
             > {
-                const [bobDIDDocument, bobIdentity] =
-                    await didDocumentManager.generate();
-                return [
-                    new SmashUser(bobIdentity, 'bob', 'INFO'),
-                    bobDIDDocument,
-                    bobIdentity,
-                ];
+                const bobIdentity = await didDocumentManager.generate();
+                return [new SmashUser(bobIdentity, 'bob', 'INFO'), bobIdentity];
             },
         };
 
         let bob: SmashMessaging;
         let bobIdentity: IMPeerIdentity;
-        let bobDIDDocument: DIDDocument;
 
         beforeEach(async () => {
-            [bob, bobDIDDocument, bobIdentity] =
-                await testContext.createMessagingInstance();
+            [bob, bobIdentity] = await testContext.createMessagingInstance();
         });
 
         afterEach(async () => {
@@ -246,7 +239,7 @@ describe('Smash Tutorial', () => {
          */
         test('Configuring messaging endpoints', async () => {
             testUtils.logger.info(
-                `Setting up endpoints for ${bobDIDDocument.id}...`,
+                `Setting up endpoints for ${bobIdentity.did}...`,
             );
 
             const preKeyPair = await bobIdentity.generateNewPreKeyPair();
@@ -287,7 +280,7 @@ describe('Smash Tutorial', () => {
     describe('3. Exchanging messages with peers', () => {
         const testContext = {
             async initializePeer(name: string) {
-                const identity = (await didDocumentManager.generate())[1];
+                const identity = await didDocumentManager.generate();
                 const messaging = new SmashUser(identity, name);
                 await messaging.updateMeta({ title: name });
 
@@ -359,7 +352,6 @@ describe('Smash Tutorial', () => {
                     timestamp: sent.timestamp,
                     after: expect.any(String),
                 }),
-                expect.any(SmashPeer),
             );
         });
 
@@ -467,7 +459,7 @@ describe('Smash Tutorial', () => {
     describe('4. Managing peer profiles', () => {
         const testContext = {
             async initializePeer(name: string) {
-                const identity = (await didDocumentManager.generate())[1];
+                const identity = await didDocumentManager.generate();
                 const messaging = new SmashUser(identity, name);
                 await messaging.updateMeta({ title: name });
 
@@ -528,7 +520,6 @@ describe('Smash Tutorial', () => {
                     sha256: expect.any(String),
                     timestamp: expect.any(String),
                 }),
-                expect.any(SmashPeer),
             );
         });
 
@@ -565,7 +556,6 @@ describe('Smash Tutorial', () => {
                     sha256: expect.any(String),
                     timestamp: expect.any(String),
                 }),
-                expect.any(SmashPeer),
             );
         });
     });
@@ -738,7 +728,7 @@ describe('Smash Tutorial', () => {
 
         beforeEach(async () => {
             // Set up NAB with new identity
-            const nabIdentity = (await didDocumentManager.generate())[1];
+            const nabIdentity = await didDocumentManager.generate();
             nab = new TestNAB(nabIdentity, 'test-nab');
 
             // Connect NAB to endpoint
@@ -766,7 +756,7 @@ describe('Smash Tutorial', () => {
             'Joining a neighborhood',
             async () => {
                 // Set up test user
-                const bobIdentity = (await didDocumentManager.generate())[1];
+                const bobIdentity = await didDocumentManager.generate();
                 bob = new SmashUser(bobIdentity, 'bob');
 
                 // Calculate timeout
@@ -806,9 +796,9 @@ describe('Smash Tutorial', () => {
             let darcy: SmashUser;
 
             beforeEach(async () => {
-                const bobIdentity = (await didDocumentManager.generate())[1];
-                const aliceIdentity = (await didDocumentManager.generate())[1];
-                const darcyIdentity = (await didDocumentManager.generate())[1];
+                const bobIdentity = await didDocumentManager.generate();
+                const aliceIdentity = await didDocumentManager.generate();
+                const darcyIdentity = await didDocumentManager.generate();
                 await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
 
                 bob = new SmashUser(bobIdentity, 'bob');

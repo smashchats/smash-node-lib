@@ -1,6 +1,6 @@
+import { TestPeer, createPeer } from '@tests/how-to/user.utils.js';
 import { apiServerUrl, socketServerUrl } from '@tests/jest.global.js';
 import { TEST_CONFIG, aliasWaitFor, delay } from '@tests/time.utils.js';
-import { TestPeer, createPeer } from '@tests/user.utils.js';
 import {
     EncapsulatedIMProtoMessage,
     IMProtoMessage,

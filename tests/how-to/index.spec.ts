@@ -1,10 +1,11 @@
-import { TestMessage, TestUtils } from '@tests/events.utils.js';
+import { TestMessage, TestUtils } from '@tests/how-to/events.utils.js';
+import { TestPeer, createPeer } from '@tests/how-to/user.utils.js';
 import { socketServerUrl } from '@tests/jest.global.js';
 import { TEST_CONFIG, delay } from '@tests/time.utils.js';
-import { TestPeer, createPeer } from '@tests/user.utils.js';
 import {
     EncapsulatedIMProtoMessage,
     IMProfile,
+    IMText,
     Logger,
     SmashMessaging,
 } from 'smash-node-lib';
@@ -102,10 +103,9 @@ describe('[SmashMessaging] Between peers registered to a SME', () => {
             await delay(TEST_CONFIG.DEFAULT_POLL_INTERVAL);
 
             // Send test message
-            aliceSentMessage = await alice.messaging.sendTextMessage(
+            aliceSentMessage = await alice.messaging.send(
                 bob.did,
-                TEST_MESSAGE.text,
-                '0',
+                new IMText(TEST_MESSAGE.text),
             );
 
             await delay(TEST_CONFIG.MESSAGE_DELIVERY);
@@ -211,10 +211,9 @@ describe('[SmashMessaging] Between peers registered to a SME', () => {
 
                 jest.resetAllMocks();
 
-                await bob.messaging.sendTextMessage(
+                await bob.messaging.send(
                     alice.did,
-                    REPLY_MESSAGE,
-                    lastMessage.sha256,
+                    new IMText(REPLY_MESSAGE, lastMessage.sha256),
                 );
                 await delay(TEST_CONFIG.MESSAGE_DELIVERY);
 
@@ -246,17 +245,15 @@ describe('[SmashMessaging] Between peers registered to a SME', () => {
             };
 
             // Message exchange
-            const aliceSentMessage = await alice.messaging.sendTextMessage(
+            const aliceSentMessage = await alice.messaging.send(
                 bob.did,
-                TEST_MESSAGES.aliceToBob,
-                '0',
+                new IMText(TEST_MESSAGES.aliceToBob),
             );
             await delay(TEST_CONFIG.MESSAGE_DELIVERY);
 
-            await bob.messaging.sendTextMessage(
+            await bob.messaging.send(
                 alice.did,
-                TEST_MESSAGES.bobToAlice,
-                aliceSentMessage.sha256,
+                new IMText(TEST_MESSAGES.bobToAlice, aliceSentMessage.sha256),
             );
             await delay(TEST_CONFIG.MESSAGE_DELIVERY);
 
@@ -286,8 +283,8 @@ describe('[SmashMessaging] Between peers registered to a SME', () => {
         it('Bob receives the two messages', async () => {
             const messages = ['0', '1'];
             const messagePromises = [
-                alice.messaging.sendTextMessage(bob.did, messages[0], ''),
-                alice.messaging.sendTextMessage(bob.did, messages[1], ''),
+                alice.messaging.send(bob.did, new IMText(messages[0])),
+                alice.messaging.send(bob.did, new IMText(messages[1])),
             ];
 
             const firstMessage = await messagePromises[0];

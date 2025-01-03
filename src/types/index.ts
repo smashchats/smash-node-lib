@@ -3,7 +3,7 @@ import type { DIDString } from '@src/types/did.types.js';
 import { EncapsulatedIMProtoMessage } from '@src/types/message.types.js';
 import { SmashEndpoint } from '@src/types/sme.types.js';
 
-export type { Identity, IECKeyPair, IJsonIdentity } from '2key-ratchet';
+export type { IECKeyPair, IJsonIdentity } from '2key-ratchet';
 
 export * from '@src/types/action.types.js';
 export * from '@src/types/callbacks.types.js';

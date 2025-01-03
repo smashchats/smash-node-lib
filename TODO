@@ -2,8 +2,8 @@
 
 ### BIG REFACTORING (with possible functional changes):
 
-- [-] manual refactor while writing the happy path tutorial test suite (mainly splitting modules and restructuring code)
-- [ ] make previous test suites pass again
+- [x] manual refactor while writing the happy path tutorial test suite (mainly splitting modules and restructuring code)
+- [-] make previous test suites pass again
 
 - [ ] use AI to refactor file paths / reorganise module file structure
 - [ ] use AI to extract more modules: more modular, decoupled, and loosely coupled
@@ -69,7 +69,6 @@ Tutorial = Covers entire product but HAPPY PATH ONLY
 - [x] smashing another user from the neighborhood
 - [x] passing another user from the neighborhood
 - [x] clearing another user from the neighborhood
-- [ ] loading the library with existing peers/chats
 
 then, next feats
 

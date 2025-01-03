@@ -1,5 +1,4 @@
 import { SmashMessaging } from '@src/SmashMessaging.js';
-import { SmashPeer } from '@src/SmashPeer.js';
 import { SME_DEFAULT_CONFIG } from '@src/const.js';
 import { SmashActionJson } from '@src/types/action.types.js';
 import { DIDDocument, DIDString } from '@src/types/did.types.js';
@@ -140,15 +139,13 @@ export abstract class SmashNAB extends SmashMessaging {
     private async handleDiscover(
         did: DIDString,
         message: SmashChatDiscoverMessage,
-        peer?: SmashPeer,
     ): Promise<void> {
         const discovered = await this.onDiscover(
             did,
             message.sha256,
             message.timestamp,
         );
-
-        await peer?.send({
+        await this.peers.get(did)?.send({
             type: SMASH_PROFILE_LIST,
             data: discovered,
             after: '0', // TODO: Implement meaningful 'after' value handling

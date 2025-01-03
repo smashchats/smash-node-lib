@@ -1,4 +1,3 @@
-import { SmashPeer } from '@src/SmashPeer.js';
 import { DIDString } from '@src/types/did.types.js';
 import {
     IMDIDDocumentMessage,
@@ -67,5 +66,5 @@ export interface MessagingEventMap {
 export type EventArgs<T extends string> = T extends keyof MessagingEventMap
     ? MessagingEventMap[T]
     : T extends reverseDNS
-      ? [did: DIDString, message: IMProtoEventType<T>, peer?: SmashPeer]
+      ? [did: DIDString, message: IMProtoEventType<T>]
       : never;

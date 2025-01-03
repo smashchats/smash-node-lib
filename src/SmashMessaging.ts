@@ -19,6 +19,9 @@ import {
     IMReadACKMessage,
     IM_ACK_READ,
     IM_ACK_RECEIVED,
+    IM_SESSION_ENDPOINT,
+    IM_SESSION_RESET,
+    ISO8601,
     type MessageStatus,
     reverseDNSRegex,
     type sha256,
@@ -27,31 +30,16 @@ import type { LogLevel } from '@src/utils/index.js';
 import { Logger } from '@src/utils/index.js';
 import { EventEmitter } from 'events';
 
-// interface SmashChat {
-//     with: DID;
-//     lastMessageTimestamp: string;
-// }
+interface SmashChat {
+    with: DID;
+    lastMessageTimestamp: string;
+}
 
 type ProfileMeta = Omit<IMProfile, 'did'>;
 
-// class PreferredEndpointHandler extends BaseResolver<
-//     IMSessionEndpointMessage,
-//     void
-// > {
-//     resolve(peer: SmashPeer, message: IMSessionEndpointMessage): Promise<void> {
-//         peer.setPreferredEndpoint(message.data);
-//         return Promise.resolve();
-//     }
-// }
-
-// class SessionResetHandler extends BaseResolver<IMSessionResetMessage, void> {
-//     resolve(peer: SmashPeer, message: IMSessionResetMessage): Promise<void> {
-//         return peer.incomingSessionReset(message.sha256!);
-//     }
-// }
-
 // TODO: safeguard crypto operations against errors
 // TODO: split beteen IMProto and Smash Messaging
+
 export class SmashMessaging extends EventEmitter {
     private static didDocManagers: Map<DIDMethod, DIDManager> = new Map();
     public static use(method: DIDMethod, manager: DIDManager) {
@@ -105,6 +93,12 @@ export class SmashMessaging extends EventEmitter {
             this.sessionManager,
         );
         this.registerAckHandlers();
+        this.on(IM_SESSION_ENDPOINT, (did, message) => {
+            return this.peers.get(did)?.setPreferredEndpoint(message.data);
+        });
+        this.on(IM_SESSION_RESET, (did, message) => {
+            return this.peers.get(did)?.incomingSessionReset(message.sha256!);
+        });
         this.logger.info(
             `Loaded Smash lib (log level: ${LOG_LEVEL}, id: ${LOG_ID})`,
         );
@@ -160,17 +154,22 @@ export class SmashMessaging extends EventEmitter {
         }
     }
 
-    // async initChats(chats: SmashChat[]) {
-    //     return Promise.all(
-    //         chats.map(async (chat) => {
-    //             const peerDid = await DIDResolver.resolve(chat.with);
-    //             this.peers[peerDid.id] = await this.getOrCreatePeer(
-    //                 peerDid,
-    //                 chat.lastMessageTimestamp,
-    //             );
-    //         }),
-    //     );
-    // }
+    async initChats(chats: SmashChat[]) {
+        return Promise.all(
+            chats.map(async (chat) => {
+                const peerDid = await SmashMessaging.resolve(chat.with);
+                this.peers.set(
+                    peerDid.id,
+                    await this.createNewPeer(
+                        peerDid,
+                        new Date(
+                            chat.lastMessageTimestamp as ISO8601,
+                        ).getTime(),
+                    ),
+                );
+            }),
+        );
+    }
 
     /**
      * Firehose incoming events to the library user
@@ -184,12 +183,7 @@ export class SmashMessaging extends EventEmitter {
         this.logger.debug(JSON.stringify(messages, null, 2));
         messages.forEach((message) => {
             if (reverseDNSRegex.test(message.type)) {
-                this.emit(
-                    message.type,
-                    sender,
-                    message,
-                    this.peers.get(sender),
-                );
+                this.emit(message.type, sender, message);
             } else {
                 this.logger.warn(
                     `Invalid message type format received: ${message.type}`,

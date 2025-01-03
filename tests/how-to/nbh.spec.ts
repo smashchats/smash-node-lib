@@ -1,7 +1,7 @@
 import { Identity } from '2key-ratchet';
+import { peerArgs } from '@tests/how-to/user.utils.js';
 import { socketServerUrl } from '@tests/jest.global.js';
 import { TEST_CONFIG, aliasWaitFor, delay } from '@tests/time.utils.js';
-import { peerArgs } from '@tests/user.utils.js';
 import {
     DIDDocument,
     IMProtoMessage,

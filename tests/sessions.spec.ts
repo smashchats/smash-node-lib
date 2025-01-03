@@ -1,11 +1,11 @@
-import { TestUtils } from '@tests/events.utils.js';
+import { TestUtils } from '@tests/how-to/events.utils.js';
+import { TestPeer, createPeer } from '@tests/how-to/user.utils.js';
 import {
     SME_PUBLIC_KEY,
     secondarySocketServerUrl,
     socketServerUrl,
 } from '@tests/jest.global.js';
 import { TEST_CONFIG, delay } from '@tests/time.utils.js';
-import { TestPeer, createPeer } from '@tests/user.utils.js';
 import { Logger, SmashMessaging } from 'smash-node-lib';
 
 describe('[Sessions] Session Management', () => {

@@ -5,11 +5,11 @@ import {
     PreKeyBundleProtocol,
     PreKeyMessageProtocol,
 } from '2key-ratchet';
+import { IMPeerIdentity } from '@src/IMPeerIdentity.js';
 import { EXPIRATION_TIME_MS } from '@src/const.js';
 import {
     DIDDocument,
     EncapsulatedIMProtoMessage,
-    Identity,
     SmashEndpoint,
 } from '@src/types/index.js';
 import { CryptoUtils, Logger } from '@src/utils/index.js';
@@ -37,7 +37,7 @@ export class SignalSession {
 
     static async create(
         peerDidDocument: DIDDocument,
-        identity: Identity,
+        identity: IMPeerIdentity,
         sme: SmashEndpoint,
         logger: Logger,
     ) {
@@ -94,7 +94,7 @@ export class SignalSession {
     }
 
     static async parseSession(
-        identity: Identity,
+        identity: IMPeerIdentity,
         sessionId: string,
         data: ArrayBuffer,
         logger: Logger,
