@@ -66,7 +66,7 @@ Tutorial = Covers entire product but HAPPY PATH ONLY
 - [x] clean peer shutdown
 - [x] setting up a Neighborhood / NAB
 - [x] joining the Neighborhood
-- [ ] discovering other peers in the neighborhood (NBH_PROFILES)
+- [x] discovering other peers in the neighborhood (NBH_PROFILE_LIST)
 - [ ] smashing another user from the neighborhood
 - [ ] passing another user from the neighborhood
 - [ ] clearing another user from the neighborhood

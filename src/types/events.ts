@@ -21,7 +21,6 @@ import { IMProtoMessage, sha256 } from '@src/types/message.types.js';
 import {
     SMASH_NBH_DISCOVER,
     SMASH_NBH_JOIN,
-    SMASH_NBH_PROFILE_LIST,
     SMASH_NBH_RELATIONSHIP,
     SMASH_PROFILE_LIST,
     SmashChatDiscoverMessage,
@@ -42,7 +41,6 @@ export type IMProtoEventMap = {
     [SMASH_NBH_JOIN]: SmashChatJoinMessage;
     [SMASH_NBH_DISCOVER]: SmashChatDiscoverMessage;
     [SMASH_NBH_RELATIONSHIP]: SmashChatRelationshipMessage;
-    [SMASH_NBH_PROFILE_LIST]: SmashChatProfileListMessage;
     [SMASH_PROFILE_LIST]: SmashChatProfileListMessage;
 };
 // Allow extending this type

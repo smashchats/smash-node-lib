@@ -176,6 +176,7 @@ export class SmashMessaging extends EventEmitter {
         if (!messages?.length) return;
         this.logger.debug(`notifyNewMessages (${messages?.length})`);
         this.logger.debug(JSON.stringify(messages, null, 2));
+        // TODO: assess risk of emitting arbitrary event names
         messages.forEach((message) =>
             this.emit(message.type, sender, message, this.peers.get(sender)),
         );

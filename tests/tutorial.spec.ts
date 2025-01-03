@@ -3,20 +3,27 @@ import { SME_PUBLIC_KEY, socketServerUrl } from '@tests/jest.global.js';
 import { TEST_CONFIG, aliasWaitFor, delay } from '@tests/time.utils.js';
 import {
     CryptoUtils,
+    DID,
     DIDDocManager,
     DIDDocument,
+    DIDString,
     IMPeerIdentity,
+    IMProfile,
     IMProfileMessage,
     IMProtoMessage,
     IMText,
     IM_CHAT_TEXT,
     IM_PROFILE,
     Logger,
+    NBH_ADDED,
+    NBH_PROFILE_LIST,
     SMASH_NBH_JOIN,
     SmashEndpoint,
     SmashMessaging,
     SmashNAB,
     SmashPeer,
+    SmashProfile,
+    SmashProfileList,
     SmashUser,
 } from 'smash-node-lib';
 
@@ -74,6 +81,12 @@ describe('Smash Tutorial', () => {
     const waitFor = testUtils.setupWaitFor();
     let didDocumentManager: DIDDocManager;
 
+    beforeEach(async () => {
+        didDocumentManager = new DIDDocManager();
+        SmashMessaging.use('doc', didDocumentManager);
+        testUtils.logger.info('DIDDocManager initialized');
+    });
+
     /**
      * @tutorial-section Prerequisites
      * @tutorial-step 0
@@ -113,8 +126,6 @@ describe('Smash Tutorial', () => {
         let bobExportedIdentity: string;
 
         beforeEach(async () => {
-            didDocumentManager = new DIDDocManager();
-            SmashMessaging.use('doc', didDocumentManager);
             [bobDIDDocument, bobIdentity] = await didDocumentManager.generate();
             bobExportedIdentity = await bobIdentity.serialize();
         });
@@ -571,11 +582,8 @@ describe('Smash Tutorial', () => {
      * handles peer discovery and neighborhood membership.
      */
     describe('5. Working with Neighborhoods', () => {
-        class TestNAB extends SmashNAB {
-            public onJoin = jest.fn();
-            public onDiscover = jest.fn();
-            public onRelationship = jest.fn();
-        }
+        let nab: TestNAB;
+        let bob: SmashUser | undefined;
 
         const testContext = {
             smeConfig: {
@@ -584,30 +592,92 @@ describe('Smash Tutorial', () => {
             },
         };
 
-        let nab: TestNAB;
-        let bob: SmashUser | undefined;
+        /**
+         * @tutorial-step 5.1
+         * @task Setting up a neighborhood (as a Neigbhorhood administrator)
+         * A Neighborhood is an abstract concept of peers that are part of the same community.
+         * Neighborhoods are managed by self-organizing peers called the Neighborhood Admin Bot (NAB).
+         * NABs are regular Smash Messaging peers that have been configured to act as a NAB.
+         * The library provides the abstract SmashNAB class to help you implement your own NAB.
+         * @concepts
+         * - Neighborhood joining process
+         * - Join events
+         * - NAB responses
+         */
+        class TestNAB extends SmashNAB {
+            private members: DIDString[] = [];
+            private metadata: Map<DIDString, IMProfile> = new Map();
+
+            /**
+             * @tutorial-step 5.1.1
+             * @task Processing join requests
+             * @concepts
+             * - Neighborhood joining process
+             * - Join events
+             * - NAB responses
+             */
+            public onJoin = jest.fn(async (did: DID) => {
+                const didDoc = await SmashMessaging.resolve(did);
+                this.members.push(didDoc.id);
+            });
+
+            /**
+             * @tutorial-step 5.1.2
+             * @task Handling members profile data
+             * @concepts
+             * - Profile data storage
+             * - Profile data retrieval
+             */
+            constructor(identity: IMPeerIdentity, name: string) {
+                super(identity, name);
+                this.on(IM_PROFILE, (did, profile) => {
+                    this.metadata.set(did, profile.data);
+                });
+            }
+
+            /**
+             * @tutorial-step 5.1.3
+             * @task Processing discover requests
+             * @concepts
+             * - Peer discovery
+             * - Profile broadcasting
+             * - NAB-mediated discovery
+             */
+            public onDiscover = jest.fn(async (from: DIDString) => {
+                return (await Promise.all(
+                    this.members
+                        .filter((member) => member !== from)
+                        .map(async (member) => ({
+                            did: await SmashMessaging.resolve(member),
+                            meta: this.metadata.get(member),
+                        })),
+                )) as SmashProfileList;
+            });
+
+            public onRelationship = jest.fn();
+        }
 
         beforeEach(async () => {
+            // Set up NAB with new identity
             const nabIdentity = (await didDocumentManager.generate())[1];
             nab = new TestNAB(nabIdentity, 'test-nab');
 
-            await nab.endpoints.connect(
-                testContext.smeConfig,
-                await nabIdentity.generateNewPreKeyPair(),
-            );
+            // Connect NAB to endpoint
+            const preKeyPair = await nabIdentity.generateNewPreKeyPair();
+            await nab.endpoints.connect(testContext.smeConfig, preKeyPair);
 
+            // Register NAB's DID document
             didDocumentManager.set(await nab.getDIDDocument());
         });
 
         afterEach(async () => {
             await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
-            await nab.close();
-            await bob?.close();
+            await Promise.all([nab?.close(), bob?.close()]);
         });
 
         /**
-         * @tutorial-step 5.1
-         * @task Join a neighborhood
+         * @tutorial-step 5.2
+         * @task Joining a neighborhood (as a Neighborhood user)
          * @concepts
          * - Neighborhood joining process
          * - Join events
@@ -616,27 +686,124 @@ describe('Smash Tutorial', () => {
         test(
             'Joining a neighborhood',
             async () => {
+                // Set up test user
                 const bobIdentity = (await didDocumentManager.generate())[1];
                 bob = new SmashUser(bobIdentity, 'bob');
+
+                // Calculate timeout
                 const JOIN_TIMEOUT =
                     TEST_CONFIG.MESSAGE_DELIVERY_TIMEOUT -
                     TEST_CONFIG.MESSAGE_DELIVERY;
 
+                // Set up join event listener
                 const waitForJoin = waitFor(nab, SMASH_NBH_JOIN, {
                     timeout: JOIN_TIMEOUT,
                 });
+                const onNbhAdded = jest.fn();
+                bob.on(NBH_ADDED, onNbhAdded);
 
-                await bob.join(await nab.getJoinInfo([testContext.smeConfig]));
+                // Join neighborhood and wait for confirmation
+                const joinInfo = await nab.getJoinInfo([testContext.smeConfig]);
+                await bob.join(joinInfo);
+
                 await waitForJoin;
 
+                // Verify that the specified NAB received the join request
                 const bobDIDDocument = await bob.getDIDDocument();
                 expect(nab.onJoin).toHaveBeenCalledWith(
                     bobDIDDocument,
                     expect.any(String),
                     expect.any(String),
                 );
+
+                // Verify join callback (on User side)
+                expect(onNbhAdded).toHaveBeenCalledWith(nab.did);
             },
             TEST_CONFIG.MESSAGE_DELIVERY_TIMEOUT,
         );
+
+        describe('In a Neighborhood with other peers', () => {
+            let alice: SmashUser;
+            let darcy: SmashUser;
+
+            beforeEach(async () => {
+                // Set up test users
+                const bobIdentity = (await didDocumentManager.generate())[1];
+                const aliceIdentity = (await didDocumentManager.generate())[1];
+                const darcyIdentity = (await didDocumentManager.generate())[1];
+
+                bob = new SmashUser(bobIdentity, 'bob');
+                alice = new SmashUser(aliceIdentity, 'alice');
+                darcy = new SmashUser(darcyIdentity, 'darcy');
+
+                const joinInfo = await nab.getJoinInfo([testContext.smeConfig]);
+                await Promise.all([
+                    bob.join(joinInfo),
+                    alice.join(joinInfo),
+                    darcy.join(joinInfo),
+                ]);
+
+                await delay(TEST_CONFIG.MESSAGE_DELIVERY);
+
+                await bob.updateMeta({ title: 'bob' });
+                await alice.updateMeta({ title: 'alice' });
+                await darcy.updateMeta({ title: 'darcy' });
+
+                await delay(TEST_CONFIG.MESSAGE_DELIVERY);
+            });
+
+            afterEach(async () => {
+                await Promise.all([alice?.close(), darcy?.close()]);
+            });
+
+            /**
+             * @tutorial-step 5.3
+             * @task Discover neighborhood peers
+             * @concepts
+             * - Peer discovery mechanism
+             * - Profile broadcasting
+             * - NAB-mediated discovery
+             */
+            test('Discovering neighborhood peers', async () => {
+                if (!bob) throw new Error('Bob is not initialized');
+
+                const onNeighborhoodProfiles = jest.fn();
+                bob.on(NBH_PROFILE_LIST, onNeighborhoodProfiles);
+                const waitForDiscovery = waitFor(bob, NBH_PROFILE_LIST);
+
+                await bob.discover();
+                await waitForDiscovery;
+
+                // Verify Bob's profile discovery result contains Alice and Darcy's profiles
+                const expectedDiscoveredProfile = async (user: SmashUser) => {
+                    const didDoc = await user.getDIDDocument();
+                    return expect.objectContaining<SmashProfile>({
+                        did: expect.objectContaining<DIDDocument>({
+                            id: didDoc.id,
+                            ik: didDoc.ik,
+                            ek: didDoc.ek,
+                            signature: expect.any(String),
+                            endpoints: expect.arrayContaining([
+                                expect.objectContaining<SmashEndpoint>({
+                                    url: testContext.smeConfig.url,
+                                    preKey: expect.any(String),
+                                    signature: expect.any(String),
+                                }),
+                            ]),
+                        }),
+                        meta: user.profile,
+                    });
+                };
+                expect(onNeighborhoodProfiles).toHaveBeenCalledWith(
+                    nab.did,
+                    expect.arrayContaining(
+                        await Promise.all([
+                            expectedDiscoveredProfile(alice),
+                            expectedDiscoveredProfile(darcy),
+                        ]),
+                    ) as SmashProfileList,
+                );
+            });
+        });
     });
 });

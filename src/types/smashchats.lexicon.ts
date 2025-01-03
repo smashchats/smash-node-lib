@@ -5,11 +5,12 @@ import {
 } from '@src/types/index.js';
 
 export const SMASH_NBH_JOIN = 'com.smashchats.nbh.join';
-export const SMASH_NBH_ADDED = 'com.smashchats.nbh.added';
 export const SMASH_NBH_DISCOVER = 'com.smashchats.nbh.discover';
 export const SMASH_NBH_RELATIONSHIP = 'com.smashchats.relationship';
-export const SMASH_NBH_PROFILE_LIST = 'com.smashchats.nbh.profiles';
 export const SMASH_PROFILE_LIST = 'com.smashchats.profiles';
+
+export const NBH_PROFILE_LIST = 'nbh_discovered';
+export const NBH_ADDED = 'nbh_added';
 
 /**
  * Join message

@@ -4,10 +4,14 @@ import { SmashActionJson } from '@src/types/action.types.js';
 import { DIDDocument, DIDString } from '@src/types/did.types.js';
 import { ISO8601, sha256 } from '@src/types/message.types.js';
 import {
+    SMASH_NBH_DISCOVER,
     SMASH_NBH_JOIN,
+    SMASH_PROFILE_LIST,
     SmashChatRelationshipData,
 } from '@src/types/smashchats.lexicon.js';
 import { SMEConfigJSONWithoutDefaults } from '@src/types/sme.types.js';
+
+import { SmashProfileList } from './types/smash.types.js';
 
 export abstract class SmashNAB extends SmashMessaging {
     private static getDiffFromDefault(config: SMEConfigJSONWithoutDefaults) {
@@ -51,13 +55,13 @@ export abstract class SmashNAB extends SmashMessaging {
         didDocument: DIDDocument,
         sha256?: sha256,
         timeString?: ISO8601,
-    ): Promise<unknown>;
+    ): Promise<void>;
 
     public abstract onDiscover(
         from: DIDString,
         sha256?: sha256,
         timeString?: ISO8601,
-    ): Promise<unknown>;
+    ): Promise<SmashProfileList>;
 
     public abstract onRelationship(
         from: DIDString,
@@ -68,10 +72,24 @@ export abstract class SmashNAB extends SmashMessaging {
 
     constructor(...args: ConstructorParameters<typeof SmashMessaging>) {
         super(...args);
+        // TODO: shouldn't we specify a JOIN result ack???
         this.on(SMASH_NBH_JOIN, async (did, message) => {
             const didDocument = await SmashMessaging.resolve(did);
             this.logger.debug(`onJoin ${didDocument.id} ${message.sha256}`);
             this.onJoin(didDocument, message.sha256, message.timestamp);
+        });
+        this.on(SMASH_NBH_DISCOVER, async (did, message, peer) => {
+            const discovered = await this.onDiscover(
+                did,
+                message.sha256,
+                message.timestamp,
+            );
+            await peer?.send({
+                type: SMASH_PROFILE_LIST,
+                data: discovered,
+                // TODO: is the after property really useful? when? how? why?
+                after: '0',
+            });
         });
     }
 
