@@ -22,37 +22,41 @@ declare module '@src/types/events.js' {
 }
 
 export class SmashUser extends SmashMessaging {
-    private readonly neighborhoodAdminIDs: string[] = [];
-    private readonly neighborhoodAdmins: SmashPeer[] = [];
+    private readonly neighborhoodAdmins = new Map<string, SmashPeer>();
 
     public async join(joinAction: SmashActionJson) {
-        // Initialize endpoints if SME config is provided
-        if (joinAction.config?.sme?.length) {
-            await Promise.all(
-                joinAction.config?.sme?.map((smeConfig) =>
-                    this.identity
-                        .generateNewPreKeyPair()
-                        .then((preKeyPair) =>
-                            this.endpoints.connect(smeConfig, preKeyPair),
-                        ),
-                ),
-            );
-            this.logger.debug(
-                `Connected to ${joinAction.config?.sme?.length} endpoints configured by join action config.`,
-            );
-        }
-        const nabPeer = await this.peers.getOrCreate(joinAction.did);
+        await this.connectToSMEEndpoints(joinAction);
+        await this.joinNeighborhood(joinAction.did);
+    }
+
+    private async connectToSMEEndpoints(joinAction: SmashActionJson) {
+        if (!joinAction.config?.sme?.length) return;
+
+        await Promise.all(
+            joinAction.config.sme.map(async (smeConfig) => {
+                const preKeyPair = await this.identity.generateNewPreKeyPair();
+                await this.endpoints.connect(smeConfig, preKeyPair);
+            }),
+        );
+
+        this.logger.debug(
+            `Connected to ${joinAction.config.sme.length} endpoints configured by join action config.`,
+        );
+    }
+
+    private async joinNeighborhood(nabDid: DID) {
+        const nabPeer = await this.peers.getOrCreate(nabDid);
         await nabPeer.send(SMASH_NBH_JOIN_MESSAGE);
-        // Add neighborhood admin (NAB) and emit user event
-        this.neighborhoodAdminIDs.push(nabPeer.id);
-        this.neighborhoodAdmins.push(nabPeer);
+
+        this.neighborhoodAdmins.set(nabPeer.id, nabPeer);
         this.emit(NBH_ADDED, nabPeer.id);
     }
 
     private async setRelationship(userDid: DID, action: Relationship) {
-        (await this.peers.getOrCreate(userDid)).setRelationship(
+        const peer = await this.peers.getOrCreate(userDid);
+        peer.setRelationship(
             action,
-            this.neighborhoodAdmins,
+            Array.from(this.neighborhoodAdmins.values()),
         );
     }
 
@@ -70,14 +74,21 @@ export class SmashUser extends SmashMessaging {
 
     public async discover() {
         // TODO: handle for multiple NABs
-        await this.neighborhoodAdmins[0].send(SMASH_NBH_DISCOVER_MESSAGE);
+        const firstNab = this.neighborhoodAdmins.values().next().value;
+        if (firstNab) {
+            await firstNab.send(SMASH_NBH_DISCOVER_MESSAGE);
+        }
     }
 
     constructor(...args: ConstructorParameters<typeof SmashMessaging>) {
         super(...args);
+        this.initializeProfileListHandler();
+    }
+
+    private initializeProfileListHandler() {
         this.on(SMASH_PROFILE_LIST, (did, message) => {
             this.logger.debug(`onProfileList ${did} ${message.sha256}`);
-            if (this.neighborhoodAdminIDs.includes(did)) {
+            if (this.neighborhoodAdmins.has(did)) {
                 this.emit(
                     NBH_PROFILE_LIST,
                     did,
