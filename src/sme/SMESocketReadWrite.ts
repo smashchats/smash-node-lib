@@ -35,7 +35,6 @@ export class SMESocketReadWrite extends SMESocketWriteOnly {
             url: smeConfig.url,
             preKeyPair,
         };
-        this.logger.debug('auth', JSON.stringify(auth, null, 2));
         return new Promise<SmashEndpoint>((resolve, reject) => {
             const preKeyPublicKey = auth.preKeyPair.publicKey;
             Promise.all([

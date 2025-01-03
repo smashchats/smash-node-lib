@@ -88,7 +88,7 @@ export class SignalSession {
             logger.debug(`>> session created with id ${sessionId}`);
             return session;
         } catch (err) {
-            logger.warn('Cannot create session.');
+            logger.warn(`Cannot create session: ${(err as Error).message}`);
             throw err;
         }
     }

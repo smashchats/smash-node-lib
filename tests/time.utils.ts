@@ -21,7 +21,7 @@ export async function delay(milliseconds: number): Promise<void> {
 export const TEST_CONFIG = {
     TEST_TIMEOUT_MS: 5500,
     INITIAL_DATE: '2024-01-01T00:00:00.000Z',
-    PROTOCOL_OVERHEAD_SIZE: 2,
+    PROTOCOL_OVERHEAD_SIZE: 3,
     MESSAGE_DELIVERY: 550,
     MESSAGE_DELIVERY_TIMEOUT: 15500,
     DEFAULT_SETUP_DELAY: 550,

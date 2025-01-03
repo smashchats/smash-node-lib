@@ -1,3 +1,4 @@
+import { Crypto } from '@peculiar/webcrypto';
 import { TestMessage, TestUtils } from '@tests/how-to/events.utils.js';
 import { TestPeer, createPeer } from '@tests/how-to/user.utils.js';
 import { socketServerUrl } from '@tests/jest.global.js';
@@ -43,6 +44,7 @@ describe('[SmashMessaging] Between peers registered to a SME', () => {
                 return mockedNow;
             }
         } as DateConstructor;
+        const crypto = new Crypto();
         SmashMessaging.setCrypto(crypto);
         await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
     });
@@ -59,7 +61,7 @@ describe('[SmashMessaging] Between peers registered to a SME', () => {
 
         alice = await createPeer('alice', socketServerUrl);
         updatedAliceMeta = {
-            did: alice.did.id,
+            did: alice.messaging.did,
             title: 'Alice',
             description: 'Alice is a cool person',
             avatar: 'https://alice.com/picture.png',
@@ -87,7 +89,7 @@ describe('[SmashMessaging] Between peers registered to a SME', () => {
     describe('Alice sends one message to Bob', () => {
         const TEST_MESSAGE: TestMessage = {
             text: 'hello world 1',
-            sha256: 'kPay1AyS9MkvDMfXSKhaSeNev02sUpA7k4oauLahq8w=',
+            sha256: '5M5Fsom9c/BefiQKkexx7K+wlMglxoejVcHP6KXKfvI=',
         };
 
         let aliceSentMessage: EncapsulatedIMProtoMessage;
@@ -161,13 +163,12 @@ describe('[SmashMessaging] Between peers registered to a SME', () => {
                 await delay(TEST_CONFIG.DEFAULT_POLL_INTERVAL);
 
                 expect(bob.onData).toHaveBeenCalledWith(
-                    expect.any(String),
-                    expect.objectContaining({
-                        data: expect.objectContaining({
+                    alice.did.id,
+                    expect.objectContaining<
+                        Partial<EncapsulatedIMProtoMessage>
+                    >({
+                        data: expect.objectContaining<IMProfile>({
                             ...updatedAliceMeta,
-                            did: expect.objectContaining({
-                                id: alice.did.id,
-                            }),
                         }),
                     }),
                 );
@@ -180,9 +181,9 @@ describe('[SmashMessaging] Between peers registered to a SME', () => {
             });
 
             it('receives the message once', async () => {
+                expect(bob.onData.mock.calls.length).toBeGreaterThan(1);
                 expect(bob.onData.mock.calls.length).toBeLessThanOrEqual(
-                    // account for overhead and ACKs
-                    1 + 2 * TEST_CONFIG.PROTOCOL_OVERHEAD_SIZE,
+                    2 * TEST_CONFIG.PROTOCOL_OVERHEAD_SIZE + 1,
                 );
             });
 

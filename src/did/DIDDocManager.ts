@@ -39,7 +39,7 @@ export class DIDDocManager extends DIDManager {
             signature,
             endpoints: [],
         };
-        this.set(didDocument);
+        this.set(JSON.parse(JSON.stringify(didDocument)));
         const newIdentity = new IMPeerIdentity(did, ik, ek);
         return newIdentity;
     }

@@ -100,13 +100,8 @@ export class SmashMessaging extends EventEmitter {
             return this.peers.get(did)?.incomingSessionReset(message.sha256!);
         });
         this.logger.info(
-            `Loaded Smash lib (log level: ${LOG_LEVEL}, id: ${LOG_ID})`,
+            `SmashMessaging (log level: ${LOG_LEVEL}, id: ${LOG_ID}, did: ${this.identity.did})`,
         );
-        if (LOG_LEVEL === 'DEBUG') {
-            this.getDIDDocument().then((didDoc) => {
-                this.logger.debug(JSON.stringify(didDoc, null, 2));
-            });
-        }
     }
 
     static setCrypto(c: globalThis.Crypto) {
