@@ -14,6 +14,7 @@ import { CryptoUtils, Logger } from '@src/utils/index.js';
 
 export class SMESocketManager {
     private readonly smeSockets: Record<string, SMESocketWriteOnly>;
+    private closed: boolean = false;
 
     constructor(
         private readonly logger: Logger,
@@ -23,6 +24,9 @@ export class SMESocketManager {
     }
 
     getOrCreate(url: string): SMESocketWriteOnly {
+        if (this.closed) {
+            throw new Error('SMESocketManager is closed');
+        }
         if (!this.smeSockets[url]) {
             this.logger.debug(`Creating new SMESocketWriteOnly for ${url}`);
             this.smeSockets[url] = new SMESocketWriteOnly(
@@ -92,6 +96,7 @@ export class SMESocketManager {
     }
 
     async closeAllSockets() {
+        this.closed = true;
         return Promise.allSettled(
             Object.values(this.smeSockets).map((socket) =>
                 this.closeSocket(socket),

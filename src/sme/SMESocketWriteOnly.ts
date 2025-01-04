@@ -18,25 +18,28 @@ export class SMESocketWriteOnly {
 
     async close(TIMEOUT_MS = 5000): Promise<void> {
         return new Promise((resolve) => {
-            this.logger.debug(`> Disconnecting from SME ${this.url}`);
-            const socket = this.socket;
-            if (!socket) {
+            this.logger.debug(
+                `> Disconnecting from SME ${this.url} [${this.socket?.id}]`,
+            );
+            if (!this.socket) {
                 return resolve();
             }
+            const socket = this.socket;
             const timeout =
                 typeof globalThis.setTimeout !== 'undefined'
                     ? globalThis.setTimeout(() => {
                           this.logger.warn(
-                              `Timeout exceeded while closing socket (${TIMEOUT_MS}ms), forcing cleanup`,
+                              `Timeout exceeded while closing socket (${TIMEOUT_MS}ms), forcing cleanup [${this.socket?.id}]`,
                           );
                           this.forceCleanup();
                           resolve();
                       }, TIMEOUT_MS)
                     : undefined;
-
             if (socket.connected) {
                 socket.once('disconnect', () => {
-                    this.logger.info(`> Disconnected from SME ${this.url}`);
+                    this.logger.info(
+                        `> Disconnected from SME ${this.url} [${this.socket?.id}]`,
+                    );
                     if (typeof globalThis.clearTimeout !== 'undefined') {
                         globalThis.clearTimeout(timeout);
                     }
@@ -58,7 +61,9 @@ export class SMESocketWriteOnly {
         if (!this.socket) {
             return;
         }
-        this.logger.debug(`> socket cleanup (${this.url})...`);
+        this.logger.debug(
+            `> socket cleanup (${this.url})... [${this.socket?.id}]`,
+        );
         this.socket.removeAllListeners();
         this.socket.disconnect();
         this.socket.close();
@@ -86,11 +91,16 @@ export class SMESocketWriteOnly {
     ): Promise<void> {
         return new Promise<void>((resolve, reject) => {
             if (!messageIds.length) {
-                this.logger.warn(`called sendData with no messageIds`);
+                this.logger.warn(
+                    `Called sendData with no messageIds [${this.socket?.id}]`,
+                );
                 return resolve();
             }
             if (!this.socket || this.socket.disconnected) {
-                this.logger.info('connecting write-only socket');
+                this.logger.info(
+                    `Creating write-only socket for ${this.url} [prev: ${this.socket?.id}]`,
+                );
+                this.forceCleanup();
                 this.initSocket();
                 if (!this.socket) {
                     return reject(
@@ -103,12 +113,12 @@ export class SMESocketWriteOnly {
                     ? globalThis.setTimeout(() => {
                           reject(
                               new Error(
-                                  `Timeout exceeded while sending data to ${this.url}`,
+                                  `Timeout exceeded while sending data to ${this.url} [${this.socket?.id}]`,
                               ),
                           );
                       }, TIMEOUT_MS)
                     : undefined;
-            this.socket.emit('data', preKey, sessionId, buffer, () => {
+            this.socket!.emit('data', preKey, sessionId, buffer, () => {
                 if (typeof globalThis.clearTimeout !== 'undefined') {
                     globalThis.clearTimeout(timeout);
                 }
@@ -130,40 +140,50 @@ export class SMESocketWriteOnly {
 
         socket.on('connect', () => {
             const transport = socket.io.engine.transport.name; // in most cases, "polling"
-            this.logger.info(`> Connected to SME ${this.url} (${transport})`);
+            this.logger.info(
+                `> Connected to SME ${this.url} (${transport}) [${this.socket?.id}]`,
+            );
             socket.io.engine.on('upgrade', () => {
                 const upgradedTransport = socket.io.engine.transport.name; // in most cases, "websocket"
                 this.logger.info(
-                    `> Upgraded connection to SME ${this.url} (${upgradedTransport})`,
+                    `> Upgraded connection to SME ${this.url} (${upgradedTransport}) [${this.socket?.id}]`,
                 );
             });
         });
 
         socket.on('connect_error', (error: Error) => {
-            this.logger.warn(`> Connect error to SME ${this.url}: ${error}`);
+            this.logger.warn(
+                `> Connect error to SME ${this.url}: ${error} [${this.socket?.id}]`,
+            );
         });
 
         socket.on('ping', () => {
-            this.logger.debug(`> Ping from SME ${this.url}`);
+            this.logger.debug(
+                `> Ping from SME ${this.url} [${this.socket?.id}]`,
+            );
         });
 
         socket.on('reconnect', () => {
-            this.logger.info(`> Reconnected to SME ${this.url}`);
+            this.logger.info(
+                `> Reconnected to SME ${this.url} [${this.socket?.id}]`,
+            );
         });
 
         socket.on('reconnect_attempt', (attempt: number) => {
             this.logger.debug(
-                `> Reconnect attempt ${attempt} to SME ${this.url}`,
+                `> Reconnect attempt ${attempt} to SME ${this.url} [${this.socket?.id}]`,
             );
         });
 
         socket.on('reconnect_error', (error: Error) => {
-            this.logger.warn(`> Reconnect error to SME ${this.url}: ${error}`);
+            this.logger.warn(
+                `> Reconnect error to SME ${this.url}: ${error} [${this.socket?.id}]`,
+            );
         });
 
         socket.on('reconnect_failed', () => {
             this.logger.error(
-                `> Failed to connect to SME ${this.url}. Giving up.`,
+                `> Failed to connect to SME ${this.url}. Giving up. [${this.socket?.id}]`,
             );
             this.forceCleanup();
         });

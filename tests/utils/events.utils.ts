@@ -1,6 +1,5 @@
 import { apiServerUrl } from '@tests/jest.global.js';
-import { delay } from '@tests/time.utils.js';
-import { TEST_CONFIG } from '@tests/time.utils.js';
+import { TEST_CONFIG, delay } from '@tests/utils/time.utils.js';
 import { Logger } from 'smash-node-lib';
 
 export interface TestMessage {

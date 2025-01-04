@@ -24,6 +24,8 @@ export class SmashPeer {
     // TODO subscribe on changes like updates to DID, IK, EK, PK...
     private endpoints: SmashPeerEndpoint[] = [];
 
+    private closed: boolean = false;
+
     private readonly messageQueue: Map<sha256, EncapsulatedIMProtoMessage> =
         new Map();
     private readonly MAX_RETRY_ATTEMPTS = 10;
@@ -228,14 +230,13 @@ export class SmashPeer {
     }
 
     private async scheduleFlushQueue(attempt: number, delay: number) {
+        if (this.closed) {
+            return;
+        }
         if (typeof globalThis.setTimeout !== 'undefined') {
             this.retryTimeout = globalThis.setTimeout(
                 () => this.flushQueue(attempt, delay, true),
                 delay,
-            );
-        } else {
-            this.logger.warn(
-                'setTimeout not available: skipping flush queue scheduling.',
             );
         }
     }
@@ -276,18 +277,30 @@ export class SmashPeer {
         }
     }
 
-    async cancelRetry() {
+    public async close() {
+        this.closed = true;
+        this.messageQueue.clear();
+        await this.cancelRetry();
+        await Promise.allSettled(
+            this.endpoints.map((endpoint) => endpoint.clearQueue()),
+        );
+    }
+
+    private async cancelRetry() {
         this.logger.debug(`SmashPeer::cancelRetry for peer ${this.id}`);
         // mutex: wait for flushqueue before clearing retries
-        return this.mutex.acquire(
+        await this.mutex.acquire(
             `flushQueue-${this.id}`,
-            () => {
+            async () => {
                 this.logger.debug(
                     `SmashPeer::cancelRetry: acquired (${this.retryTimeout})`,
                 );
                 this.clearRetryTimeout();
+                await Promise.allSettled(
+                    this.endpoints.map((endpoint) => endpoint.waitForQueue()),
+                );
             },
-            { skipQueue: true, timeout: 3000 },
+            { skipQueue: true, timeout: 10000 },
         );
     }
 

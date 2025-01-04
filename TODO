@@ -7,8 +7,8 @@ KEY USAGE ISSUE WHEN USING NODE Crypto OBJECT
 - [x] manual refactor while writing the happy path tutorial test suite (mainly splitting modules and restructuring code)
 - [-] make previous test suites pass again
 
-    - [-] tests/how-to/index.spec.ts
-    - [-] tests/how-to/nbh.spec.ts
+    - [x] tests/how-to/index.spec.ts
+    - [x] tests/how-to/nbh.spec.ts
     - [ ] tests/how-to/sessions.spec.ts
     - [ ] tests/how-to/edgecases.spec.ts
     - [ ] tests/how-to/delivery.spec.ts

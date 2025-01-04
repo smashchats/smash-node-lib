@@ -29,9 +29,15 @@ export class SmashPeerEndpoint {
 
     private readonly mutex = new AsyncLock();
 
-    queue(message: EncapsulatedIMProtoMessage): Promise<void> {
+    public queue(message: EncapsulatedIMProtoMessage): Promise<void> {
         return this.mutex.acquire(QUEUE_MUTEX_NAME, () => {
             this.queueBypassingMutex(message);
+        });
+    }
+
+    public clearQueue(): Promise<void> {
+        return this.mutex.acquire(QUEUE_MUTEX_NAME, () => {
+            this.messageQueue.clear();
         });
     }
 
@@ -42,7 +48,7 @@ export class SmashPeerEndpoint {
         );
     }
 
-    async ack(messageIds: sha256[]) {
+    public async ack(messageIds: sha256[]) {
         return this.mutex.acquire(QUEUE_MUTEX_NAME, () => {
             messageIds.forEach((messageId) => {
                 this.messageQueue.delete(messageId);
@@ -53,14 +59,39 @@ export class SmashPeerEndpoint {
         });
     }
 
+    public async waitForQueue(): Promise<void> {
+        this.logger.debug(
+            `> waiting to acquire queue mutex for ${this.config.url} ...`,
+        );
+        await this.mutex.acquire(
+            QUEUE_MUTEX_NAME,
+            () => {
+                this.logger.debug(
+                    `> ... acquired queue mutex for ${this.config.url}`,
+                );
+            },
+            {
+                skipQueue: true,
+            },
+        );
+    }
+
     /**
      * Flushes the message queue to the endpoint.
      * If the session is expired, it will be re-initialized.
      * @throws Error if message isnt delivered within 3 seconds.
      */
-    async flush(shouldUseSession: SignalSession | undefined): Promise<void> {
+    public async flush(
+        shouldUseSession: SignalSession | undefined,
+    ): Promise<void> {
         const session = shouldUseSession ?? (await this.thisSession());
+        this.logger.debug(
+            `> waiting to acquire flushing mutex for ${this.config.url} ...`,
+        );
         return this.mutex.acquire(QUEUE_MUTEX_NAME, async () => {
+            this.logger.debug(
+                `> ... acquired flushing mutex for ${this.config.url}`,
+            );
             await this.init(session);
             if (!this.messageQueue.size) {
                 this.logger.debug(
@@ -133,7 +164,7 @@ export class SmashPeerEndpoint {
         return this.session;
     }
 
-    resetSession() {
+    public resetSession() {
         this.session = undefined;
     }
 }

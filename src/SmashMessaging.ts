@@ -224,22 +224,24 @@ export class SmashMessaging extends EventEmitter {
     }
 
     public async close(): Promise<void> {
+        // WARNING: destructive action!!
+        this.removeAllListeners();
+        // Cancelling peer message queues
         const peersToClose = Array.from(this.peers.values());
         this.logger.debug(`>> closing (${peersToClose.length}) peers`);
-
-        const [peersResult, socketsResult] = await Promise.all([
-            Promise.allSettled(peersToClose.map((p) => p.cancelRetry())),
-            this.smeSocketManager.closeAllSockets(),
-        ]);
-
+        const peersResult = await Promise.allSettled(
+            peersToClose.map((p) => p.close()),
+        );
+        // Closing all network sockets
+        const socketsResult = await this.smeSocketManager.closeAllSockets();
         this.endpoints.reset([]);
-
+        // Handling close results
         this.handleCloseResults(peersResult, socketsResult);
     }
 
     private handleCloseResults(
-        peersResult: PromiseSettledResult<void>[],
-        socketsResult: PromiseSettledResult<void>[],
+        peersResult: PromiseSettledResult<unknown>[],
+        socketsResult: PromiseSettledResult<unknown>[],
     ): void {
         const failedToClosePeers = peersResult.filter(
             (r) => r.status === 'rejected',

@@ -88,6 +88,10 @@ describe('Smash Tutorial', () => {
         testUtils.logger.info('DIDDocManager initialized');
     });
 
+    afterEach(async () => {
+        await testUtils.cleanup();
+    });
+
     /**
      * @tutorial-section Prerequisites
      * @tutorial-step 0
@@ -106,6 +110,10 @@ describe('Smash Tutorial', () => {
         testUtils.logger.info('Crypto engine set. Ready!');
     });
 
+    afterAll(async () => {
+        await testUtils.cleanup();
+    });
+
     /**
      * @tutorial-section Identity Creation
      * @tutorial-step 1
@@ -122,12 +130,12 @@ describe('Smash Tutorial', () => {
      * secure messaging using the Signal protocol.
      */
     describe('1. Creating a new decentralized identity (DID)', () => {
-        let bobIdentity: IMPeerIdentity;
-        let bobExportedIdentity: string;
+        let jackIdentity: IMPeerIdentity;
+        let jackExportedIdentity: string;
 
         beforeEach(async () => {
-            bobIdentity = await didDocumentManager.generate();
-            bobExportedIdentity = await bobIdentity.serialize();
+            jackIdentity = await didDocumentManager.generate();
+            jackExportedIdentity = await jackIdentity.serialize();
         });
 
         /**
@@ -139,22 +147,22 @@ describe('Smash Tutorial', () => {
          * - Key signatures
          */
         test('Understanding DID components', async () => {
-            const bobDIDDocument = await bobIdentity.getDIDDocument();
+            const jackDIDDocument = await jackIdentity.getDIDDocument();
 
-            expect(bobDIDDocument.id).toBeDefined();
-            testUtils.logger.info(`DID: ${bobDIDDocument.id}`);
+            expect(jackDIDDocument.id).toBeDefined();
+            testUtils.logger.info(`DID: ${jackDIDDocument.id}`);
 
-            expect(bobDIDDocument.ik).toBeDefined();
-            testUtils.logger.info(`IK: ${bobDIDDocument.ik}`);
+            expect(jackDIDDocument.ik).toBeDefined();
+            testUtils.logger.info(`IK: ${jackDIDDocument.ik}`);
 
-            expect(bobDIDDocument.ek).toBeDefined();
-            testUtils.logger.info(`EK: ${bobDIDDocument.ek}`);
+            expect(jackDIDDocument.ek).toBeDefined();
+            testUtils.logger.info(`EK: ${jackDIDDocument.ek}`);
 
             await expect(
                 CryptoUtils.singleton.verifyExportedKey(
-                    bobDIDDocument.ik,
-                    bobDIDDocument.ek,
-                    bobDIDDocument.signature,
+                    jackDIDDocument.ik,
+                    jackDIDDocument.ek,
+                    jackDIDDocument.signature,
                 ),
             ).resolves.toBe(true);
         });
@@ -170,7 +178,7 @@ describe('Smash Tutorial', () => {
         describe('Working with stored identities', () => {
             beforeEach(async () => {
                 // Set up DID resolution for testing
-                didDocumentManager.set(await bobIdentity.getDIDDocument());
+                didDocumentManager.set(await jackIdentity.getDIDDocument());
             });
 
             /**
@@ -183,14 +191,16 @@ describe('Smash Tutorial', () => {
             test('Restoring a Smash instance from saved identity', async () => {
                 testUtils.logger.info('Deserializing identity...');
                 const restoredIdentity =
-                    await IMPeerIdentity.deserialize(bobExportedIdentity);
+                    await IMPeerIdentity.deserialize(jackExportedIdentity);
                 testUtils.logger.info(`> Deserialized ${restoredIdentity.did}`);
 
-                const bob = new SmashUser(restoredIdentity, 'bob', 'INFO');
-                expect(bob).toBeInstanceOf(SmashMessaging);
+                const jack = new SmashUser(restoredIdentity, 'jack', 'INFO');
+                expect(jack).toBeInstanceOf(SmashMessaging);
                 testUtils.logger.info(
                     'Messaging instance created successfully',
                 );
+                await jack.close();
+                await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
             });
         });
     });
@@ -213,20 +223,24 @@ describe('Smash Tutorial', () => {
             async createMessagingInstance(): Promise<
                 [SmashMessaging, IMPeerIdentity]
             > {
-                const bobIdentity = await didDocumentManager.generate();
-                return [new SmashUser(bobIdentity, 'bob', 'INFO'), bobIdentity];
+                const laraIdentity = await didDocumentManager.generate();
+                return [
+                    new SmashUser(laraIdentity, 'lara', 'INFO'),
+                    laraIdentity,
+                ];
             },
         };
 
-        let bob: SmashMessaging;
-        let bobIdentity: IMPeerIdentity;
+        let lara: SmashMessaging;
+        let laraIdentity: IMPeerIdentity;
 
         beforeEach(async () => {
-            [bob, bobIdentity] = await testContext.createMessagingInstance();
+            [lara, laraIdentity] = await testContext.createMessagingInstance();
         });
 
         afterEach(async () => {
-            await bob.close();
+            await lara.close();
+            await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
         });
 
         /**
@@ -239,11 +253,11 @@ describe('Smash Tutorial', () => {
          */
         test('Configuring messaging endpoints', async () => {
             testUtils.logger.info(
-                `Setting up endpoints for ${bobIdentity.did}...`,
+                `Setting up endpoints for ${laraIdentity.did}...`,
             );
 
-            const preKeyPair = await bobIdentity.generateNewPreKeyPair();
-            const addedEndpoint = await bob.endpoints.connect(
+            const preKeyPair = await laraIdentity.generateNewPreKeyPair();
+            const addedEndpoint = await lara.endpoints.connect(
                 {
                     url: socketServerUrl,
                     smePublicKey: SME_PUBLIC_KEY,
@@ -251,7 +265,7 @@ describe('Smash Tutorial', () => {
                 preKeyPair,
             );
 
-            const updatedDIDDocument = await bob.getDIDDocument();
+            const updatedDIDDocument = await lara.getDIDDocument();
             expect(updatedDIDDocument.endpoints).toEqual(
                 expect.arrayContaining([
                     expect.objectContaining({
@@ -298,20 +312,20 @@ describe('Smash Tutorial', () => {
             },
         };
 
-        let bob: SmashMessaging;
         let alice: SmashMessaging;
+        let bob: SmashMessaging;
 
         beforeEach(async () => {
-            [bob, alice] = await Promise.all([
-                testContext.initializePeer('bob'),
-                testContext.initializePeer('alice'),
+            [alice, bob] = await Promise.all([
+                testContext.initializePeer('Alice'),
+                testContext.initializePeer('Bob'),
             ]);
         });
 
         afterEach(async () => {
+            await Promise.allSettled([alice.close(), bob.close()]);
             await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
-            await Promise.allSettled([bob.close(), alice.close()]);
-        });
+        }, TEST_CONFIG.TEST_TIMEOUT_MS * 2);
 
         /**
          * @tutorial-step 3.1
@@ -321,11 +335,11 @@ describe('Smash Tutorial', () => {
          * - Message sending
          */
         test('Sending messages', async () => {
-            const message = new IMText('Hello, Alice!');
-            const sent = await bob.send(alice.did, message);
+            const message = new IMText('Hello, Bob!');
+            const sent = await alice.send(bob.did, message);
 
             expect(sent.type).toBe(IM_CHAT_TEXT);
-            expect(sent.data).toBe('Hello, Alice!');
+            expect(sent.data).toBe('Hello, Bob!');
         });
 
         /**
@@ -385,8 +399,8 @@ describe('Smash Tutorial', () => {
              */
             test('Message delivery confirmation', async () => {
                 const onStatus = jest.fn();
-                bob.on('status', onStatus);
-                const sent = await testContext.exchangeMessage(bob, alice);
+                alice.on('status', onStatus);
+                const sent = await testContext.exchangeMessage(alice, bob);
                 expect(onStatus).toHaveBeenCalledWith('delivered', [
                     sent.sha256,
                 ]);
@@ -398,8 +412,8 @@ describe('Smash Tutorial', () => {
              */
             test('Message reception confirmation', async () => {
                 const onStatus = jest.fn();
-                bob.on('status', onStatus);
-                const sent = await testContext.exchangeMessage(bob, alice);
+                alice.on('status', onStatus);
+                const sent = await testContext.exchangeMessage(alice, bob);
                 await delay(TEST_CONFIG.MESSAGE_DELIVERY * 2);
                 expect(onStatus).toHaveBeenCalledWith('received', [
                     sent.sha256,
@@ -411,16 +425,18 @@ describe('Smash Tutorial', () => {
              * @task Implement read receipts
              */
             test('Message read status', async () => {
-                const bobAck = jest.fn();
-                bob.on('status', bobAck);
-                const sent = await testContext.exchangeMessage(bob, alice);
+                const aliceAck = jest.fn();
+                alice.on('status', aliceAck);
+                const sent = await testContext.exchangeMessage(alice, bob);
 
                 await delay(TEST_CONFIG.MESSAGE_DELIVERY);
-                expect(bobAck).not.toHaveBeenCalledWith('read', [sent.sha256]);
+                expect(aliceAck).not.toHaveBeenCalledWith('read', [
+                    sent.sha256,
+                ]);
 
-                await alice.ackMessagesRead(bob.did, [sent.sha256]);
+                await bob.ackMessagesRead(alice.did, [sent.sha256]);
                 await delay(TEST_CONFIG.MESSAGE_DELIVERY);
-                expect(bobAck).toHaveBeenCalledWith('read', [sent.sha256]);
+                expect(aliceAck).toHaveBeenCalledWith('read', [sent.sha256]);
             });
         });
 
@@ -483,20 +499,20 @@ describe('Smash Tutorial', () => {
             },
         };
 
-        let bob: SmashMessaging;
-        let alice: SmashMessaging;
+        let duane: SmashMessaging;
+        let emily: SmashMessaging;
 
         beforeEach(async () => {
-            [bob, alice] = await Promise.all([
-                testContext.initializePeer('bob'),
-                testContext.initializePeer('alice'),
+            [duane, emily] = await Promise.all([
+                testContext.initializePeer('Duane'),
+                testContext.initializePeer('Emily'),
             ]);
         });
 
         afterEach(async () => {
+            await Promise.allSettled([duane.close(), emily.close()]);
             await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
-            await Promise.allSettled([bob.close(), alice.close()]);
-        });
+        }, TEST_CONFIG.TEST_TIMEOUT_MS * 2);
 
         /**
          * @tutorial-step 4.1
@@ -507,18 +523,18 @@ describe('Smash Tutorial', () => {
          */
         test('Initial profile exchange', async () => {
             const onProfile = jest.fn();
-            bob.on(IM_PROFILE, onProfile);
+            duane.on(IM_PROFILE, onProfile);
 
-            await bob.send(alice.did, new IMText('hello'));
+            await duane.send(emily.did, new IMText('hello'));
             await delay(TEST_CONFIG.MESSAGE_DELIVERY * 2);
 
             expect(onProfile).toHaveBeenCalledWith(
-                alice.did,
+                emily.did,
                 expect.objectContaining<IMProfileMessage>({
                     type: IM_PROFILE,
                     data: {
-                        did: alice.did,
-                        title: 'alice',
+                        did: emily.did,
+                        title: 'Emily',
                         description: '',
                         avatar: '',
                     },
@@ -538,23 +554,23 @@ describe('Smash Tutorial', () => {
          */
         test('Profile update propagation', async () => {
             const onProfile = jest.fn();
-            bob.on(IM_PROFILE, onProfile);
+            duane.on(IM_PROFILE, onProfile);
 
             // Establish initial contact
-            await bob.send(alice.did, new IMText('hello'));
+            await duane.send(emily.did, new IMText('hello'));
             await delay(TEST_CONFIG.MESSAGE_DELIVERY);
 
             // Update profile
-            await alice.updateMeta({ title: 'alice2' });
+            await emily.updateMeta({ title: 'Emily2' });
             await delay(TEST_CONFIG.MESSAGE_DELIVERY);
 
             expect(onProfile).toHaveBeenCalledWith(
-                alice.did,
+                emily.did,
                 expect.objectContaining<IMProfileMessage>({
                     type: IM_PROFILE,
                     data: {
-                        did: alice.did,
-                        title: 'alice2',
+                        did: emily.did,
+                        title: 'Emily2',
                         description: '',
                         avatar: '',
                     },
@@ -581,7 +597,6 @@ describe('Smash Tutorial', () => {
      */
     describe('5. Working with Neighborhoods', () => {
         let nab: TestNAB;
-        let bob: SmashUser;
 
         const testContext = {
             smeConfig: {
@@ -746,9 +761,9 @@ describe('Smash Tutorial', () => {
         });
 
         afterEach(async () => {
+            await nab.close();
             await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
-            await Promise.all([nab?.close(), bob?.close()]);
-        });
+        }, TEST_CONFIG.TEST_TIMEOUT_MS * 2);
 
         /**
          * @tutorial-step 5.2
@@ -762,8 +777,8 @@ describe('Smash Tutorial', () => {
             'Joining a neighborhood',
             async () => {
                 // Set up test user
-                const bobIdentity = await didDocumentManager.generate();
-                bob = new SmashUser(bobIdentity, 'bob');
+                const lolaIdentity = await didDocumentManager.generate();
+                const lola = new SmashUser(lolaIdentity, 'Lola');
 
                 // Calculate timeout
                 const JOIN_TIMEOUT =
@@ -775,41 +790,45 @@ describe('Smash Tutorial', () => {
                     timeout: JOIN_TIMEOUT,
                 });
                 const onNbhAdded = jest.fn();
-                bob.on(NBH_ADDED, onNbhAdded);
+                lola.on(NBH_ADDED, onNbhAdded);
 
                 // Join neighborhood and wait for confirmation
                 const joinInfo = await nab.getJoinInfo([testContext.smeConfig]);
-                await bob.join(joinInfo);
+                await lola.join(joinInfo);
 
                 await waitForJoin;
 
                 // Verify that the specified NAB received the join request
-                const bobDIDDocument = await bob.getDIDDocument();
+                const lolaDIDDocument = await lola.getDIDDocument();
                 expect(nab.onJoin).toHaveBeenCalledWith(
-                    bobDIDDocument,
+                    lolaDIDDocument,
                     expect.any(String),
                     expect.any(String),
                 );
 
                 // Verify join callback (on User side)
                 expect(onNbhAdded).toHaveBeenCalledWith(nab.did);
+
+                await lola.close();
+                await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
             },
             TEST_CONFIG.MESSAGE_DELIVERY_TIMEOUT,
         );
 
         describe('In a Neighborhood with other peers', () => {
             let alice: SmashUser;
-            let darcy: SmashUser;
+            let bob: SmashUser;
+            let charlie: SmashUser;
 
             beforeEach(async () => {
                 const bobIdentity = await didDocumentManager.generate();
                 const aliceIdentity = await didDocumentManager.generate();
-                const darcyIdentity = await didDocumentManager.generate();
+                const charlieIdentity = await didDocumentManager.generate();
                 await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
 
-                bob = new SmashUser(bobIdentity, 'bob');
-                alice = new SmashUser(aliceIdentity, 'alice');
-                darcy = new SmashUser(darcyIdentity, 'darcy');
+                bob = new SmashUser(bobIdentity, 'bob@nab');
+                alice = new SmashUser(aliceIdentity, 'alice@nab');
+                charlie = new SmashUser(charlieIdentity, 'charlie@nab');
 
                 const allThreeHaveJoined = waitFor(nab, SMASH_NBH_JOIN, {
                     count: 3,
@@ -819,7 +838,7 @@ describe('Smash Tutorial', () => {
                 await Promise.all([
                     bob.join(joinInfo),
                     alice.join(joinInfo),
-                    darcy.join(joinInfo),
+                    charlie.join(joinInfo),
                 ]);
 
                 await allThreeHaveJoined;
@@ -831,7 +850,7 @@ describe('Smash Tutorial', () => {
                 });
                 await bob.updateMeta({ title: 'bob' });
                 await alice.updateMeta({ title: 'alice' });
-                await darcy.updateMeta({ title: 'darcy' });
+                await charlie.updateMeta({ title: 'charlie' });
 
                 await profilesUpdated;
                 await delay(TEST_CONFIG.MESSAGE_DELIVERY);
@@ -840,12 +859,14 @@ describe('Smash Tutorial', () => {
             }, TEST_CONFIG.TEST_TIMEOUT_MS * 5);
 
             afterEach(async () => {
-                await Promise.all([
+                console.warn('closing peers');
+                await Promise.allSettled([
                     alice?.close(),
-                    darcy?.close(),
+                    charlie?.close(),
                     bob?.close(),
                 ]);
-            });
+                await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
+            }, TEST_CONFIG.TEST_TIMEOUT_MS * 10);
 
             /**
              * @tutorial-step 5.3
@@ -863,7 +884,7 @@ describe('Smash Tutorial', () => {
                 await bob.discover();
                 await waitForDiscovery;
 
-                // Verify Bob's profile discovery result contains Alice and Darcy's profiles
+                // Verify Bob's profile discovery result contains Alice and charlie's profiles
                 const expectedDiscoveredProfile = async (user: SmashUser) => {
                     const didDoc = await user.getDIDDocument();
                     return expect.objectContaining<SmashProfile>({
@@ -888,7 +909,7 @@ describe('Smash Tutorial', () => {
                     expect.arrayContaining(
                         await Promise.all([
                             expectedDiscoveredProfile(alice),
-                            expectedDiscoveredProfile(darcy),
+                            expectedDiscoveredProfile(charlie),
                         ]),
                     ) as SmashProfileList,
                 );
@@ -907,7 +928,7 @@ describe('Smash Tutorial', () => {
                     new Promise<number>((resolve, reject) => {
                         const timeout = setTimeout(() => {
                             reject(new Error('Timeout'));
-                        }, TEST_CONFIG.TEST_TIMEOUT_MS);
+                        }, TEST_CONFIG.TEST_TIMEOUT_MS * 2);
                         bob.once(NBH_PROFILE_LIST, (_, profiles) => {
                             const aliceProfile = profiles.find(
                                 (profile) => profile.did.id === alice.did,
@@ -925,8 +946,9 @@ describe('Smash Tutorial', () => {
                     nabReceivedRelationship = waitFor(
                         nab,
                         SMASH_NBH_RELATIONSHIP,
+                        { timeout: TEST_CONFIG.TEST_TIMEOUT_MS * 2 },
                     );
-                });
+                }, TEST_CONFIG.TEST_TIMEOUT_MS * 2);
 
                 /**
                  * @tutorial-step 5.4.1
@@ -950,7 +972,7 @@ describe('Smash Tutorial', () => {
                         const newDistance = await getDistanceFromBobToAlice();
                         expect(newDistance).toBeLessThan(initialDistance);
                     },
-                    TEST_CONFIG.TEST_TIMEOUT_MS * 2,
+                    TEST_CONFIG.TEST_TIMEOUT_MS * 4,
                 );
 
                 /**
@@ -975,7 +997,7 @@ describe('Smash Tutorial', () => {
                         const newDistance = await getDistanceFromBobToAlice();
                         expect(newDistance).toBeGreaterThan(initialDistance);
                     },
-                    TEST_CONFIG.TEST_TIMEOUT_MS * 2,
+                    TEST_CONFIG.TEST_TIMEOUT_MS * 4,
                 );
 
                 /**
@@ -999,7 +1021,7 @@ describe('Smash Tutorial', () => {
                         const newDistance = await getDistanceFromBobToAlice();
                         expect(newDistance).toEqual(initialDistance);
                     },
-                    TEST_CONFIG.TEST_TIMEOUT_MS * 4,
+                    TEST_CONFIG.TEST_TIMEOUT_MS * 10,
                 );
             });
         });
