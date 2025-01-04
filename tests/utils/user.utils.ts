@@ -12,24 +12,23 @@ export interface TestPeer {
     did: DIDDocument;
     onData: jest.Mock;
     onStatus: jest.Mock;
+    identity: IMPeerIdentity;
+    name: string;
 }
 
-const defaultDidManager = new DIDDocManager();
+export const defaultDidManager = new DIDDocManager();
 SmashMessaging.use('doc', defaultDidManager);
-
-export const generateIdentity = async (
-    didManager: DIDManager = defaultDidManager,
-) => {
-    return await didManager.generate();
-};
 
 export const createPeer = async (
     name: string,
     serverUrl?: string | string[],
     loadIdentity?: IMPeerIdentity,
-    didManager?: DIDManager,
+    didManager: DIDManager = defaultDidManager,
 ): Promise<TestPeer> => {
-    const identity = loadIdentity ?? (await generateIdentity(didManager));
+    if (!didManager) {
+        throw new Error('no DID manager found, cannot generate keys');
+    }
+    const identity = loadIdentity ?? (await didManager.generate());
     const config = serverUrl
         ? (Array.isArray(serverUrl) ? serverUrl : [serverUrl]).map((url) => ({
               url,
@@ -38,7 +37,7 @@ export const createPeer = async (
         : [];
     const messaging = new SmashMessaging(identity, name, 'DEBUG');
     for (const endpoint of config) {
-        const preKeyPair = await identity.generateNewPreKeyPair();
+        const preKeyPair = await didManager.generateNewPreKeyPair(identity);
         await messaging.endpoints.connect(endpoint, preKeyPair);
     }
 
@@ -50,5 +49,5 @@ export const createPeer = async (
     // Status events
     messaging.on('data', onData);
     messaging.on('status', onStatus);
-    return { messaging, did, onData, onStatus };
+    return { messaging, did, onData, onStatus, identity, name };
 };

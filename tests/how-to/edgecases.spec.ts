@@ -1,5 +1,9 @@
 import { Crypto } from '@peculiar/webcrypto';
-import { apiServerUrl, socketServerUrl } from '@tests/jest.global.js';
+import {
+    SME_PUBLIC_KEY,
+    apiServerUrl,
+    socketServerUrl,
+} from '@tests/jest.global.js';
 import { TEST_CONFIG, aliasWaitFor, delay } from '@tests/utils/time.utils.js';
 import { TestPeer, createPeer } from '@tests/utils/user.utils.js';
 import {
@@ -14,6 +18,41 @@ import {
     sha256,
     sortSmashMessages,
 } from 'smash-node-lib';
+
+// TODO: import config on lib loading (& add to tutorial)
+const restartTestPeer = async (logger: Logger, peer: TestPeer) => {
+    logger.debug('>> Exporting peer identity');
+    const peerExportedIdentity = await peer.messaging.exportIdentity();
+    logger.debug('> Exported', JSON.stringify(peerExportedIdentity, null, 2));
+
+    logger.debug('>> Closing peer messaging');
+    await peer.messaging.close();
+    await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
+
+    logger.debug('>> Importing peer identity');
+    const peerIdentity =
+        await SmashMessaging.importIdentity(peerExportedIdentity);
+    logger.debug(
+        '> Imported',
+        JSON.stringify(await peerIdentity.serialize(), null, 2),
+    );
+
+    logger.debug('>> Creating restarted peer');
+    const restartedPeer = await createPeer(
+        `${peer.name} (after restart)`,
+        [],
+        peerIdentity,
+    );
+    const peerEndpointsReconfig = peer.did.endpoints.map((endpoint, index) => ({
+        ...endpoint,
+        smePublicKey: SME_PUBLIC_KEY,
+        preKeyPair: peer.identity.signedPreKeys[index],
+    }));
+    await restartedPeer.messaging.endpoints.reset(peerEndpointsReconfig);
+    return restartedPeer;
+};
+
+// TODO: refactor test suite into How To guides generation material
 
 /**
  * **************************************************************
@@ -59,20 +98,25 @@ describe('SmashMessaging: Edge cases', () => {
 
                 // 1. Alice sends a message to Bob
                 logger.info('>> Alice sends a message to Bob');
+                const bobReceivedFirstMessage = waitFor(
+                    bob.messaging,
+                    IM_CHAT_TEXT,
+                );
                 const message1 = 'initial message';
                 const sent = await alice.messaging.send(
                     bob.did,
                     new IMText(message1),
                 );
-                await delay(2 * TEST_CONFIG.MESSAGE_DELIVERY);
+                await bobReceivedFirstMessage;
 
                 logger.info('>> Verify Bob received the message');
                 expect(bob.onData).toHaveBeenCalledWith(
                     alice.did.id,
                     expect.objectContaining({ sha256: sent.sha256 }),
                 );
-                await delay(TEST_CONFIG.MESSAGE_DELIVERY);
+
                 logger.info('>> Verify Alice received the ACK');
+                await delay(TEST_CONFIG.MESSAGE_DELIVERY);
                 expect(alice.onStatus).toHaveBeenCalledWith(
                     'delivered',
                     expect.arrayContaining([sent.sha256]),
@@ -94,33 +138,22 @@ describe('SmashMessaging: Edge cases', () => {
                 logger.info(
                     '>> Simulate Bob restart with lost session context',
                 );
-                logger.debug('>> Exporting Bob identity');
-                const bobExportedIdentity =
-                    await bob.messaging.exportIdentity();
-                logger.debug('>> Closing Bob messaging');
-                await bob.messaging.close();
-                await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
-                logger.debug('>> Importing Bob identity');
-                const bobIdentity =
-                    await SmashMessaging.importIdentity(bobExportedIdentity);
-                logger.debug('>> Creating new Bob peer');
-                bob = await createPeer(
-                    'bob (after restart)',
-                    socketServerUrl,
-                    bobIdentity,
-                );
-
+                bob = await restartTestPeer(logger, bob);
                 if (!bob) throw new Error('Bob not found');
-                await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
 
                 // 4. Try sending another message
                 logger.info('>> Try sending another message');
+                const bobReceivedSecondMessage = waitFor(
+                    bob.messaging,
+                    IM_CHAT_TEXT,
+                    { timeout: TEST_CONFIG.MESSAGE_DELIVERY_TIMEOUT },
+                );
                 const message2 = 'message after session expiry';
                 const sent2 = await alice.messaging.send(
                     await bob.messaging.getDIDDocument(),
                     new IMText(message2),
                 );
-                await delay(2 * TEST_CONFIG.MESSAGE_DELIVERY);
+                await bobReceivedSecondMessage;
 
                 // 5. Verify message received
                 logger.info('>> Verify Bob received the second message');
@@ -128,8 +161,9 @@ describe('SmashMessaging: Edge cases', () => {
                     alice.did.id,
                     expect.objectContaining({ sha256: sent2.sha256 }),
                 );
-                await delay(TEST_CONFIG.MESSAGE_DELIVERY);
+
                 logger.info('>> Verify Alice received the ACK');
+                await delay(TEST_CONFIG.MESSAGE_DELIVERY);
                 expect(alice.onStatus).toHaveBeenCalledWith(
                     'received',
                     expect.arrayContaining([sent2.sha256]),
@@ -138,7 +172,7 @@ describe('SmashMessaging: Edge cases', () => {
                 logger.info('>> Cleanup');
                 await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
             },
-            TEST_CONFIG.MESSAGE_DELIVERY_TIMEOUT * 2,
+            TEST_CONFIG.MESSAGE_DELIVERY_TIMEOUT,
         );
 
         it(
@@ -151,11 +185,15 @@ describe('SmashMessaging: Edge cases', () => {
 
                 // 1. Initial communication
                 logger.info('>> Alice sends a first message to Bob');
+                const bobReceivedFirstMessage = waitFor(
+                    bob.messaging,
+                    IM_CHAT_TEXT,
+                );
                 const sent1 = await alice.messaging.send(
                     bob.did,
                     new IMText('hello'),
                 );
-                await delay(TEST_CONFIG.MESSAGE_DELIVERY);
+                await bobReceivedFirstMessage;
 
                 // Verify first message received
                 logger.info('>> Verify first message received');
@@ -165,22 +203,8 @@ describe('SmashMessaging: Edge cases', () => {
                 );
 
                 // 2. Simulate Bob restart - create new instance with same identity
-                logger.info('>> Simulate Bob restart: export identity');
-                const bobExportedIdentity =
-                    await bob.messaging.exportIdentity();
-                await bob.messaging.close();
-                await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
-
-                logger.info('>> Simulate Bob restart: import identity');
-                const bobIdentity =
-                    await SmashMessaging.importIdentity(bobExportedIdentity);
-                bob = await createPeer(
-                    'bob (after restart)',
-                    socketServerUrl,
-                    bobIdentity,
-                );
-                await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
-
+                logger.info('>> Simulate Bob restart');
+                bob = await restartTestPeer(logger, bob);
                 if (!bob) throw new Error('Bob not found');
 
                 logger.info('>> Init chats for Bob');
@@ -191,18 +215,21 @@ describe('SmashMessaging: Edge cases', () => {
                     },
                 ]);
 
-                await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
-                await delay(2 * TEST_CONFIG.MESSAGE_DELIVERY);
+                await delay(TEST_CONFIG.MESSAGE_DELIVERY);
 
                 // 3. Alice tries to send another message
                 logger.info('>> Alice tries to send another message to Bob');
+                const bobReceivedSecondMessage = waitFor(
+                    bob.messaging,
+                    IM_CHAT_TEXT,
+                    { timeout: TEST_CONFIG.MESSAGE_DELIVERY_TIMEOUT },
+                );
                 const message2 = 'are you there?';
                 const sent2 = await alice.messaging.send(
                     bob.did,
                     new IMText(message2),
                 );
-
-                await delay(2 * TEST_CONFIG.MESSAGE_DELIVERY);
+                await bobReceivedSecondMessage;
 
                 logger.info('>> Verify Bob received the second message');
                 expect(bob.onData).toHaveBeenCalledWith(
@@ -212,12 +239,17 @@ describe('SmashMessaging: Edge cases', () => {
 
                 // 4. Bob tries to send another message to Alice
                 logger.info('>> Bob tries to send a reply message to Alice');
+                const aliceReceivedReplyMessage = waitFor(
+                    alice.messaging,
+                    IM_CHAT_TEXT,
+                    { timeout: TEST_CONFIG.MESSAGE_DELIVERY_TIMEOUT },
+                );
                 const message3 = 'I am here!';
                 const sent3 = await bob.messaging.send(
                     alice.did,
                     new IMText(message3),
                 );
-                await delay(2 * TEST_CONFIG.MESSAGE_DELIVERY);
+                await aliceReceivedReplyMessage;
 
                 logger.info('>> Verify Alice received the reply message');
                 expect(alice.onData).toHaveBeenCalledWith(
@@ -243,6 +275,10 @@ describe('SmashMessaging: Edge cases', () => {
 
                     // 1. Initial communication to establish sessions
                     logger.info('>> Alice sends message1 to Bob');
+                    const bobReceivedFirstMessage = waitFor(
+                        bob.messaging,
+                        IM_CHAT_TEXT,
+                    );
                     const message1 = 'initial message';
                     // count (on Bob end):
                     // - Alice profile message to bob
@@ -254,7 +290,7 @@ describe('SmashMessaging: Edge cases', () => {
                         bob.did,
                         new IMText(message1),
                     );
-                    await delay(TEST_CONFIG.MESSAGE_DELIVERY);
+                    await bobReceivedFirstMessage;
 
                     logger.info(
                         `>> Verify Bob received the message (and no more messages than expected (${firstMessageCount}))`,
@@ -266,7 +302,7 @@ describe('SmashMessaging: Edge cases', () => {
                     expect(bob.onData.mock.calls.length).toBeLessThanOrEqual(
                         firstMessageCount,
                     );
-                    await bob.onData.mockClear();
+                    bob.onData.mockClear();
 
                     // 2. Mock Date to simulate time near TTL for both peers
                     // WARNING: this only works because the library uses Date.now() when comparing SESSION_TTL_MS
@@ -283,65 +319,39 @@ describe('SmashMessaging: Edge cases', () => {
                         );
 
                     // 3. Force both peers to trigger resets simultaneously
-                    // 3a. Close both peers
-                    logger.info('>> Closing both peers');
-                    const bobExportedIdentity =
-                        await bob.messaging.exportIdentity();
-                    const aliceExportedIdentity =
-                        await alice.messaging.exportIdentity();
-
-                    await bob.messaging.close();
-                    await alice.messaging.close();
-                    await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
-
-                    logger.info('>> Both peers closed');
-
-                    // 3b. Restart both peers
+                    // 3a. Restarting both peers
                     logger.info('>> Restarting both peers');
-                    const bobIdentity =
-                        await SmashMessaging.importIdentity(
-                            bobExportedIdentity,
-                        );
-                    const aliceIdentity = await SmashMessaging.importIdentity(
-                        aliceExportedIdentity,
-                    );
-                    bob = await createPeer(
-                        'bob (after restart)',
-                        socketServerUrl,
-                        bobIdentity,
-                    );
-                    alice = await createPeer(
-                        'alice (after restart)',
-                        socketServerUrl,
-                        aliceIdentity,
-                    );
-                    await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
+                    [alice, bob] = await Promise.all([
+                        restartTestPeer(logger, alice),
+                        restartTestPeer(logger, bob),
+                    ]);
 
                     if (!bob || !alice)
                         throw new Error('Bob or Alice not found');
 
-                    // 3c. Init chats for both peers
+                    // 3b. Init chats for both peers
                     logger.info(
                         '>> Init chats for both peers (= triggering parallel SESSION RESET)',
                     );
                     const currentTime = new Date().toISOString();
-                    const aliceResetPromise = alice.messaging.initChats([
-                        {
-                            with: bob.did,
-                            lastMessageTimestamp: currentTime,
-                        },
+                    await Promise.all([
+                        alice.messaging.initChats([
+                            {
+                                with: bob.did,
+                                lastMessageTimestamp: currentTime,
+                            },
+                        ]),
+                        bob.messaging.initChats([
+                            {
+                                with: alice.did,
+                                lastMessageTimestamp: currentTime,
+                            },
+                        ]),
                     ]);
-                    const bobResetPromise = bob.messaging.initChats([
-                        {
-                            with: alice.did,
-                            lastMessageTimestamp: currentTime,
-                        },
-                    ]);
-                    await Promise.all([aliceResetPromise, bobResetPromise]);
                     await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
 
                     logger.info('>> Wait for both peers to reset');
-                    await delay(3 * TEST_CONFIG.MESSAGE_DELIVERY);
+                    await delay(4 * TEST_CONFIG.MESSAGE_DELIVERY);
 
                     // expected calls on Bob end:
                     // - Alice profile message to Bob
@@ -359,17 +369,21 @@ describe('SmashMessaging: Edge cases', () => {
                     expect(bob.onData.mock.calls.length).toBeLessThanOrEqual(
                         expectedCalls,
                     );
-                    await bob.onData.mockClear();
+                    bob.onData.mockClear();
 
                     // 4. Verify communication still works
                     logger.info('>> Alice sends message to Bob after reset');
+                    const bobReceivedSecondMessage = waitFor(
+                        bob.messaging,
+                        IM_CHAT_TEXT,
+                        { timeout: TEST_CONFIG.MESSAGE_DELIVERY_TIMEOUT },
+                    );
                     const message2 = 'message after simultaneous reset';
                     const sent2 = await alice.messaging.send(
                         bob.did,
                         new IMText(message2),
                     );
-
-                    await delay(10 * TEST_CONFIG.MESSAGE_DELIVERY);
+                    await bobReceivedSecondMessage;
 
                     const secondMessageCount = 1;
                     logger.info('>> Verify Bob received the second message');
@@ -388,7 +402,7 @@ describe('SmashMessaging: Edge cases', () => {
                     logger.info('>> Cleanup');
                     await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
                 },
-                TEST_CONFIG.MESSAGE_DELIVERY_TIMEOUT * 2,
+                TEST_CONFIG.MESSAGE_DELIVERY_TIMEOUT * 3,
             );
         });
     });

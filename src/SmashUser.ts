@@ -4,6 +4,7 @@ import {
     SMASH_NBH_DISCOVER_MESSAGE,
     SMASH_NBH_JOIN_MESSAGE,
 } from '@src/const.js';
+import { DIDManager } from '@src/did/DIDManager.js';
 import { SmashActionJson } from '@src/types/action.types.js';
 import { DID, DIDString } from '@src/types/did.types.js';
 import { SmashProfileList } from '@src/types/smash.types.js';
@@ -34,7 +35,17 @@ export class SmashUser extends SmashMessaging {
 
         await Promise.all(
             joinAction.config.sme.map(async (smeConfig) => {
-                const preKeyPair = await this.identity.generateNewPreKeyPair();
+                const didManager = SmashMessaging.didDocManagers.get(
+                    DIDManager.parseMethod(this.did),
+                );
+                if (!didManager) {
+                    throw new Error(
+                        'no DID manager found, cannot generate prekey pair',
+                    );
+                }
+                const preKeyPair = await didManager.generateNewPreKeyPair(
+                    this.identity,
+                );
                 await this.endpoints.connect(smeConfig, preKeyPair);
             }),
         );

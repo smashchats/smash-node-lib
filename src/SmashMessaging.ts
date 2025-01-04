@@ -21,7 +21,6 @@ import {
     IM_ACK_RECEIVED,
     IM_SESSION_ENDPOINT,
     IM_SESSION_RESET,
-    ISO8601,
     type MessageStatus,
     reverseDNSRegex,
     type sha256,
@@ -41,7 +40,7 @@ type ProfileMeta = Omit<IMProfile, 'did'>;
 // TODO: split beteen IMProto and Smash Messaging
 
 export class SmashMessaging extends EventEmitter {
-    private static readonly didDocManagers = new Map<DIDMethod, DIDManager>();
+    protected static readonly didDocManagers = new Map<DIDMethod, DIDManager>();
     protected readonly logger: Logger;
     public readonly endpoints: EndpointManager;
     protected readonly peers: PeerRegistry;
@@ -274,16 +273,19 @@ export class SmashMessaging extends EventEmitter {
     }
 
     public async initChats(chats: SmashChat[]): Promise<void> {
-        await Promise.all(
-            chats.map(async (chat) => {
-                const peerDid = await SmashMessaging.resolve(chat.with);
-                const lastMessageTime = new Date(
-                    chat.lastMessageTimestamp as ISO8601,
-                ).getTime();
-                const peer = await this.createNewPeer(peerDid, lastMessageTime);
-                this.peers.set(peerDid.id, peer);
-            }),
+        const results = await Promise.allSettled(
+            chats.map(async (chat) =>
+                this.peers.getOrCreate(chat.with, chat.lastMessageTimestamp),
+            ),
         );
+        const failures = results.filter((r) => r.status === 'rejected');
+        if (failures.length > 0) {
+            this.logger.warn(
+                `Failed to initialize ${failures.length} chats: ${failures
+                    .map((f) => (f as PromiseRejectedResult).reason)
+                    .join(', ')}`,
+            );
+        }
     }
 
     public async ackMessagesRead(
@@ -304,6 +306,7 @@ export class SmashMessaging extends EventEmitter {
         return peer.send(message);
     }
 
+    // TODO: serialize using DID standard format W3C (including when private keys are present!!!)
     public async exportIdentity(): Promise<string> {
         this.logger.warn('EXPORTED IDENTITY CONTAINS SECRETS: DO NOT SHARE!');
         return this.identity.serialize();

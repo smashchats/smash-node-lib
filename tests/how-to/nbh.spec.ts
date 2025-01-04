@@ -1,7 +1,7 @@
 import { Crypto } from '@peculiar/webcrypto';
 import { SME_PUBLIC_KEY, socketServerUrl } from '@tests/jest.global.js';
 import { TEST_CONFIG, aliasWaitFor, delay } from '@tests/utils/time.utils.js';
-import { generateIdentity } from '@tests/utils/user.utils.js';
+import { defaultDidManager } from '@tests/utils/user.utils.js';
 import {
     DIDDocument,
     DIDString,
@@ -25,6 +25,8 @@ import {
 // TODO docs library interface (config, events, etc)
 // TODO docs neighborhood admin bot API and example
 // TODO test suite covering User with multiple Neighborhoods
+
+// TODO: refactor test suite into How To guides generation material
 
 /** **************************************************************
  *  tests specific to the Smash Neighborhood Admin Bot API and Neighborhood-related actions
@@ -53,7 +55,7 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
     let nabSMEConfig: SMEConfigJSONWithoutDefaults[];
 
     beforeEach(async () => {
-        const identity = await generateIdentity();
+        const identity = await defaultDidManager.generate();
         nabSMEConfig = [
             {
                 url: socketServerUrl,
@@ -61,7 +63,8 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
             },
         ];
         nab = new TestNAB(identity, 'TestNAB', 'DEBUG');
-        const preKeyPair = await identity.generateNewPreKeyPair();
+        const preKeyPair =
+            await defaultDidManager.generateNewPreKeyPair(identity);
         await nab.endpoints.connect(nabSMEConfig[0], preKeyPair);
         await delay(100);
         nabDid = await nab.getDIDDocument();
@@ -172,7 +175,7 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
         const onUserDiscover = jest.fn();
 
         beforeEach(async () => {
-            const identity = await generateIdentity();
+            const identity = await defaultDidManager.generate();
             userIdentity = identity;
             user = new SmashUser(identity, 'user', 'DEBUG');
             user.on(NBH_ADDED, onUserNBHAdded);
@@ -220,7 +223,8 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
             let nabReceivedJoin: Promise<void>;
 
             beforeEach(async () => {
-                const preKeyPair = await userIdentity.generateNewPreKeyPair();
+                const preKeyPair =
+                    await defaultDidManager.generateNewPreKeyPair(userIdentity);
                 await user.endpoints.connect(
                     {
                         url: socketServerUrl,
@@ -289,7 +293,7 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
                 let counter: number;
 
                 beforeEach(async () => {
-                    const identity = await generateIdentity();
+                    const identity = await defaultDidManager.generate();
                     targetUser = new SmashUser(identity, 'targetUser');
                     targetDid = targetUser.did;
                     counter = 0;

@@ -9,6 +9,8 @@ import { TEST_CONFIG, delay } from '@tests/utils/time.utils.js';
 import { TestPeer, createPeer } from '@tests/utils/user.utils.js';
 import { IMText, Logger, SmashMessaging } from 'smash-node-lib';
 
+// TODO: refactor test suite into How To guides generation material
+
 describe('[Sessions] Session Management', () => {
     const logger = new Logger('sessions.spec', 'DEBUG');
 
@@ -106,13 +108,12 @@ describe('[Sessions] Session Management', () => {
 
     describe('Preferred Endpoint Management', () => {
         beforeEach(async () => {
-            logger.debug(
-                'Creating test peers Alice and Bob, Alice has two endpoints',
-            );
-            await alice.messaging.setEndpoints([
-                { url: socketServerUrl, smePublicKey: SME_PUBLIC_KEY },
+            logger.debug('Configuring second endpoint for Alice');
+            const preKeyPair = await alice.identity.generateNewPreKeyPair();
+            await alice.messaging.endpoints.connect(
                 { url: secondarySocketServerUrl, smePublicKey: SME_PUBLIC_KEY },
-            ]);
+                preKeyPair,
+            );
             alice.did = await alice.messaging.getDIDDocument();
             await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
         });

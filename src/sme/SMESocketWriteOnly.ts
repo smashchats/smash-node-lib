@@ -87,7 +87,7 @@ export class SMESocketWriteOnly {
         sessionId: string,
         buffer: ArrayBuffer,
         messageIds: sha256[],
-        TIMEOUT_MS: number = 10000,
+        TIMEOUT_MS: number = 5000,
     ): Promise<void> {
         return new Promise<void>((resolve, reject) => {
             if (!messageIds.length) {

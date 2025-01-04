@@ -89,8 +89,6 @@ export class GenerateKeyPatcher extends CryptoManager {
     private static jsonStringifyReplace(_key: string, value: unknown) {
         if (typeof value === 'object' && value && 'algorithm' in value) {
             const key = value as CryptoKey;
-            console.log(key);
-            console.log(this.jwkMap);
             const jwk = this.jwkMap.get(key);
             if (jwk) {
                 return {

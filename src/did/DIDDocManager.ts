@@ -1,4 +1,4 @@
-import { Curve } from '2key-ratchet';
+import { Curve, IECKeyPair } from '2key-ratchet';
 import { IMPeerIdentity } from '@src/IMPeerIdentity.js';
 import { DIDManager } from '@src/did/DIDManager.js';
 import { DID, DIDDocument, DIDString } from '@src/types/index.js';
@@ -19,11 +19,11 @@ export class DIDDocManager extends DIDManager {
         return Promise.resolve(did);
     }
 
-    async generate(): Promise<IMPeerIdentity> {
+    public async generate(exportable: boolean = true): Promise<IMPeerIdentity> {
         const cryptoSingleton = CryptoUtils.singleton;
         const [ik, ek] = await Promise.all([
-            IMPeerIdentity.generateIdentityKeys(),
-            IMPeerIdentity.generateExchangeKeys(),
+            IMPeerIdentity.generateIdentityKeys(exportable),
+            IMPeerIdentity.generateExchangeKeys(exportable),
         ]);
         const thumbprint = await ik.publicKey.thumbprint();
         const did = `did:doc:${thumbprint}` as const;
@@ -42,6 +42,16 @@ export class DIDDocManager extends DIDManager {
         this.set(JSON.parse(JSON.stringify(didDocument)));
         const newIdentity = new IMPeerIdentity(did, ik, ek);
         return newIdentity;
+    }
+
+    public async generateNewPreKeyPair(
+        identity: IMPeerIdentity,
+        exportable: boolean = true,
+    ): Promise<IECKeyPair> {
+        const preKeyPair =
+            await IMPeerIdentity.generateExchangeKeys(exportable);
+        identity.addPreKeyPair(preKeyPair);
+        return preKeyPair;
     }
 
     set(didDocument: DIDDocument) {

@@ -14,6 +14,8 @@ import {
 const ISO8601_TIMESTAMP_REGEX =
     /^(?<year>-?(?:[1-9][0-9]*)?[0-9]{4})-(?<month>1[0-2]|0[1-9])-(?<day>3[01]|0[1-9]|[12][0-9])T(?<hour>2[0-3]|[01][0-9]):(?<minute>[0-5][0-9]):(?<second>[0-5][0-9])(?:\.(?<ms>[0-9]+))?(?<timezone>Z|[+-](?:2[0-3]|[01][0-9]):[0-5][0-9])$/;
 
+// TODO: refactor test suite into How To guides generation material
+
 /**
  * **************************************************************
  *  tests generic to all Smash Peers
