@@ -28,8 +28,6 @@ export class PeerRegistry extends Map<DIDString, SmashPeer> {
         return this.get(this.ikToId[ik]);
     }
 
-    // TODO: handle DID update
-    // TODO: split profile from DID updates?
     // TODO: handle differential profile updates?
     // TODO: handle updates from other peers IF signed (and with proper trusting level—ie. not from any peer & only ADDING not replacing/removing endpoints if not from the peer itself )
 
@@ -37,6 +35,9 @@ export class PeerRegistry extends Map<DIDString, SmashPeer> {
         did: DID,
         lastMessageTimestamp?: string,
     ): Promise<SmashPeer> {
+        if (this.closed) {
+            throw new Error('PeerRegistry closed');
+        }
         const peerDid = await SmashMessaging.resolve(did);
         const peer = this.get(peerDid.id);
         if (!peer) {
@@ -78,5 +79,13 @@ export class PeerRegistry extends Map<DIDString, SmashPeer> {
                 // TODO: profile differential updates (no need to send profile if already propagated)
                 after: '',
             } as IMProfileMessage);
+    }
+
+    private closed: boolean = false;
+    async closeAll() {
+        this.closed = true;
+        const peersToClose = Array.from(this.values());
+        this.clear();
+        return Promise.allSettled(peersToClose.map((p) => p.close()));
     }
 }

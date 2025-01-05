@@ -1,11 +1,9 @@
-KEY USAGE ISSUE WHEN USING NODE Crypto OBJECT
-
 ## Refactoring plan
 
 ### BIG REFACTORING (with possible functional changes):
 
 - [x] manual refactor while writing the happy path tutorial test suite (mainly splitting modules and restructuring code)
-- [-] make previous test suites pass again
+- [x] make previous test suites pass again
 
     - [x] tests/how-to/index.spec.ts
     - [x] tests/how-to/nbh.spec.ts

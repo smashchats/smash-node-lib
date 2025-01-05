@@ -186,13 +186,16 @@ export class SMESocketWriteOnly {
             );
 
             // Log detailed connection state
-            this.logger.debug('Socket connection state:', {
-                id: socket.id,
-                connected: socket.connected,
-                disconnected: socket.disconnected,
-                transport: socket.io.engine.transport.name,
-                readyState: socket.io.engine.readyState,
-            });
+            this.logger.debug(
+                'Socket connection state:',
+                JSON.stringify({
+                    id: socket.id,
+                    connected: socket.connected,
+                    disconnected: socket.disconnected,
+                    transport: socket.io.engine.transport.name,
+                    readyState: socket.io.engine.readyState,
+                }),
+            );
 
             socket.io.engine.on('upgrade', () => {
                 const upgradedTransport = socket.io.engine.transport.name;

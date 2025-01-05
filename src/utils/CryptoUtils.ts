@@ -92,7 +92,7 @@ export class CryptoUtils {
         keyEncoded: string,
         exportable: boolean = true,
     ): Promise<CryptoKey> {
-        return this.importKey(keyEncoded, ECDH_ALG, exportable, ['deriveBits']);
+        return this.importKey(keyEncoded, ECDH_ALG, exportable, []);
     }
 
     async importExchangePrivateKey(

@@ -1,4 +1,3 @@
-import { Crypto } from '@peculiar/webcrypto';
 import { socketServerUrl } from '@tests/jest.global.js';
 import { TestMessage, TestUtils } from '@tests/utils/events.utils.js';
 import { TEST_CONFIG, delay } from '@tests/utils/time.utils.js';
@@ -46,7 +45,6 @@ describe('[SmashMessaging] Between peers registered to a SME', () => {
                 return mockedNow;
             }
         } as DateConstructor;
-        const crypto = new Crypto();
         SmashMessaging.setCrypto(crypto);
         await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
     });

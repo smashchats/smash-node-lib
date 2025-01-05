@@ -163,6 +163,7 @@ export class SmashMessaging extends EventEmitter {
             lastMessageTime,
             this.sessionManager,
             this.smeSocketManager,
+            this.peers,
         );
     }
 
@@ -226,12 +227,10 @@ export class SmashMessaging extends EventEmitter {
         // WARNING: destructive action!!
         this.removeAllListeners();
         // Cancelling peer message queues
-        const peersToClose = Array.from(this.peers.values());
-        this.logger.debug(`>> closing (${peersToClose.length}) peers`);
-        const peersResult = await Promise.allSettled(
-            peersToClose.map((p) => p.close()),
-        );
+        this.logger.debug(`>> closing (${this.peers.size}) peers`);
+        const peersResult = await this.peers.closeAll();
         // Closing all network sockets
+        this.logger.debug(`>> closing all sockets`);
         const socketsResult = await this.smeSocketManager.closeAllSockets();
         this.endpoints.reset([]);
         // Handling close results

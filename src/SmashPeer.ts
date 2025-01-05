@@ -1,3 +1,4 @@
+import { PeerRegistry } from '@src/PeerRegistry.js';
 import { SmashMessaging } from '@src/SmashMessaging.js';
 import { IM_RESET_SESSION_MESSAGE } from '@src/const.js';
 import { SessionManager, SignalSession } from '@src/signal/index.js';
@@ -24,8 +25,6 @@ export class SmashPeer {
     // TODO subscribe on changes like updates to DID, IK, EK, PK...
     private endpoints: SmashPeerEndpoint[] = [];
 
-    private closed: boolean = false;
-
     private readonly messageQueue: Map<sha256, EncapsulatedIMProtoMessage> =
         new Map();
     private readonly MAX_RETRY_ATTEMPTS = 10;
@@ -39,6 +38,7 @@ export class SmashPeer {
         private readonly lastMessageTime: number,
         private readonly sessionManager: SessionManager,
         private readonly smeSocketManager: SMESocketManager,
+        private readonly peerRegistry: PeerRegistry,
     ) {
         this.id = typeof did === 'string' ? did : did.id;
     }
@@ -209,6 +209,12 @@ export class SmashPeer {
     }
 
     private async attemptFlushOrRetry(attempt: number, delay: number) {
+        if (this.closed) {
+            this.logger.debug(
+                `skipping flush ${attempt + 1} attempt - peer is closed`,
+            );
+            return;
+        }
         try {
             this.logger.debug(
                 `> flushing attempt ${attempt + 1}/${this.MAX_RETRY_ATTEMPTS}`,
@@ -216,7 +222,11 @@ export class SmashPeer {
             await this.flush();
             this.clearRetryTimeout();
         } catch (err) {
-            // FAILURE, exponential backoff
+            if (this.closed) {
+                this.logger.debug(`skipping retry - peer is closed`);
+                return;
+            }
+            // Exponential backoff
             const newDelay = Math.min(delay * 2, this.MAX_RETRY_DELAY_MS);
             this.logger.debug(
                 `retry ${attempt + 1}/${this.MAX_RETRY_ATTEMPTS} failed (${(err as Error).message}), ` +
@@ -229,16 +239,30 @@ export class SmashPeer {
         }
     }
 
-    private async scheduleFlushQueue(attempt: number, delay: number) {
+    private async scheduleFlushQueue(
+        attempt: number,
+        delay: number,
+    ): Promise<void> {
+        const peerId = this.id;
+        this.clearRetryTimeout();
         if (this.closed) {
+            this.logger.debug(`skipping scheduling flush - peer is closed`);
             return;
         }
-        if (typeof globalThis.setTimeout !== 'undefined') {
-            this.retryTimeout = globalThis.setTimeout(
-                () => this.flushQueue(attempt, delay, true),
-                delay,
-            );
-        }
+        this.retryTimeout =
+            typeof globalThis.setTimeout !== 'undefined'
+                ? globalThis.setTimeout(async () => {
+                      // Get the canonical instance when the timeout fires
+                      const peer = this.peerRegistry.get(peerId);
+                      if (!peer || peer.closed) {
+                          this.logger.debug(
+                              `skipping scheduled flush - peer was closed or disposed`,
+                          );
+                          return;
+                      }
+                      await peer.flushQueue(attempt, delay, true);
+                  }, delay)
+                : undefined;
     }
 
     private preferredEndpoint: SmashPeerEndpoint | undefined;
@@ -277,13 +301,17 @@ export class SmashPeer {
         }
     }
 
+    private closed: boolean = false;
     public async close() {
+        this.logger.debug(`Closing peer ${this.id}`);
+        // Set closed first to prevent new retries from being scheduled
         this.closed = true;
         this.messageQueue.clear();
         await this.cancelRetry();
         await Promise.allSettled(
             this.endpoints.map((endpoint) => endpoint.clearQueue()),
         );
+        this.logger.debug(`Closed peer ${this.id} (${this.closed})`);
     }
 
     private async cancelRetry() {
@@ -305,6 +333,9 @@ export class SmashPeer {
     }
 
     private clearRetryTimeout() {
+        this.logger.debug(
+            `SmashPeer::clearRetryTimeout ${this.retryTimeout} for peer ${this.id}`,
+        );
         if (typeof globalThis.clearTimeout !== 'undefined') {
             globalThis.clearTimeout(this.retryTimeout);
         }
