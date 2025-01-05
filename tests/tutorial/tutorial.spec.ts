@@ -944,15 +944,14 @@ describe('Smash Tutorial', () => {
                         bob.discover();
                     });
                 let initialDistance: number;
-                let nabReceivedRelationship: Promise<void>;
+                let onNabReceivedRelationship: () => Promise<void>;
 
                 beforeEach(async () => {
                     initialDistance = await getDistanceFromBobToAlice();
-                    nabReceivedRelationship = waitFor(
-                        nab,
-                        SMASH_NBH_RELATIONSHIP,
-                        { timeout: TEST_CONFIG.TEST_TIMEOUT_MS * 2 },
-                    );
+                    onNabReceivedRelationship = () =>
+                        waitFor(nab, SMASH_NBH_RELATIONSHIP, {
+                            timeout: TEST_CONFIG.TEST_TIMEOUT_MS * 2,
+                        });
                 }, TEST_CONFIG.TEST_TIMEOUT_MS * 2);
 
                 /**
@@ -965,6 +964,8 @@ describe('Smash Tutorial', () => {
                 test(
                     'Bob smashing Alice',
                     async () => {
+                        const nabReceivedRelationship =
+                            onNabReceivedRelationship();
                         await bob.smash(alice.did);
                         await nabReceivedRelationship;
                         expect(nab.onRelationship).toHaveBeenCalledWith(
@@ -990,6 +991,8 @@ describe('Smash Tutorial', () => {
                 test(
                     'Bob passing Alice',
                     async () => {
+                        const nabReceivedRelationship =
+                            onNabReceivedRelationship();
                         await bob.pass(alice.did);
                         await nabReceivedRelationship;
                         expect(nab.onRelationship).toHaveBeenCalledWith(
@@ -1014,14 +1017,18 @@ describe('Smash Tutorial', () => {
                 test(
                     'Bob clearing Alice',
                     async () => {
+                        let nabReceivedRelationship;
+                        nabReceivedRelationship = onNabReceivedRelationship();
                         await bob.smash(alice.did);
-                        await delay(TEST_CONFIG.MESSAGE_DELIVERY);
+                        await nabReceivedRelationship;
+                        nabReceivedRelationship = onNabReceivedRelationship();
                         await bob.clear(alice.did);
-                        await delay(TEST_CONFIG.MESSAGE_DELIVERY);
+                        await nabReceivedRelationship;
+                        nabReceivedRelationship = onNabReceivedRelationship();
                         await bob.pass(alice.did);
-                        await delay(TEST_CONFIG.MESSAGE_DELIVERY);
+                        await nabReceivedRelationship;
+                        nabReceivedRelationship = onNabReceivedRelationship();
                         await bob.clear(alice.did);
-                        await delay(TEST_CONFIG.MESSAGE_DELIVERY);
                         await nabReceivedRelationship;
                         const newDistance = await getDistanceFromBobToAlice();
                         expect(newDistance).toEqual(initialDistance);

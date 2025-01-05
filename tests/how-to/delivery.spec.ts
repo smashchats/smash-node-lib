@@ -141,8 +141,6 @@ describe('[Message Delivery] Message delivery and acknowledgment', () => {
                         preKeyPair,
                     );
                     bob.did = await bob.messaging.getDIDDocument();
-                    await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
-                    await delay(TEST_CONFIG.MESSAGE_DELIVERY);
                     await sendMsgTo(bob);
                     await delay(TEST_CONFIG.MESSAGE_DELIVERY);
                     expect(alice?.onStatus).not.toHaveBeenCalled();
