@@ -12,7 +12,7 @@ KEY USAGE ISSUE WHEN USING NODE Crypto OBJECT
     - [x] tests/how-to/sessions.spec.ts
     - [x] tests/how-to/edgecases.spec.ts
     - [x] tests/how-to/delivery.spec.ts
-    - [ ] tests/how-to/identity.spec.ts
+    - [x] tests/how-to/identity.spec.ts
 
 - [ ] use AI to refactor all individual code files (to be more readable, performant, maintainable, secure, efficient, etc)
 - [ ] use AI to refactor module file paths structure (make sure all tests pass)
