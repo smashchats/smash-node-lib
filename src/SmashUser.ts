@@ -35,7 +35,7 @@ export class SmashUser extends SmashMessaging {
 
         await Promise.all(
             joinAction.config.sme.map(async (smeConfig) => {
-                const didManager = SmashMessaging.didDocManagers.get(
+                const didManager = DIDManager.get(
                     DIDManager.parseMethod(this.did),
                 );
                 if (!didManager) {

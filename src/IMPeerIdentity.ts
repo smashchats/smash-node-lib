@@ -1,8 +1,8 @@
 import type { IECKeyPair } from '2key-ratchet';
 import { Curve, Identity } from '2key-ratchet';
 import type { ECKeyType } from '2key-ratchet/dist/types/type.js';
-import { SmashMessaging } from '@src/SmashMessaging.js';
 import { GenerateKeyPatcher } from '@src/crypto/utils/GenerateKeyPatcher.js';
+import { DIDManager } from '@src/did/DIDManager.js';
 import type {
     DIDDocument,
     DIDString,
@@ -137,7 +137,7 @@ export class IMPeerIdentity extends Identity {
     }
 
     public async getDIDDocument(): Promise<DIDDocument> {
-        const doc = await SmashMessaging.resolve(this.did);
+        const doc = await DIDManager.resolve(this.did);
         if (!doc) {
             throw new Error(`Could not resolve DID document for ${this.did}`);
         }

@@ -4,9 +4,10 @@
 
 - [x] manual refactor while writing the happy path tutorial test suite (mainly splitting modules and restructuring code)
 - [x] make previous test suites pass again
-- [ ] use AI to refactor all individual code files (to be more readable, performant, maintainable, secure, efficient, etc)
-- [ ] use AI to refactor module file paths structure (make sure all tests pass)
-- [ ] use AI to extract more submodules: more modular, decoupled, and loosely coupled (make sure all tests pass)
+- [-] use AI to refactor all individual code files (to be more readable, performant, maintainable, secure, efficient, etc)
+- [ ] remove // TODO comments from codebase -> transform into tracked issues
+- [ ] use AI to refactor module file paths structure (reorg files) (+ make sure all tests pass)
+    - [ ] extract more submodules: more modular, decoupled, and loosely coupled (make sure all tests pass)
 
 ### TESTS REFACTORING (keeping or increasing coverage):
 

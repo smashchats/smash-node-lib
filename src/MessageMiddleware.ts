@@ -1,6 +1,6 @@
 import { PeerRegistry } from '@src/PeerRegistry.js';
-import { SmashMessaging } from '@src/SmashMessaging.js';
 import { SmashPeer } from '@src/SmashPeer.js';
+import { DIDManager } from '@src/did/DIDManager.js';
 import { DLQ } from '@src/signal/DLQ.js';
 import {
     DID,
@@ -104,7 +104,7 @@ export class MessageMiddleware {
         peerIk: string,
         message: IMDIDDocumentMessage,
     ): Promise<DIDDocument> {
-        const did = await SmashMessaging.resolve(message.data as DIDDocument);
+        const did = await DIDManager.resolve(message.data as DIDDocument);
         await this.validateDIDMatchesIk(did, peerIk);
         this.logger.debug(`Received DID in DID message for ${did.id}`);
         return did;
@@ -114,7 +114,7 @@ export class MessageMiddleware {
         peerIk: string,
         message: IMProfileMessage,
     ): Promise<DIDDocument> {
-        const did = await SmashMessaging.resolve(message.data.did as DID);
+        const did = await DIDManager.resolve(message.data.did as DID);
         await this.validateDIDMatchesIk(did, peerIk);
         this.logger.debug(`Received DID in profile for ${did.id}`);
         return did;

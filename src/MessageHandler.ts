@@ -1,4 +1,4 @@
-import { Logger } from './utils/Logger.js';
+import { Logger } from '@src/utils/Logger.js';
 
 export class MessageHandler {
     constructor(private readonly logger: Logger) {}

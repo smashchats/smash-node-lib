@@ -1,4 +1,5 @@
 import { ECPublicKey } from '2key-ratchet';
+import { IMPeerIdentity } from '@src/IMPeerIdentity.js';
 import { SessionManager } from '@src/signal/index.js';
 import { SMESocketManager } from '@src/sme/SMESocketManager.js';
 import type {
@@ -8,8 +9,6 @@ import type {
 } from '@src/types/index.js';
 import type { Logger } from '@src/utils/Logger.js';
 import { CryptoUtils } from '@src/utils/index.js';
-
-import { IMPeerIdentity } from './IMPeerIdentity.js';
 
 // ASSUMPTION#3: Endpoints can be uniquely identified by their URL.
 export class EndpointManager extends Map<string, SmashEndpoint> {

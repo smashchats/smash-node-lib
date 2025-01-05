@@ -8,8 +8,7 @@ import {
     SmashChatDiscoverMessage,
     SmashChatJoinMessage,
 } from '@src/types/smashchats.lexicon.js';
-
-import { SMEConfigJSON } from './types/sme.types.js';
+import { SMEConfigJSON } from '@src/types/sme.types.js';
 
 export const EXPIRATION_TIME_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 

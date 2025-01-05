@@ -40,7 +40,6 @@ type ProfileMeta = Omit<IMProfile, 'did'>;
 // TODO: split beteen IMProto and Smash Messaging
 
 export class SmashMessaging extends EventEmitter {
-    protected static readonly didDocManagers = new Map<DIDMethod, DIDManager>();
     protected readonly logger: Logger;
     public readonly endpoints: EndpointManager;
     protected readonly peers: PeerRegistry;
@@ -105,19 +104,11 @@ export class SmashMessaging extends EventEmitter {
     }
 
     public static use(method: DIDMethod, manager: DIDManager): void {
-        this.didDocManagers.set(method, manager);
+        DIDManager.use(method, manager);
     }
 
     public static resolve(did: DID): Promise<DIDDocument> {
-        const didString = typeof did === 'string' ? did : did.id;
-        const method = DIDManager.parseMethod(didString);
-        const resolver = this.didDocManagers.get(method);
-
-        if (!resolver) {
-            throw new Error(`No resolver found for ${didString}`);
-        }
-
-        return resolver.resolve(didString);
+        return DIDManager.resolve(did);
     }
 
     public static setCrypto(c: globalThis.Crypto): void {
