@@ -6,7 +6,11 @@ import {
 } from '@tests/jest.global.js';
 import { TestUtils } from '@tests/utils/events.utils.js';
 import { TEST_CONFIG, delay } from '@tests/utils/time.utils.js';
-import { TestPeer, createPeer } from '@tests/utils/user.utils.js';
+import {
+    TestPeer,
+    createPeer,
+    defaultDidManager,
+} from '@tests/utils/user.utils.js';
 import { IMText, Logger, SmashMessaging } from 'smash-node-lib';
 
 // TODO: refactor test suite into How To guides generation material
@@ -109,7 +113,9 @@ describe('[Sessions] Session Management', () => {
     describe('Preferred Endpoint Management', () => {
         beforeEach(async () => {
             logger.debug('Configuring second endpoint for Alice');
-            const preKeyPair = await alice.identity.generateNewPreKeyPair();
+            const preKeyPair = await defaultDidManager.generateNewPreKeyPair(
+                alice.identity,
+            );
             await alice.messaging.endpoints.connect(
                 { url: secondarySocketServerUrl, smePublicKey: SME_PUBLIC_KEY },
                 preKeyPair,

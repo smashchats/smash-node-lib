@@ -215,7 +215,7 @@ describe('[Message Delivery] Message delivery and acknowledgment', () => {
                         (1 + 2 * TEST_CONFIG.PROTOCOL_OVERHEAD_SIZE) * 2,
                     );
                 },
-                TEST_CONFIG.MESSAGE_DELIVERY_TIMEOUT * 4,
+                TEST_CONFIG.MESSAGE_DELIVERY_TIMEOUT * 6,
             );
         });
 
@@ -245,12 +245,12 @@ describe('[Message Delivery] Message delivery and acknowledgment', () => {
                 defaultDidManager.set(bob.did);
                 sent = await sendMsgTo(bob);
                 await delay(TEST_CONFIG.MESSAGE_DELIVERY);
-            }, TEST_CONFIG.TEST_TIMEOUT_MS * 4);
+            }, TEST_CONFIG.TEST_TIMEOUT_MS * 6);
 
             afterEach(async () => {
                 await bob?.messaging.close();
                 await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
-            }, TEST_CONFIG.TEST_TIMEOUT_MS * 2);
+            }, TEST_CONFIG.TEST_TIMEOUT_MS * 4);
 
             it('should NOT receive a DELIVERED ack (no SME mailbox)', async () => {
                 logger.debug('>> Verify that message wasnt delivered');

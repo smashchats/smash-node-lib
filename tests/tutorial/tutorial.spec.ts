@@ -1,6 +1,7 @@
 import { Crypto } from '@peculiar/webcrypto';
 import { SME_PUBLIC_KEY, socketServerUrl } from '@tests/jest.global.js';
 import { TEST_CONFIG, aliasWaitFor, delay } from '@tests/utils/time.utils.js';
+import { defaultDidManager } from '@tests/utils/user.utils.js';
 import {
     CryptoUtils,
     DID,
@@ -256,7 +257,8 @@ describe('Smash Tutorial', () => {
                 `Setting up endpoints for ${laraIdentity.did}...`,
             );
 
-            const preKeyPair = await laraIdentity.generateNewPreKeyPair();
+            const preKeyPair =
+                await defaultDidManager.generateNewPreKeyPair(laraIdentity);
             const addedEndpoint = await lara.endpoints.connect(
                 {
                     url: socketServerUrl,
@@ -298,7 +300,8 @@ describe('Smash Tutorial', () => {
                 const messaging = new SmashUser(identity, name);
                 await messaging.updateMeta({ title: name });
 
-                const preKeyPair = await identity.generateNewPreKeyPair();
+                const preKeyPair =
+                    await defaultDidManager.generateNewPreKeyPair(identity);
                 await messaging.endpoints.connect(
                     {
                         url: socketServerUrl,
@@ -485,7 +488,8 @@ describe('Smash Tutorial', () => {
                 const messaging = new SmashUser(identity, name);
                 await messaging.updateMeta({ title: name });
 
-                const preKeyPair = await identity.generateNewPreKeyPair();
+                const preKeyPair =
+                    await defaultDidManager.generateNewPreKeyPair(identity);
                 await messaging.endpoints.connect(
                     {
                         url: socketServerUrl,
@@ -753,7 +757,8 @@ describe('Smash Tutorial', () => {
             nab = new TestNAB(nabIdentity, 'test-nab');
 
             // Connect NAB to endpoint
-            const preKeyPair = await nabIdentity.generateNewPreKeyPair();
+            const preKeyPair =
+                await defaultDidManager.generateNewPreKeyPair(nabIdentity);
             await nab.endpoints.connect(testContext.smeConfig, preKeyPair);
 
             // Register NAB's DID document
