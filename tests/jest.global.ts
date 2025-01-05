@@ -237,7 +237,7 @@ export default async function setup(): Promise<void> {
                     peerId: string,
                     sessionId: string,
                     data: unknown,
-                    acknowledge: () => void | undefined,
+                    acknowledge: () => void,
                 ) => {
                     log(
                         `>> Received data: ${clientKeyId} --> ${peerId} (session: ${sessionId}, endpoint: ${endpoint})`,
@@ -268,7 +268,7 @@ export default async function setup(): Promise<void> {
                     setTimeout(() => {
                         if (!activeSockets[peerId]) {
                             log(
-                                `No active socket found for peer ${peerId} (total active sockets: ${Object.keys(activeSockets).length})`,
+                                `No active socket found for peer ${peerId} (total active sockets: ${Object.keys(activeSockets).length}) (delayed)`,
                             );
                             return;
                         }
@@ -278,8 +278,10 @@ export default async function setup(): Promise<void> {
                         activeSockets[peerId].emit('data', sessionId, data);
                     }, delayMs);
                     if (shouldAck) {
+                        log(
+                            `Sending delivery ack (socket ID: ${client.id}, session: ${sessionId})`,
+                        );
                         acknowledge();
-                        log(`Data acknowledged for session ${sessionId}`);
                     }
                 },
             );
@@ -417,6 +419,16 @@ export default async function setup(): Promise<void> {
             console.error('Socket.IO connect error:', err);
         });
 
+        // Add this debug log for upgrade requests
+        httpServer.on('request', (req) => {
+            if (req.headers.upgrade === 'websocket') {
+                log('Received WebSocket upgrade request:', {
+                    url: req.url,
+                    headers: req.headers,
+                });
+            }
+        });
+
         const mainNamespace = socketServer.of('/' + VALID_PATH);
         const secondaryNamespace = socketServer.of('/' + SECONDARY_PATH);
         const emptyNamespace = socketServer.of('/' + EMPTY_PATH);
@@ -476,7 +488,12 @@ export default async function setup(): Promise<void> {
                 : undefined;
 
             log('>> Initializing data endpoint with acknowledgment');
-            await initDataEndpoint(socketServerUrl, clientPublicKey, client);
+            await initDataEndpoint(
+                socketServerUrl,
+                clientPublicKey,
+                client,
+                true,
+            );
             if (clientPublicKey) {
                 log('>> Initializing challenge for authenticated client');
                 await initChallengeEndpoint(clientPublicKey, client);
@@ -505,6 +522,31 @@ export default async function setup(): Promise<void> {
                 log('>> Initializing challenge for authenticated client');
                 await initChallengeEndpoint(clientPublicKey, client);
             }
+        });
+
+        // Add namespace-specific logging
+        socketServer.of('/valid').on('connection', (socket) => {
+            log('Namespace /valid connection:', socket.id);
+
+            socket.on('disconnect', (reason) => {
+                log('Namespace /valid disconnect:', {
+                    id: socket.id,
+                    reason,
+                    remainingSockets: Object.keys(socket.nsp.sockets).length,
+                });
+            });
+        });
+
+        socketServer.of('/empty').on('connection', (socket) => {
+            log('Namespace /empty connection:', socket.id);
+
+            socket.on('disconnect', (reason) => {
+                log('Namespace /empty disconnect:', {
+                    id: socket.id,
+                    reason,
+                    remainingSockets: Object.keys(socket.nsp.sockets).length,
+                });
+            });
         });
 
         httpServer.listen(PORT, () => {

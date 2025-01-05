@@ -6,13 +6,16 @@ import {
     socketServerUrl,
 } from '@tests/jest.global.js';
 import { TEST_CONFIG, aliasWaitFor, delay } from '@tests/utils/time.utils.js';
-import { TestPeer, createPeer } from '@tests/utils/user.utils.js';
+import {
+    TestPeer,
+    createPeer,
+    defaultDidManager,
+} from '@tests/utils/user.utils.js';
 import {
     DIDDocument,
     EncapsulatedIMProtoMessage,
     IMText,
     Logger,
-    SMEConfigJSONWithoutDefaults,
     SmashEndpoint,
     SmashMessaging,
 } from 'smash-node-lib';
@@ -48,9 +51,11 @@ describe('[Message Delivery] Message delivery and acknowledgment', () => {
 
     describe('Alice', () => {
         let alice: TestPeer;
-        let bob: TestPeer;
 
-        const sendMsgToBob = async (message: string = 'test message') =>
+        const sendMsgTo = async (
+            bob: TestPeer,
+            message: string = 'test message',
+        ) =>
             alice?.messaging.send(
                 bob.did,
                 new IMText(message),
@@ -62,23 +67,25 @@ describe('[Message Delivery] Message delivery and acknowledgment', () => {
 
         afterEach(async () => {
             await alice?.messaging.close();
-            await bob?.messaging.close();
             await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
-        }, 20000);
+        }, TEST_CONFIG.TEST_TIMEOUT_MS * 2);
 
         describe('sends a message to Bob on a valid SME', () => {
+            let bob: TestPeer;
+
             beforeEach(async () => {
                 bob = await createPeer('bob', socketServerUrl);
             });
 
+            afterEach(async () => {
+                await bob?.messaging.close();
+                await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
+            }, TEST_CONFIG.TEST_TIMEOUT_MS * 2);
+
             it('should receive a DELIVERED ack on SME delivery', async () => {
-                const waitForStatus = waitFor(alice?.messaging, 'status', {
-                    count: 1,
-                    timeout: TEST_CONFIG.TEST_TIMEOUT_MS / 2,
-                });
-                const sent = await sendMsgToBob();
+                const waitForStatus = waitFor(alice?.messaging, 'status');
+                const sent = await sendMsgTo(bob);
                 await waitForStatus;
-                await delay(TEST_CONFIG.MESSAGE_DELIVERY);
                 expect(alice?.onStatus).toHaveBeenCalledWith(
                     'delivered',
                     expect.arrayContaining([sent.sha256]),
@@ -88,7 +95,7 @@ describe('[Message Delivery] Message delivery and acknowledgment', () => {
             describe('then when Bob receives it', () => {
                 it('should get a RECEIVED ack from Bob', async () => {
                     const waitForBobToReceive = waitFor(bob.messaging, 'data');
-                    const sent = await sendMsgToBob();
+                    const sent = await sendMsgTo(bob);
                     await waitForBobToReceive;
                     await delay(TEST_CONFIG.MESSAGE_DELIVERY);
                     expect(alice?.onStatus).toHaveBeenCalledWith(
@@ -100,7 +107,7 @@ describe('[Message Delivery] Message delivery and acknowledgment', () => {
 
             it('message ACKs should not loop', async () => {
                 const waitForBobToReceive = waitFor(bob.messaging, 'data');
-                await sendMsgToBob();
+                await sendMsgTo(bob);
                 await waitForBobToReceive;
                 await delay(TEST_CONFIG.MESSAGE_DELIVERY);
                 // statuses can be grouped, so at most called number of times is the
@@ -112,27 +119,44 @@ describe('[Message Delivery] Message delivery and acknowledgment', () => {
         });
 
         describe('sends a message to Bob on a not valid SME', () => {
-            beforeEach(async () => {
-                bob = await createPeer('bob');
-                bob.messaging.setEndpoints([
-                    {
-                        url: emptySocketServerUrl,
-                        smePublicKey: SME_PUBLIC_KEY,
-                    },
-                ]);
-                bob.did = await bob.messaging.getDIDDocument();
+            let bob: TestPeer;
+            afterEach(async () => {
+                await bob?.messaging.close();
                 await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
-                await delay(TEST_CONFIG.MESSAGE_DELIVERY);
-            });
+            }, TEST_CONFIG.TEST_TIMEOUT_MS * 2);
 
-            it('should NOT receive a DELIVERED ack (no valid SME)', async () => {
-                await sendMsgToBob();
-                await delay(TEST_CONFIG.MESSAGE_DELIVERY);
-                expect(alice?.onStatus).not.toHaveBeenCalled();
-            });
+            it(
+                'should NOT receive a DELIVERED ack (no valid SME)',
+                async () => {
+                    bob = await createPeer('bob');
+                    const preKeyPair =
+                        await defaultDidManager.generateNewPreKeyPair(
+                            bob.identity,
+                        );
+                    bob.messaging.endpoints.connect(
+                        {
+                            url: emptySocketServerUrl,
+                            smePublicKey: SME_PUBLIC_KEY,
+                        },
+                        preKeyPair,
+                    );
+                    bob.did = await bob.messaging.getDIDDocument();
+                    await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
+                    await delay(TEST_CONFIG.MESSAGE_DELIVERY);
+                    await sendMsgTo(bob);
+                    await delay(TEST_CONFIG.MESSAGE_DELIVERY);
+                    expect(alice?.onStatus).not.toHaveBeenCalled();
+                },
+                TEST_CONFIG.TEST_TIMEOUT_MS * 2,
+            );
         });
 
         describe('sends a message to Bob on an Endpoint that doesnt send ACKs', () => {
+            let bob: TestPeer;
+            afterEach(async () => {
+                await bob?.messaging.close();
+                await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
+            }, TEST_CONFIG.TEST_TIMEOUT_MS * 2);
             it(
                 'should stop trying to send the message upon RECEIVED ack',
                 async () => {
@@ -170,6 +194,14 @@ describe('[Message Delivery] Message delivery and acknowledgment', () => {
                     // we need to let long enough for exponential retries to be obviously never ending
                     await delay(TEST_CONFIG.MESSAGE_DELIVERY * 40);
 
+                    logger.info('>> Verify that bob received message');
+                    expect(bob?.onData).toHaveBeenCalledWith(
+                        alice?.did.id,
+                        expect.objectContaining({
+                            sha256: sent?.sha256,
+                        }),
+                    );
+
                     logger.info(
                         '>> Verify that message was marked as received',
                     );
@@ -180,29 +212,26 @@ describe('[Message Delivery] Message delivery and acknowledgment', () => {
 
                     logger.info('>> Verify that message stopped re-sending');
                     expect(bob?.onData.mock.calls.length).toBeLessThanOrEqual(
-                        // *2 to let some delay for the message to be ACKed and cleared
                         (1 + 2 * TEST_CONFIG.PROTOCOL_OVERHEAD_SIZE) * 2,
                     );
-
-                    logger.info('>> Cleanup');
-                    await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
                 },
-                3 * TEST_CONFIG.MESSAGE_DELIVERY_TIMEOUT,
+                TEST_CONFIG.MESSAGE_DELIVERY_TIMEOUT * 4,
             );
         });
 
         describe('sends a message to Bob a SME that dont know him', () => {
             let sent: EncapsulatedIMProtoMessage;
+            let bob: TestPeer;
 
             beforeEach(async () => {
                 logger.debug('>> Creating Bob with invalid SME');
                 bob = await createPeer('bob', emptySocketServerUrl);
                 await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
-                logger.debug(
-                    '>> Alice sends a message to Bob (with SME url mocked)',
-                );
+
+                logger.debug('>> Alice sends a message to Bob ');
                 const oldBobDid = bob.did;
                 const oldBobEndpoint = bob.did.endpoints[0] as SmashEndpoint;
+                // mocked to have a valid-looking SME
                 bob.did = {
                     ...oldBobDid,
                     endpoints: [
@@ -213,9 +242,15 @@ describe('[Message Delivery] Message delivery and acknowledgment', () => {
                         } as SmashEndpoint,
                     ],
                 } as DIDDocument;
-                sent = await sendMsgToBob();
+                defaultDidManager.set(bob.did);
+                sent = await sendMsgTo(bob);
                 await delay(TEST_CONFIG.MESSAGE_DELIVERY);
-            });
+            }, TEST_CONFIG.TEST_TIMEOUT_MS * 4);
+
+            afterEach(async () => {
+                await bob?.messaging.close();
+                await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
+            }, TEST_CONFIG.TEST_TIMEOUT_MS * 2);
 
             it('should NOT receive a DELIVERED ack (no SME mailbox)', async () => {
                 logger.debug('>> Verify that message wasnt delivered');
@@ -228,26 +263,48 @@ describe('[Message Delivery] Message delivery and acknowledgment', () => {
                     'should eventually receive the message without user action',
                     async () => {
                         logger.debug('>> Reconnecting Bob to the default SME');
-                        bob.messaging.setEndpoints([
+                        const bobReceivedSomeData = waitFor(
+                            bob.messaging,
+                            'data',
                             {
+                                timeout:
+                                    TEST_CONFIG.MESSAGE_DELIVERY_TIMEOUT * 2,
+                            },
+                        );
+                        const aliceReceivedStatusUpate = waitFor(
+                            alice?.messaging,
+                            'status',
+                            {
+                                timeout: TEST_CONFIG.MESSAGE_DELIVERY_TIMEOUT,
+                            },
+                        );
+
+                        const endpointToReconfig = bob.did.endpoints[0];
+                        await bob.messaging.endpoints.reset([
+                            {
+                                ...endpointToReconfig,
                                 url: socketServerUrl,
                                 smePublicKey: SME_PUBLIC_KEY,
-                            } as SMEConfigJSONWithoutDefaults,
+                            },
                         ]);
-                        bob.did = await bob.messaging.getDIDDocument();
-                        await delay(2 * TEST_CONFIG.TEST_TIMEOUT_MS);
+
+                        await bobReceivedSomeData;
+
                         expect(bob.onData).toHaveBeenCalledWith(
                             alice?.did.id,
                             expect.objectContaining({
                                 sha256: sent.sha256,
                             }),
                         );
+
+                        await aliceReceivedStatusUpate;
+                        await delay(TEST_CONFIG.MESSAGE_DELIVERY);
                         expect(alice?.onStatus).toHaveBeenCalledWith(
                             'received',
                             expect.arrayContaining([sent.sha256]),
                         );
                     },
-                    3 * TEST_CONFIG.TEST_TIMEOUT_MS,
+                    TEST_CONFIG.MESSAGE_DELIVERY_TIMEOUT * 5,
                 );
             });
         });

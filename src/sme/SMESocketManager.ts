@@ -58,7 +58,7 @@ export class SMESocketManager {
     ): Promise<SmashEndpoint> {
         this.logger.debug(
             `Initializing SMESocketManager with auth for ${url}`,
-            JSON.stringify(smeConfig, null, 2),
+            JSON.stringify(smeConfig),
         );
         // let's create a new RW socket to hold the state of our new authd endpoint
         const smeSocket = new SMESocketReadWrite(

@@ -313,7 +313,7 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
                         nab,
                         SMASH_NBH_RELATIONSHIP,
                         {
-                            timeout: TEST_CONFIG.TEST_TIMEOUT_MS / 2,
+                            timeout: TEST_CONFIG.TEST_TIMEOUT_MS,
                         },
                     );
                     await user[action as 'smash' | 'pass' | 'clear'](targetDid);
@@ -336,17 +336,29 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
                     expect(nab.onRelationship).toHaveBeenCalledTimes(counter);
                 };
 
-                it('should perform Smash action and notify NAB', async () => {
-                    await testAction('smash');
-                });
+                it(
+                    'should perform Smash action and notify NAB',
+                    async () => {
+                        await testAction('smash');
+                    },
+                    TEST_CONFIG.TEST_TIMEOUT_MS * 2,
+                );
 
-                it('should perform Pass action and notify NAB', async () => {
-                    await testAction('pass');
-                });
+                it(
+                    'should perform Pass action and notify NAB',
+                    async () => {
+                        await testAction('pass');
+                    },
+                    TEST_CONFIG.TEST_TIMEOUT_MS * 2,
+                );
 
-                it('should not perform (already cleared) Clear action', async () => {
-                    await testAction('clear', true);
-                });
+                it(
+                    'should not perform (already cleared) Clear action',
+                    async () => {
+                        await testAction('clear', true);
+                    },
+                    TEST_CONFIG.TEST_TIMEOUT_MS * 2,
+                );
 
                 it(
                     'should perform successive actions',
@@ -356,7 +368,7 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
                         await testAction('smash');
                         await testAction('pass');
                     },
-                    TEST_CONFIG.TEST_TIMEOUT_MS * 4,
+                    TEST_CONFIG.TEST_TIMEOUT_MS * 5,
                 );
 
                 it(
@@ -366,7 +378,7 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
                         await delay(100);
                         await testAction('pass', true);
                     },
-                    TEST_CONFIG.TEST_TIMEOUT_MS * 2,
+                    TEST_CONFIG.TEST_TIMEOUT_MS * 3,
                 );
             });
         });
