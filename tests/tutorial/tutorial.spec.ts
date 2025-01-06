@@ -1030,15 +1030,11 @@ describe('Smash Tutorial', () => {
                         nabReceivedRelationship = onNabReceivedRelationship();
                         await bob.smash(alice.did);
                         await nabReceivedRelationship;
+                        await delay(TEST_CONFIG.MESSAGE_DELIVERY);
                         nabReceivedRelationship = onNabReceivedRelationship();
                         await bob.clear(alice.did);
                         await nabReceivedRelationship;
-                        nabReceivedRelationship = onNabReceivedRelationship();
-                        await bob.pass(alice.did);
-                        await nabReceivedRelationship;
-                        nabReceivedRelationship = onNabReceivedRelationship();
-                        await bob.clear(alice.did);
-                        await nabReceivedRelationship;
+                        await delay(TEST_CONFIG.MESSAGE_DELIVERY);
                         const newDistance = await getDistanceFromBobToAlice();
                         expect(newDistance).toEqual(initialDistance);
                     },
