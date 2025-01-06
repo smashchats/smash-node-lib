@@ -273,10 +273,13 @@ export class SmashMessaging extends EventEmitter {
 
     /**
      * Send a message to a peer
+     * @param peerDid - The DID of the peer to send the message to (DID url or Document)
+     * @param message - The message to send (already encapsulated or not)
+     * @returns The encapsulated message that has been scheduled for sending
      */
     public async send(
         peerDid: DID,
-        message: IMProtoMessage,
+        message: IMProtoMessage | EncapsulatedIMProtoMessage,
     ): Promise<EncapsulatedIMProtoMessage> {
         const peer = await this.peers.getOrCreate(peerDid);
         return peer.send(message);

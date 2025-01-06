@@ -4,40 +4,11 @@
 
 - [x] manual refactor while writing the happy path tutorial test suite (mainly splitting modules and restructuring code)
 - [x] make previous test suites pass again
-- [-] refactor all individual code files (to be more readable, performant, maintainable, secure, efficient, etc)
+- [x] refactor all individual code files (to be more readable, performant, maintainable, secure, efficient, etc)
 - [x] remove // TODO comments from codebase -> transform into tracked issues
 - [x] refactor module file paths structure (reorg files) (+ make sure all tests pass)
 - [x] extract more submodules: more modular, decoupled, and loosely coupled (make sure all tests pass)
-
 - [ ] set everything private then resolve issues (ie check strict minimum as public and internal APIs)
-
-### TESTS REFACTORING (keeping or increasing coverage):
-
-- generate unit .test files with mocks/spies for each module corresponding to the library API reference (**testing only publicly exported**) --> should have 100% coverage for publicly exposed APIs (public and internal)
-- refactor functional (.spec) tests files to be more readable, maintainable, comprehensive -> corresponding to The Tutorial and the How-Tos --> should have 100% functional coverage (100% of the lines, combined)
-
-### GENERATE DOCS FROM TESTS:
-
-- convert back and forth between tests and docs (GPT API?)
-- publish docs along with tests results and links to source code
-
-use ReSpec for protocol specs repo
-
-## Random notes
-
-DID resolvers / generators / managers, based on
-
-- with cache (use lib?)
-
-https://github.com/digitalbazaar/did-io
-https://www.npmjs.com/package/@digitalbazaar/did-method-key
-https://www.npmjs.com/package/did-resolver
-https://www.npmjs.com/package/@cef-ebsi/key-did-resolver
-
-for badges/endorsements?:
-https://www.npmjs.com/package/@cef-ebsi/verifiable-credential
-
-https://github.com/decentralized-identity/did-resolver
 
 ## HAPPY PATH
 
@@ -67,12 +38,38 @@ Tutorial = Covers entire product but HAPPY PATH ONLY
 
 then, next feats
 
+- [ ] update message status more granular (sending, delivered, received, read, failed, retrying)
 - [ ] loading the library with existing _data_ (tbd)
 - [ ] (un)blocking another peer
 
-### TODO
+### TESTS REFACTORING (keeping or increasing coverage):
 
-retrieve the old TODO
+- generate unit .test files with mocks/spies for each module corresponding to the library API reference (**testing only publicly exported**) --> should have 100% coverage for publicly exposed APIs (public and internal)
+- refactor functional (.spec) tests files to be more readable, maintainable, comprehensive -> corresponding to The Tutorial and the How-Tos --> should have 100% functional coverage (100% of the lines, combined)
+
+### GENERATE DOCS FROM TESTS:
+
+- convert back and forth between tests and docs (GPT API?)
+- publish docs along with tests results and links to source code
+
+use ReSpec for protocol specs repo
+
+## Random notes
+
+DID resolvers / generators / managers, based on
+
+- with cache (use lib?)
+
+https://github.com/digitalbazaar/did-io
+https://www.npmjs.com/package/@digitalbazaar/did-method-key
+https://www.npmjs.com/package/did-resolver
+https://www.npmjs.com/package/@cef-ebsi/key-did-resolver
+
+for badges/endorsements?:
+https://www.npmjs.com/package/@cef-ebsi/verifiable-credential
+
+https://github.com/decentralized-identity/did-resolver
+
 DIDcomm? https://identity.foundation/didcomm-messaging/spec/
 
 \_did DNS URI record
@@ -84,3 +81,7 @@ https://www.ietf.org/archive/id/draft-mayrhofer-did-dns-05.txt
 Note: a DID is PII as per the GDPR.
 
 investigate JWE for the challenge
+
+### TODO
+
+retrieve the old TODO from dropped branch

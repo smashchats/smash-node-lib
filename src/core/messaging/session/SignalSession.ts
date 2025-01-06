@@ -16,76 +16,48 @@ import type { SmashEndpoint } from '@src/shared/types/sme.types.js';
 import type { Logger } from '@src/shared/utils/Logger.js';
 
 export class SignalSession {
-    public readonly createdAtTime: number;
+    public readonly createdAtTime: number = Date.now();
+
     // TODO cleanup outdated sessions after a grace period
     // TODO think about coordinated TTL constants
     public static readonly SESSION_TTL_MS = EXPIRATION_TIME_MS;
-
     public firstUse: boolean = true;
 
-    constructor(
+    private constructor(
         public readonly id: string,
         private readonly cipher: AsymmetricRatchet,
         public readonly peerIk: string,
         private readonly logger: Logger,
-    ) {
-        this.createdAtTime = Date.now();
-    }
+    ) {}
 
-    isExpired(): boolean {
+    public isExpired(): boolean {
         return Date.now() - this.createdAtTime > SignalSession.SESSION_TTL_MS;
     }
 
-    static async create(
+    public static async create(
         peerDidDocument: DIDDocument,
         identity: IMPeerIdentity,
         sme: SmashEndpoint,
         logger: Logger,
-    ) {
+    ): Promise<SignalSession> {
+        logger.debug('SignalSession::create');
+
         try {
-            logger.debug('SignalSession::create');
-            const bundle = new PreKeyBundleProtocol();
-            bundle.registrationId = 0; // warning: using fixed value, unsure about usage!
-
-            // IK
-            bundle.identity.signingKey = await ECPublicKey.create(
-                await KeyUtils.importSigningPublicKey(peerDidDocument.ik),
+            const bundle = await SignalSession.createPreKeyBundle(
+                peerDidDocument,
+                sme,
             );
-            // EK + signature
-            bundle.identity.exchangeKey = await ECPublicKey.create(
-                await KeyUtils.importExchangePublicKey(peerDidDocument.ek),
-            );
-            bundle.identity.signature = BufferUtils.stringToBuffer(
-                peerDidDocument.signature,
-            );
-            // PreKey + signature
-            bundle.preKeySigned.id = 0; // warning: using fixed value, unsure about usage!
-
-            // TODO: more generic DID document parsing/manipulation
-            // Find more DID doc serviceendpoint examples
-            // Check if Bsky allow to edit DID doc with API?
-            // verif key, ek, pk + endpoint
-            const preKeyPublicKey = await ECPublicKey.create(
-                await KeyUtils.importExchangePublicKey(sme.preKey),
-            );
-
-            bundle.preKeySigned.key = preKeyPublicKey;
-            bundle.preKeySigned.signature = BufferUtils.stringToBuffer(
-                sme.signature,
-            );
-
             const protocol = await PreKeyBundleProtocol.importProto(bundle);
             const cipher = await AsymmetricRatchet.create(identity, protocol);
+            const sessionId = await SignalSession.generateSessionId(cipher);
 
-            const sessionId = await HashUtils.sha256FromKey(
-                cipher.currentRatchetKey.publicKey.key,
-            );
             const session = new SignalSession(
                 sessionId,
                 cipher,
                 peerDidDocument.ik,
                 logger,
             );
+
             logger.debug(`>> session created with id ${sessionId}`);
             return session;
         } catch (err) {
@@ -94,48 +66,96 @@ export class SignalSession {
         }
     }
 
-    static async parseSession(
+    private static async createPreKeyBundle(
+        peerDidDocument: DIDDocument,
+        sme: SmashEndpoint,
+    ): Promise<PreKeyBundleProtocol> {
+        const bundle = new PreKeyBundleProtocol();
+        bundle.registrationId = 0; // Fixed value, pending review
+
+        // Set identity keys
+        bundle.identity.signingKey = await ECPublicKey.create(
+            await KeyUtils.importSigningPublicKey(peerDidDocument.ik),
+        );
+        bundle.identity.exchangeKey = await ECPublicKey.create(
+            await KeyUtils.importExchangePublicKey(peerDidDocument.ek),
+        );
+        bundle.identity.signature = BufferUtils.stringToBuffer(
+            peerDidDocument.signature,
+        );
+
+        // Set pre-key data
+        bundle.preKeySigned.id = 0; // Fixed value, pending review
+        bundle.preKeySigned.key = await ECPublicKey.create(
+            await KeyUtils.importExchangePublicKey(sme.preKey),
+        );
+        bundle.preKeySigned.signature = BufferUtils.stringToBuffer(
+            sme.signature,
+        );
+
+        return bundle;
+    }
+
+    private static async generateSessionId(
+        cipher: AsymmetricRatchet,
+    ): Promise<string> {
+        return HashUtils.sha256FromKey(cipher.currentRatchetKey.publicKey.key);
+    }
+
+    public static async parseSession(
         identity: IMPeerIdentity,
         sessionId: string,
         data: ArrayBuffer,
         logger: Logger,
     ): Promise<[SignalSession, EncapsulatedIMProtoMessage[]]> {
         logger.debug('SignalSession::parseSession');
+
         try {
-            const preKeyMessageProtocol =
-                await PreKeyMessageProtocol.importProto(data);
-            const expectedSessionId = await HashUtils.sha256FromKey(
-                preKeyMessageProtocol.baseKey.key,
-            );
-            if (expectedSessionId !== sessionId) {
-                throw new Error("Session IDs don't match.");
-            }
+            const preKeyMessage = await PreKeyMessageProtocol.importProto(data);
+            await SignalSession.validateSessionId(sessionId, preKeyMessage);
+
             const cipher = await AsymmetricRatchet.create(
                 identity,
-                preKeyMessageProtocol,
+                preKeyMessage,
             );
             const peerIk = await KeyUtils.encodeKeyAsString(
-                preKeyMessageProtocol.identity.signingKey.key,
+                preKeyMessage.identity.signingKey.key,
             );
+
             const session = new SignalSession(
                 sessionId,
                 cipher,
                 peerIk,
                 logger,
             );
-            const decryptedMessages = await session.decryptMessages(
-                preKeyMessageProtocol.signedMessage,
+            const messages = await session.decryptMessages(
+                preKeyMessage.signedMessage,
             );
-            return [session, decryptedMessages];
+
+            return [session, messages];
         } catch (err) {
             logger.warn('Cannot parse session.');
             throw err;
         }
     }
 
-    async encryptMessages(message: EncapsulatedIMProtoMessage[]) {
+    private static async validateSessionId(
+        sessionId: string,
+        preKeyMessage: PreKeyMessageProtocol,
+    ): Promise<void> {
+        const expectedId = await HashUtils.sha256FromKey(
+            preKeyMessage.baseKey.key,
+        );
+        if (expectedId !== sessionId) {
+            throw new Error("Session IDs don't match.");
+        }
+    }
+
+    public async encryptMessages(
+        messages: EncapsulatedIMProtoMessage[],
+    ): Promise<ArrayBuffer> {
         try {
-            const data = BufferUtils.objectToBuffer(message);
+            const data = BufferUtils.objectToBuffer(messages);
             return (await this.cipher.encrypt(data)).exportProto();
         } catch (err) {
             this.logger.warn('Cannot encrypt messages.');
@@ -143,11 +163,12 @@ export class SignalSession {
         }
     }
 
-    async decryptData(data: ArrayBuffer) {
+    public async decryptData(
+        data: ArrayBuffer,
+    ): Promise<EncapsulatedIMProtoMessage[]> {
         try {
-            return this.decryptMessages(
-                await MessageSignedProtocol.importProto(data),
-            );
+            const message = await MessageSignedProtocol.importProto(data);
+            return this.decryptMessages(message);
         } catch (err) {
             this.logger.warn('Cannot decrypt data.');
             throw err;
@@ -158,9 +179,10 @@ export class SignalSession {
         message: MessageSignedProtocol,
     ): Promise<EncapsulatedIMProtoMessage[]> {
         try {
-            const decryptedMessage = await this.cipher.decrypt(message);
-            const decryptedData = BufferUtils.bufferToObject(decryptedMessage);
-            return decryptedData as EncapsulatedIMProtoMessage[];
+            const decrypted = await this.cipher.decrypt(message);
+            return BufferUtils.bufferToObject(
+                decrypted,
+            ) as EncapsulatedIMProtoMessage[];
         } catch (err) {
             this.logger.warn('Cannot decrypt messages.');
             throw err;

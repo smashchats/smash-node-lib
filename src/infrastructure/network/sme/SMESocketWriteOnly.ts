@@ -18,10 +18,54 @@ export class SMESocketWriteOnly {
     ) {}
 
     async close(TIMEOUT_MS = 5000): Promise<void> {
+        if (!this.socket) {
+            return;
+        }
+
         return new Promise((resolve) => {
             this.logger.debug(
                 `> Disconnecting from SME ${this.url} [${this.socket?.id}]`,
             );
+
+            const timeout = this.createCloseTimeout(TIMEOUT_MS, resolve);
+
+            if (this.socket?.connected) {
+                this.handleConnectedClose(timeout, resolve);
+            } else {
+                this.handleDisconnectedClose(timeout, resolve);
+            }
+        });
+    }
+
+    private createCloseTimeout(timeoutMs: number, resolve: () => void) {
+        return setTimeout(() => {
+            this.logger.warn(
+                `Timeout exceeded while closing socket (${timeoutMs}ms), forcing cleanup [${this.socket?.id}]`,
+            );
+            this.forceCleanup();
+            resolve();
+        }, timeoutMs);
+    }
+
+    private handleConnectedClose(timeout: NodeJS.Timeout, resolve: () => void) {
+        this.socket!.once('disconnect', () => {
+            this.logger.info(
+                `> Disconnected from SME ${this.url} [${this.socket?.id}]`,
+            );
+            clearTimeout(timeout);
+            this.forceCleanup();
+            resolve();
+        });
+        this.socket!.disconnect();
+    }
+
+    private handleDisconnectedClose(
+        timeout: NodeJS.Timeout,
+        resolve: () => void,
+    ) {
+        this.forceCleanup();
+        clearTimeout(timeout);
+        resolve();
             if (!this.socket) {
                 return resolve();
             }
@@ -68,21 +112,9 @@ export class SMESocketWriteOnly {
         this.socket.removeAllListeners();
         this.socket.disconnect();
         this.socket.close();
-        // if (this.socket.io?.engine) {
-        //     this.socket.io.engine.removeAllListeners();
-        //     this.socket.io.engine.close();
-        //     this.socket.io.engine.transport?.close();
-        // }
         this.socket = undefined;
     }
 
-    // TODO: do we want to use simpler ID than preKey? (eg, sha256 of the prekey?)
-    /**
-     * @param preKey - The recipient's prekey to use as their ID on the SME.
-     * @param sessionId - The session ID to use to deliver the message.
-     * @param buffer - The data to send.
-     * @param messageIds - The corresponding sent message IDs to track.
-     */
     public sendData(
         preKey: string,
         sessionId: string,
@@ -97,18 +129,13 @@ export class SMESocketWriteOnly {
                 );
                 return resolve();
             }
-            // || this.socket.io?.engine?.readyState !== 'open'
-            if (!this.socket || !this.socket.connected) {
-                this.logger.info(
-                    `Creating write-only socket for ${this.url} [prev: ${this.socket?.id}]`,
+
+            if (!this.ensureSocketConnection()) {
+                return reject(
+                    new Error(`Failed to connect to SME ${this.url}`),
                 );
-                this.initSocket();
-                if (!this.socket) {
-                    return reject(
-                        new Error(`Failed to connect to SME ${this.url}`),
-                    );
-                }
             }
+
             this.sendWithTimeout(
                 preKey,
                 sessionId,
@@ -119,6 +146,17 @@ export class SMESocketWriteOnly {
                 .then(resolve)
                 .catch(reject);
         });
+    }
+
+    private ensureSocketConnection(): boolean {
+        if (!this.socket || !this.socket.connected) {
+            this.logger.info(
+                `Creating write-only socket for ${this.url} [prev: ${this.socket?.id}]`,
+            );
+            this.initSocket();
+            return !!this.socket;
+        }
+        return true;
     }
 
     private sendWithTimeout(
@@ -162,12 +200,17 @@ export class SMESocketWriteOnly {
             `SMESocketWriteOnly::initSocket ${this.url} ${auth ? 'with auth' : 'without auth'}`,
         );
 
-        // If we already have a socket, clean it up first
         if (this.socket) {
             this.forceCleanup();
         }
 
-        const socket = io(this.url, {
+        const socket = this.createSocket(auth);
+        this.setupSocketEventHandlers(socket);
+        this.socket = socket;
+    }
+
+    private createSocket(auth?: SMEAuthParams): Socket {
+        return io(this.url, {
             auth,
             transports: ['websocket', 'polling', 'webtransport'],
             // TODO: test reconnection/transport failure scenarios
@@ -179,144 +222,86 @@ export class SMESocketWriteOnly {
             ackTimeout: 5000,
             retries: 10,
         });
+    }
 
-        socket.on('connect', () => {
-            const transport = socket.io.engine.transport.name; // in most cases, "polling"
+    private setupSocketEventHandlers(socket: Socket) {
+        socket.on('connect', () => this.handleConnect(socket));
+        socket.on('connect_error', (error: Error) =>
+            this.handleConnectError(socket, error),
+        );
+        socket.on('reconnect', () => this.handleReconnect(socket));
+        socket.on('reconnect_attempt', (attempt: number) =>
+            this.handleReconnectAttempt(socket, attempt),
+        );
+        socket.on('reconnect_error', (error: Error) =>
+            this.handleReconnectError(socket, error),
+        );
+        socket.on('reconnect_failed', () => this.handleReconnectFailed(socket));
+    }
+
+    private handleConnect(socket: Socket) {
+        const transport = socket.io.engine.transport.name;
+        this.logger.info(
+            `> Connected to SME ${this.url} (${transport}) [${socket.id}]`,
+        );
+
+        this.logConnectionState(socket);
+        this.setupUpgradeHandler(socket);
+    }
+
+    private logConnectionState(socket: Socket) {
+        this.logger.debug(
+            'Socket connection state:',
+            JSON.stringify({
+                id: socket.id,
+                connected: socket.connected,
+                disconnected: socket.disconnected,
+                transport: socket.io.engine.transport.name,
+                readyState: socket.io.engine.readyState,
+            }),
+        );
+    }
+
+    private setupUpgradeHandler(socket: Socket) {
+        socket.io.engine.on('upgrade', () => {
+            const upgradedTransport = socket.io.engine.transport.name;
             this.logger.info(
-                `> Connected to SME ${this.url} (${transport}) [${socket.id}]`,
+                `> Upgraded connection to SME ${this.url} (${upgradedTransport}) [${socket.id}]`,
             );
-
-            // Log detailed connection state
-            this.logger.debug(
-                'Socket connection state:',
-                JSON.stringify({
-                    id: socket.id,
-                    connected: socket.connected,
-                    disconnected: socket.disconnected,
-                    transport: socket.io.engine.transport.name,
-                    readyState: socket.io.engine.readyState,
-                }),
-            );
-
-            socket.io.engine.on('upgrade', () => {
-                const upgradedTransport = socket.io.engine.transport.name;
-                this.logger.info(
-                    `> Upgraded connection to SME ${this.url} (${upgradedTransport}) [${socket.id}]`,
-                );
-                // Log post-upgrade state
-                this.logger.debug('Socket post-upgrade state:', {
-                    id: socket.id,
-                    transport: upgradedTransport,
-                    readyState: socket.io.engine.readyState,
-                });
+            this.logger.debug('Socket post-upgrade state:', {
+                id: socket.id,
+                transport: upgradedTransport,
+                readyState: socket.io.engine.readyState,
             });
         });
+    }
 
-        // socket.on('disconnect', (reason) => {
-        //     this.logger.warn(`Socket disconnected: ${reason} [${socket.id}]`);
-        //     if (
-        //         reason === 'ping timeout' ||
-        //         reason === 'transport error' ||
-        //         reason === 'transport close'
-        //     ) {
-        //         socket.disconnect();
-        //         socket.connect();
-        //     }
-        // });
+    private handleConnectError(socket: Socket, error: Error) {
+        this.logger.warn(
+            `> Connect error to SME ${this.url}: ${error} [${socket.id}]`,
+        );
+    }
 
-        socket.on('connect_error', (error: Error) => {
-            this.logger.warn(
-                `> Connect error to SME ${this.url}: ${error} [${socket.id}]`,
-            );
-        });
+    private handleReconnect(socket: Socket) {
+        this.logger.info(`> Reconnected to SME ${this.url} [${socket.id}]`);
+    }
 
-        // TODO: handle authenticated reconnections
-        socket.on('reconnect', () => {
-            this.logger.info(`> Reconnected to SME ${this.url} [${socket.id}]`);
-        });
+    private handleReconnectAttempt(socket: Socket, attempt: number) {
+        this.logger.debug(
+            `> Reconnect attempt ${attempt} to SME ${this.url} [${socket.id}]`,
+        );
+    }
 
-        socket.on('reconnect_attempt', (attempt: number) => {
-            this.logger.debug(
-                `> Reconnect attempt ${attempt} to SME ${this.url} [${socket.id}]`,
-            );
-        });
+    private handleReconnectError(socket: Socket, error: Error) {
+        this.logger.warn(
+            `> Reconnect error to SME ${this.url}: ${error} [${socket.id}]`,
+        );
+    }
 
-        socket.on('reconnect_error', (error: Error) => {
-            this.logger.warn(
-                `> Reconnect error to SME ${this.url}: ${error} [${socket.id}]`,
-            );
-        });
-
-        socket.on('reconnect_failed', () => {
-            this.logger.error(
-                `> Failed to connect to SME ${this.url}. Giving up. [${socket.id}]`,
-            );
-            this.forceCleanup();
-        });
-
-        // const originalEmit = socket.emit;
-        // const logger = this.logger;
-        // socket.emit = function (event: string, ...args: unknown[]) {
-        //     logger?.debug(
-        //         'Socket emit state:',
-        //         JSON.stringify({
-        //             id: socket.id,
-        //             event: event,
-        //             connected: socket.connected,
-        //             disconnected: socket.disconnected,
-        //             transport: socket.io.engine.transport?.name,
-        //             readyState: socket.io.engine.readyState,
-        //         }),
-        //     );
-        //     return originalEmit.apply(socket, [event, ...args]);
-        // }.bind(socket);
-
-        // socket.io.on('ping', () => {
-        //     this.logger.debug(
-        //         'Socket.io ping:',
-        //         JSON.stringify({
-        //             id: socket.id,
-        //             readyState: socket.io.engine?.readyState,
-        //             transport: socket.io.engine?.transport?.name,
-        //         }),
-        //     );
-        // });
-
-        // socket.io.engine?.on('close', (reason: string) => {
-        //     this.logger.debug(
-        //         'Engine close event:',
-        //         JSON.stringify({
-        //             id: socket.id,
-        //             reason,
-        //             readyState: socket.io.engine?.readyState,
-        //             transport: socket.io.engine?.transport?.name,
-        //         }),
-        //     );
-        // });
-
-        // socket.io.engine?.on('error', (err: string | Error) => {
-        //     this.logger.debug(
-        //         'Engine error event:',
-        //         JSON.stringify({
-        //             id: socket.id,
-        //             error: err instanceof Error ? err.message : err,
-        //             readyState: socket.io.engine?.readyState,
-        //             transport: socket.io.engine?.transport?.name,
-        //         }),
-        //     );
-        // });
-
-        // socket.onAny((event, ...args) => {
-        //     this.logger.debug(
-        //         'Raw socket.io event:',
-        //         JSON.stringify({
-        //             event,
-        //             args,
-        //             hasAck: typeof args[args.length - 1] === 'function',
-        //         }),
-        //     );
-        // });
-
-        this.socket = socket;
+    private handleReconnectFailed(socket: Socket) {
+        this.logger.error(
+            `> Failed to connect to SME ${this.url}. Giving up. [${socket.id}]`,
+        );
+        this.forceCleanup();
     }
 }

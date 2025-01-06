@@ -11,8 +11,9 @@ import AsyncLock from 'async-lock';
 const QUEUE_MUTEX_NAME = 'queue';
 
 export class SmashPeerEndpoint {
-    private readonly messageQueue: Map<sha256, EncapsulatedIMProtoMessage> =
-        new Map();
+    private readonly mutex = new AsyncLock();
+    private readonly messageQueue: Map<sha256, EncapsulatedIMProtoMessage>;
+    private session?: SignalSession;
 
     constructor(
         private readonly logger: Logger,
@@ -25,35 +26,21 @@ export class SmashPeerEndpoint {
         this.messageQueue = new Map([...historicalMessageQueue]);
     }
 
-    private readonly mutex = new AsyncLock();
-
-    public queue(message: EncapsulatedIMProtoMessage): Promise<void> {
-        return this.mutex.acquire(QUEUE_MUTEX_NAME, () => {
-            this.queueBypassingMutex(message);
+    public async queue(message: EncapsulatedIMProtoMessage): Promise<void> {
+        await this.mutex.acquire(QUEUE_MUTEX_NAME, () => {
+            this.addMessageToQueue(message);
         });
     }
 
-    public clearQueue(): Promise<void> {
-        return this.mutex.acquire(QUEUE_MUTEX_NAME, () => {
+    public async clearQueue(): Promise<void> {
+        await this.mutex.acquire(QUEUE_MUTEX_NAME, () => {
             this.messageQueue.clear();
         });
     }
 
-    private queueBypassingMutex(message: EncapsulatedIMProtoMessage) {
-        this.messageQueue.set(message.sha256, message);
-        this.logger.debug(
-            `> queued ${message.sha256} for ${this.config.url} (${this.messageQueue.size})`,
-        );
-    }
-
-    public async ack(messageIds: sha256[]) {
-        return this.mutex.acquire(QUEUE_MUTEX_NAME, () => {
-            messageIds.forEach((messageId) => {
-                this.messageQueue.delete(messageId);
-                this.logger.debug(
-                    `> acknowledged message ${messageId} for ${this.config.url} (${this.messageQueue.size})`,
-                );
-            });
+    public async ack(messageIds: sha256[]): Promise<void> {
+        await this.mutex.acquire(QUEUE_MUTEX_NAME, () => {
+            this.removeMessagesFromQueue(messageIds);
         });
     }
 
@@ -68,91 +55,52 @@ export class SmashPeerEndpoint {
                     `> ... acquired queue mutex for ${this.config.url}`,
                 );
             },
-            {
-                skipQueue: true,
-            },
+            { skipQueue: true },
         );
     }
 
-    /**
-     * Flushes the message queue to the endpoint.
-     * If the session is expired, it will be re-initialized.
-     * @throws Error if message isnt delivered within 3 seconds.
-     */
-    public async flush(
-        shouldUseSession: SignalSession | undefined,
-    ): Promise<void> {
-        const session = shouldUseSession ?? (await this.thisSession());
-        this.logger.debug(
-            `> waiting to acquire flushing mutex for ${this.config.url} ...`,
-        );
-        return this.mutex.acquire(QUEUE_MUTEX_NAME, async () => {
+    public async flush(providedSession?: SignalSession): Promise<void> {
+        const session = providedSession ?? (await this.getOrCreateSession());
+
+        await this.mutex.acquire(QUEUE_MUTEX_NAME, async () => {
             this.logger.debug(
                 `> ... acquired flushing mutex for ${this.config.url}`,
             );
-            await this.init(session);
-            if (!this.messageQueue.size) {
+
+            await this.initializeSessionIfNeeded(session);
+
+            if (this.messageQueue.size === 0) {
                 this.logger.debug(
                     `> no undelivered messages to flush for ${this.config.url}`,
                 );
                 return;
             }
-            const undeliveredMessages = Array.from(this.messageQueue.values());
-            this.logger.debug(
-                `> flushing ${undeliveredMessages.length} messages to ${this.config.url}`,
-            );
-            const socket = this.smeSocketManager.getOrCreate(this.config.url);
-            try {
-                await socket.sendData(
-                    this.config.preKey,
-                    session.id,
-                    await session.encryptMessages(undeliveredMessages),
-                    undeliveredMessages.map((m) => m.sha256),
-                );
-                this.messageQueue.clear();
-                this.logger.debug(
-                    `> flushed ${undeliveredMessages.length} messages to ${this.config.url} (cleared queue)`,
-                );
-            } catch (error) {
-                this.logger.error(
-                    `> failed to flush messages to ${this.config.url}: ${(error as Error).message}`,
-                );
-                this.logger.info(`> resetting session: ${this.session?.id}`);
-                // TODO: is reset session really needed everytime here?
-                this.session = undefined;
-                throw error;
-            }
+
+            await this.flushMessages(session);
         });
     }
 
-    private async init(session: SignalSession): Promise<void> {
-        if (session.firstUse) {
-            this.logger.debug(`> initializing first use session ${session.id}`);
-            const newSessionProtocolMessages = [];
-            try {
-                newSessionProtocolMessages.push(
-                    this.smeSocketManager.getPreferredEndpointMessage(),
-                );
-            } catch (error) {
-                this.logger.debug(
-                    `> skipping preferred endpoint message: ${(error as Error).message}`,
-                );
-            }
-            newSessionProtocolMessages.push(
-                await this.sessionManager.getDIDMessage(),
-            );
-            for (const message of newSessionProtocolMessages) {
-                this.logger.debug(
-                    `> queueing ${message.type} session message for ${this.config.url}`,
-                );
-                this.queueBypassingMutex(message);
-            }
-            session.firstUse = false;
-        }
+    public resetSession(): void {
+        this.session = undefined;
     }
 
-    private session?: SignalSession;
-    private async thisSession(): Promise<SignalSession> {
+    private addMessageToQueue(message: EncapsulatedIMProtoMessage): void {
+        this.messageQueue.set(message.sha256, message);
+        this.logger.debug(
+            `> queued ${message.sha256} for ${this.config.url} (${this.messageQueue.size})`,
+        );
+    }
+
+    private removeMessagesFromQueue(messageIds: sha256[]): void {
+        messageIds.forEach((messageId) => {
+            this.messageQueue.delete(messageId);
+            this.logger.debug(
+                `> acknowledged message ${messageId} for ${this.config.url} (${this.messageQueue.size})`,
+            );
+        });
+    }
+
+    private async getOrCreateSession(): Promise<SignalSession> {
         if (!this.session || this.session.isExpired()) {
             this.session = await this.sessionManager.initSession(
                 await this.peer.getDIDDocument(),
@@ -162,7 +110,77 @@ export class SmashPeerEndpoint {
         return this.session;
     }
 
-    public resetSession() {
+    private async initializeSessionIfNeeded(
+        session: SignalSession,
+    ): Promise<void> {
+        if (!session.firstUse) return;
+
+        this.logger.debug(`> initializing first use session ${session.id}`);
+        const protocolMessages = await this.getInitialProtocolMessages();
+
+        protocolMessages.forEach((message) => {
+            this.logger.debug(
+                `> queueing ${message.type} session message for ${this.config.url}`,
+            );
+            this.addMessageToQueue(message);
+        });
+
+        session.firstUse = false;
+    }
+
+    private async getInitialProtocolMessages(): Promise<
+        EncapsulatedIMProtoMessage[]
+    > {
+        const messages: EncapsulatedIMProtoMessage[] = [];
+
+        try {
+            messages.push(this.smeSocketManager.getPreferredEndpointMessage());
+        } catch (error) {
+            this.logger.debug(
+                `> skipping preferred endpoint message: ${(error as Error).message}`,
+            );
+        }
+
+        messages.push(await this.sessionManager.getDIDMessage());
+        return messages;
+    }
+
+    private async flushMessages(session: SignalSession): Promise<void> {
+        const messages = Array.from(this.messageQueue.values());
+        this.logger.debug(
+            `> flushing ${messages.length} messages to ${this.config.url}`,
+        );
+
+        try {
+            await this.sendMessages(session, messages);
+            this.messageQueue.clear();
+            this.logger.debug(
+                `> flushed ${messages.length} messages to ${this.config.url} (cleared queue)`,
+            );
+        } catch (error) {
+            await this.handleFlushError(error as Error);
+        }
+    }
+
+    private async sendMessages(
+        session: SignalSession,
+        messages: EncapsulatedIMProtoMessage[],
+    ): Promise<void> {
+        const socket = this.smeSocketManager.getOrCreate(this.config.url);
+        await socket.sendData(
+            this.config.preKey,
+            session.id,
+            await session.encryptMessages(messages),
+            messages.map((m) => m.sha256),
+        );
+    }
+
+    private async handleFlushError(error: Error): Promise<void> {
+        this.logger.error(
+            `> failed to flush messages to ${this.config.url}: ${error.message}`,
+        );
+        this.logger.info(`> resetting session: ${this.session?.id}`);
         this.session = undefined;
+        throw error;
     }
 }
