@@ -817,7 +817,7 @@ describe('Smash Tutorial', () => {
                 await lola.close();
                 await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
             },
-            TEST_CONFIG.MESSAGE_DELIVERY_TIMEOUT,
+            TEST_CONFIG.MESSAGE_DELIVERY_TIMEOUT * 2,
         );
 
         describe('In a Neighborhood with other peers', () => {

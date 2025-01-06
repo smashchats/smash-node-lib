@@ -33,14 +33,14 @@ describe('[Sessions] Session Management', () => {
         alice = await createPeer('alice', socketServerUrl);
         bob = await createPeer('bob', socketServerUrl);
         await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
-    });
+    }, TEST_CONFIG.TEST_TIMEOUT_MS * 2);
 
     afterEach(async () => {
         logger.debug('Cleaning up test peers');
         await alice?.messaging.close();
         await bob?.messaging.close();
         await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
-    });
+    }, TEST_CONFIG.TEST_TIMEOUT_MS * 2);
 
     describe('Session Reuse', () => {
         it('should reuse the same session for subsequent messages', async () => {

@@ -18,29 +18,36 @@ const ALGORITHMS = {
 } as const;
 
 export class IMPeerIdentity extends Identity {
+    private readonly endpoints: SmashEndpoint[];
+
     constructor(
         public readonly did: DIDString,
         signingKey: IECKeyPair,
         exchangeKey: IECKeyPair,
-        private readonly endpoints: SmashEndpoint[] = [],
+        endpoints: SmashEndpoint[] = [],
     ) {
         super(0, signingKey, exchangeKey);
+        this.endpoints = [...endpoints];
     }
 
     // Endpoint Management
-    public pushEndpoint(endpoint: SmashEndpoint): void {
-        this.removeEndpointIfExists(endpoint);
+    public getEndpoints(): SmashEndpoint[] {
+        return [...this.endpoints];
+    }
+
+    public addEndpoint(endpoint: SmashEndpoint): void {
+        this.removeEndpoint(endpoint);
         this.endpoints.push({ ...endpoint });
     }
 
-    public removeEndpointIfExists({ url, preKey }: SmashEndpoint): void {
-        const index = this.findEndpointIndex(url, preKey);
+    public removeEndpoint(endpoint: SmashEndpoint): void {
+        const index = this.findEndpointIndex(endpoint);
         if (index !== -1) {
             this.endpoints.splice(index, 1);
         }
     }
 
-    private findEndpointIndex(url: string, preKey: string): number {
+    private findEndpointIndex({ url, preKey }: SmashEndpoint): number {
         return this.endpoints.findIndex(
             (e) => e.url === url && e.preKey === preKey,
         );
@@ -52,20 +59,20 @@ export class IMPeerIdentity extends Identity {
     }
 
     public static async generateIdentityKeys(
-        extractable: boolean = false,
+        extractable = false,
     ): Promise<IECKeyPair> {
         return this.generateKeyPair(ALGORITHMS.SIGNING, extractable);
     }
 
     public static async generateExchangeKeys(
-        extractable: boolean = false,
+        extractable = false,
     ): Promise<IECKeyPair> {
         return this.generateKeyPair(ALGORITHMS.EXCHANGE, extractable);
     }
 
     private static async generateKeyPair(
         type: ECKeyType,
-        extractable: boolean = false,
+        extractable = false,
     ): Promise<IECKeyPair> {
         GenerateKeyPatcher.patch();
         return Curve.generateKeyPair(type, extractable);
@@ -109,20 +116,16 @@ export class IMPeerIdentity extends Identity {
     private async initializeFromJSON(json: IIMPeerIdentity): Promise<void> {
         this.id = json.id;
         this.createdAt = new Date(json.createdAt);
+        const preKeys = json.preKeys;
+        const signedPreKeys = json.signedPreKeys;
         [this.preKeys, this.signedPreKeys] = await Promise.all([
-            Promise.all(
-                json.preKeys.map((key) => Curve.ecKeyPairFromJson(key)),
-            ),
-            Promise.all(
-                json.signedPreKeys.map((key) => Curve.ecKeyPairFromJson(key)),
-            ),
+            Promise.all(preKeys.map(Curve.ecKeyPairFromJson.bind(Curve))),
+            Promise.all(signedPreKeys.map(Curve.ecKeyPairFromJson.bind(Curve))),
         ]);
     }
 
     public async toJSON(): Promise<IIMPeerIdentity> {
-        if (!this.createdAt) {
-            this.createdAt = new Date();
-        }
+        this.createdAt ??= new Date();
         const baseJSON = await super.toJSON();
         return {
             ...baseJSON,
@@ -142,11 +145,11 @@ export class IMPeerIdentity extends Identity {
             throw new Error(`Could not resolve DID document for ${this.did}`);
         }
 
-        this.mergeLocalEndpoints(doc);
+        this.mergeEndpointsIntoDocument(doc);
         return doc;
     }
 
-    private mergeLocalEndpoints(doc: DIDDocument): void {
+    private mergeEndpointsIntoDocument(doc: DIDDocument): void {
         const newEndpoints = this.endpoints.filter(
             (endpoint) => !this.isEndpointInDocument(endpoint, doc),
         );

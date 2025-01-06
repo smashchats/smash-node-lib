@@ -29,6 +29,16 @@ export class EndpointManager extends Map<string, SmashEndpoint> {
     async reset(
         endpoints: (SmashEndpoint & SMEConfigJSONWithoutDefaults)[],
     ): Promise<void> {
+        const { endpointsToConnect, endpointsToDisconnect } =
+            this.categorizeEndpoints(endpoints);
+
+        await this.disconnectEndpoints(endpointsToDisconnect);
+        await this.connectNewEndpoints(endpointsToConnect);
+    }
+
+    private categorizeEndpoints(
+        endpoints: (SmashEndpoint & SMEConfigJSONWithoutDefaults)[],
+    ) {
         const endpointsToConnect = endpoints.filter(
             (endpoint) => !super.has(endpoint.url),
         );
@@ -36,10 +46,16 @@ export class EndpointManager extends Map<string, SmashEndpoint> {
         const endpointsToDisconnect = Array.from(super.keys()).filter(
             (url) => !endpointURLs.has(url),
         );
+
         this.logger.debug(
             `Set ${endpoints.length} endpoints: ${endpointsToDisconnect.length} to disconnect, ` +
                 `${endpointsToConnect.length} to connect (use user.endpoints.connect() to force reconnection)`,
         );
+
+        return { endpointsToConnect, endpointsToDisconnect };
+    }
+
+    private async disconnectEndpoints(endpointsToDisconnect: string[]) {
         if (endpointsToDisconnect.length) {
             this.logger.debug(
                 `> Disconnecting endpoints: ${endpointsToDisconnect.join(', ')}`,
@@ -50,11 +66,13 @@ export class EndpointManager extends Map<string, SmashEndpoint> {
                 ),
             );
         }
+    }
+
+    private async connectNewEndpoints(
+        endpointsToConnect: (SmashEndpoint & SMEConfigJSONWithoutDefaults)[],
+    ) {
         if (endpointsToConnect.length) {
-            const prekeyPair = this.identity.signedPreKeys[0];
-            if (!prekeyPair) {
-                throw new Error('No prekey pair found');
-            }
+            const prekeyPair = this.getPrekeyPair();
             const initResults = await Promise.allSettled(
                 endpointsToConnect.map((smeConfig) =>
                     this.connect(smeConfig, prekeyPair, true, false),
@@ -62,6 +80,14 @@ export class EndpointManager extends Map<string, SmashEndpoint> {
             );
             await this.handleFailedConnections(initResults);
         }
+    }
+
+    private getPrekeyPair(): IECKeyPair {
+        const prekeyPair = this.identity.signedPreKeys[0];
+        if (!prekeyPair) {
+            throw new Error('No prekey pair found');
+        }
+        return prekeyPair;
     }
 
     /**
@@ -77,12 +103,30 @@ export class EndpointManager extends Map<string, SmashEndpoint> {
         updateIdentity: boolean = true,
         updateDID: boolean = true,
     ): Promise<SmashEndpoint> {
-        let endpointUrl: string;
         if (updateDID) {
-            // TODO: implement DID endpoint propagation
             this.logger.warn('DID endpoint propagation is not implemented yet');
         }
-        const signingKey = this.identity.signingKey;
+
+        const endpointUrl = await this.validateAndGetEndpointUrl(
+            smeConfig,
+            prekeyPair,
+        );
+
+        this.logger.debug(`Connecting to endpoint ${endpointUrl}...`);
+        const connectedEndpoint = await this.initializeEndpoint(
+            smeConfig,
+            prekeyPair,
+            endpointUrl,
+        );
+
+        this.finalizeConnection(connectedEndpoint, updateIdentity);
+        return connectedEndpoint;
+    }
+
+    private async validateAndGetEndpointUrl(
+        smeConfig: Partial<SmashEndpoint> & SMEConfigJSONWithoutDefaults,
+        prekeyPair: IECKeyPair,
+    ): Promise<string> {
         if ('preKey' in smeConfig) {
             if (!('signature' in smeConfig)) {
                 throw new Error(
@@ -93,34 +137,43 @@ export class EndpointManager extends Map<string, SmashEndpoint> {
                 smeConfig.preKey!,
                 smeConfig.signature!,
                 prekeyPair,
-                signingKey,
+                this.identity.signingKey,
             );
-            endpointUrl = smeConfig.url;
-        } else {
-            endpointUrl = smeConfig.url;
         }
-        this.logger.debug(`Connecting to endpoint ${endpointUrl}...`);
-        const connectedEndpoint = await this.smeSocketManager.initWithAuth(
+        return smeConfig.url;
+    }
+
+    private async initializeEndpoint(
+        smeConfig: Partial<SmashEndpoint> & SMEConfigJSONWithoutDefaults,
+        prekeyPair: IECKeyPair,
+        endpointUrl: string,
+    ): Promise<SmashEndpoint> {
+        return await this.smeSocketManager.initWithAuth(
             endpointUrl,
             smeConfig,
-            signingKey,
+            this.identity.signingKey,
             prekeyPair,
             this.sessionManager,
         );
+    }
+
+    private finalizeConnection(
+        connectedEndpoint: SmashEndpoint,
+        updateIdentity: boolean,
+    ) {
         super.set(connectedEndpoint.url, connectedEndpoint);
         if (updateIdentity) {
-            this.identity.pushEndpoint(connectedEndpoint);
+            this.identity.addEndpoint(connectedEndpoint);
         }
         this.logger.debug(
             `Connected to endpoint ${connectedEndpoint.url} with preKey ${connectedEndpoint.preKey} (${connectedEndpoint.signature})`,
         );
-        return connectedEndpoint;
     }
 
     private async remove(endpoint: SmashEndpoint): Promise<boolean> {
         this.logger.debug(`Disconnecting+removing endpoint ${endpoint.url}...`);
         await this.smeSocketManager.close(endpoint.url);
-        this.identity.removeEndpointIfExists(endpoint);
+        this.identity.removeEndpoint(endpoint);
         return super.delete(endpoint.url);
     }
 

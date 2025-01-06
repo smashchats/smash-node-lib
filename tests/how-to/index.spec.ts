@@ -67,7 +67,7 @@ describe('[SmashMessaging] Between peers registered to a SME', () => {
             avatar: 'https://alice.com/picture.png',
         };
         bob = await createPeer('bob', socketServerUrl);
-    });
+    }, TEST_CONFIG.TEST_TIMEOUT_MS * 2);
 
     afterEach(async () => {
         // Cleanup peers

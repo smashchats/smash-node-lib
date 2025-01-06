@@ -32,60 +32,57 @@ export class MessageMiddleware {
         messages: EncapsulatedIMProtoMessage[],
     ): Promise<void> {
         this.logger.debug(
-            `processing ${messages?.length} messages from Ik ${peerIk}`,
+            `Processing ${messages?.length} messages from IK ${peerIk}`,
         );
-        const peer: SmashPeer | undefined = this.peers.getByIk(peerIk);
-        if (peer) {
-            const uniqueMessages = this.deduplicateMessages(messages);
-            if (uniqueMessages.length === 0) {
-                this.logger.debug(
-                    'All messages were duplicates, skipping processing',
-                );
-                return;
-            }
-            // process messages, firehose data events
-            await this.firehose(peer.id, uniqueMessages);
-            // send received ACKs to the sending peer ONCE processed
-            await this.sendReceivedAcks(peer, uniqueMessages);
-            this.logger.info(
-                `processed ${uniqueMessages?.length} unique messages from ${peer.id}`,
-            );
-        } else {
-            this.dlq.push(peerIk, ...messages);
-            this.logger.debug(
-                `DLQd ${messages.length} messages from unknown peer (IK: ${peerIk})`,
-            );
-            return this.parseMissingPeerInformation(peerIk, messages);
+
+        const peer = this.peers.getByIk(peerIk);
+        if (!peer) {
+            return this.handleUnknownPeer(peerIk, messages);
         }
+
+        const uniqueMessages = this.filterUniqueMessages(messages);
+        if (uniqueMessages.length === 0) {
+            this.logger.debug(
+                'All messages were duplicates, skipping processing',
+            );
+            return;
+        }
+
+        await this.processMessages(peer, uniqueMessages);
     }
 
-    private async parseMissingPeerInformation(
+    private async handleUnknownPeer(
         peerIk: string,
         messages: EncapsulatedIMProtoMessage[],
     ): Promise<void> {
         // TODO: handle profile/DID updates (for now only handles IK updates)
         // TODO: split DID updates from profile updates
-        const did = await this.tryToResolveDIDFromMessages(peerIk, messages);
+        this.dlq.push(peerIk, ...messages);
+        this.logger.debug(
+            `Queued ${messages.length} messages from unknown peer (IK: ${peerIk})`,
+        );
+
+        const did = await this.resolvePeerDID(peerIk, messages);
         if (did) {
             await this.peers.getOrCreate(did);
-            return this.flushPeerIkDLQ(peerIk);
+            await this.processDLQMessages(peerIk);
         }
     }
 
-    private async tryToResolveDIDFromMessages(
+    private async resolvePeerDID(
         peerIk: string,
         messages: EncapsulatedIMProtoMessage[],
     ): Promise<DIDDocument | undefined> {
         for (const message of messages) {
             try {
                 if (message.type === IM_DID_DOCUMENT) {
-                    return await this.resolveDIDFromDIDMessage(
+                    return this.resolveDIDFromDIDMessage(
                         peerIk,
                         message as IMDIDDocumentMessage,
                     );
                 }
                 if (message.type === IM_PROFILE) {
-                    return await this.resolveDIDFromProfile(
+                    return this.resolveDIDFromProfile(
                         peerIk,
                         message as IMProfileMessage,
                     );
@@ -94,7 +91,6 @@ export class MessageMiddleware {
                 this.logger.debug(
                     `Failed to resolve DID from message: ${(err as Error).message}`,
                 );
-                continue;
             }
         }
         return undefined;
@@ -106,7 +102,7 @@ export class MessageMiddleware {
     ): Promise<DIDDocument> {
         const did = await DIDManager.resolve(message.data as DIDDocument);
         await this.validateDIDMatchesIk(did, peerIk);
-        this.logger.debug(`Received DID in DID message for ${did.id}`);
+        this.logger.debug(`Resolved DID from DID message: ${did.id}`);
         return did;
     }
 
@@ -116,7 +112,7 @@ export class MessageMiddleware {
     ): Promise<DIDDocument> {
         const did = await DIDManager.resolve(message.data.did as DID);
         await this.validateDIDMatchesIk(did, peerIk);
-        this.logger.debug(`Received DID in profile for ${did.id}`);
+        this.logger.debug(`Resolved DID from profile: ${did.id}`);
         return did;
     }
 
@@ -125,22 +121,22 @@ export class MessageMiddleware {
         peerIk: string,
     ): Promise<void> {
         if (peerIk !== did.ik) {
-            // TODO: handle IK upgrades
-            const err = 'Received IK doesnt match Signal Session data.';
-            this.logger.error(err);
-            throw new Error(err);
+            throw new Error('Received IK does not match Signal Session data');
         }
     }
 
-    private async flushPeerIkDLQ(peerIk: string): Promise<void> {
+    private async processDLQMessages(peerIk: string): Promise<void> {
         const messages = this.dlq.get(peerIk);
         if (!messages?.length) return;
-        this.logger.debug(`Flushing DLQ for ${peerIk}`);
+
+        this.logger.debug(`Processing queued messages for ${peerIk}`);
         await this.handle(peerIk, messages);
         this.dlq.delete(peerIk);
     }
 
-    private deduplicateMessages(messages: EncapsulatedIMProtoMessage[]) {
+    private filterUniqueMessages(
+        messages: EncapsulatedIMProtoMessage[],
+    ): EncapsulatedIMProtoMessage[] {
         const now = Date.now();
         return messages.filter((msg) => {
             if (this.processedMessages.has(msg.sha256)) {
@@ -151,16 +147,32 @@ export class MessageMiddleware {
         });
     }
 
+    private async processMessages(
+        peer: SmashPeer,
+        messages: EncapsulatedIMProtoMessage[],
+    ): Promise<void> {
+        await this.firehose(peer.id, messages);
+        await this.sendReceivedAcks(peer, messages);
+        this.logger.info(
+            `Processed ${messages.length} unique messages from ${peer.id}`,
+        );
+    }
+
     private async sendReceivedAcks(
         peer: SmashPeer,
         messages: EncapsulatedIMProtoMessage[],
-    ) {
-        const acks = messages.filter((m) => m.type !== IM_ACK_RECEIVED);
-        if (!acks.length) return;
-        this.logger.debug(`sendReceivedAcks: ${acks.length}`);
-        return peer.send({
+    ): Promise<void> {
+        const messagesToAck = messages.filter(
+            (m) => m.type !== IM_ACK_RECEIVED,
+        );
+        if (!messagesToAck.length) return;
+
+        this.logger.debug(
+            `Sending ${messagesToAck.length} received acknowledgements`,
+        );
+        await peer.send({
             type: IM_ACK_RECEIVED,
-            data: acks.map((m) => m.sha256),
+            data: messagesToAck.map((m) => m.sha256),
         } as IMReceivedACKMessage);
     }
 }

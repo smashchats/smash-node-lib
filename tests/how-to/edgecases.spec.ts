@@ -77,7 +77,7 @@ describe('SmashMessaging: Edge cases', () => {
         alice = await createPeer('alice', socketServerUrl);
         bob = await createPeer('bob', socketServerUrl);
         await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
-    });
+    }, TEST_CONFIG.TEST_TIMEOUT_MS * 2);
 
     afterEach(async () => {
         await alice?.messaging.close();

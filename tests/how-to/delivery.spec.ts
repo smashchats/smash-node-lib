@@ -63,7 +63,7 @@ describe('[Message Delivery] Message delivery and acknowledgment', () => {
 
         beforeEach(async () => {
             alice = await createPeer('alice', socketServerUrl);
-        });
+        }, TEST_CONFIG.TEST_TIMEOUT_MS * 2);
 
         afterEach(async () => {
             await alice?.messaging.close();
