@@ -38,21 +38,28 @@ export class SMESocketWriteOnly {
     }
 
     private createCloseTimeout(timeoutMs: number, resolve: () => void) {
-        return setTimeout(() => {
-            this.logger.warn(
-                `Timeout exceeded while closing socket (${timeoutMs}ms), forcing cleanup [${this.socket?.id}]`,
-            );
-            this.forceCleanup();
-            resolve();
-        }, timeoutMs);
+        return typeof globalThis.setTimeout !== 'undefined'
+            ? globalThis.setTimeout(() => {
+                  this.logger.warn(
+                      `Timeout exceeded while closing socket (${timeoutMs}ms), forcing cleanup [${this.socket?.id}]`,
+                  );
+                  this.forceCleanup();
+                  resolve();
+              }, timeoutMs)
+            : undefined;
     }
 
-    private handleConnectedClose(timeout: NodeJS.Timeout, resolve: () => void) {
+    private handleConnectedClose(
+        timeout: NodeJS.Timeout | undefined,
+        resolve: () => void,
+    ) {
         this.socket!.once('disconnect', () => {
             this.logger.info(
                 `> Disconnected from SME ${this.url} [${this.socket?.id}]`,
             );
-            clearTimeout(timeout);
+            if (typeof globalThis.clearTimeout !== 'undefined') {
+                globalThis.clearTimeout(timeout);
+            }
             this.forceCleanup();
             resolve();
         });
@@ -60,46 +67,14 @@ export class SMESocketWriteOnly {
     }
 
     private handleDisconnectedClose(
-        timeout: NodeJS.Timeout,
+        timeout: NodeJS.Timeout | undefined,
         resolve: () => void,
     ) {
         this.forceCleanup();
-        clearTimeout(timeout);
+        if (typeof globalThis.clearTimeout !== 'undefined') {
+            globalThis.clearTimeout(timeout);
+        }
         resolve();
-            if (!this.socket) {
-                return resolve();
-            }
-            const socket = this.socket;
-            const timeout =
-                typeof globalThis.setTimeout !== 'undefined'
-                    ? globalThis.setTimeout(() => {
-                          this.logger.warn(
-                              `Timeout exceeded while closing socket (${TIMEOUT_MS}ms), forcing cleanup [${this.socket?.id}]`,
-                          );
-                          this.forceCleanup();
-                          resolve();
-                      }, TIMEOUT_MS)
-                    : undefined;
-            if (socket.connected) {
-                socket.once('disconnect', () => {
-                    this.logger.info(
-                        `> Disconnected from SME ${this.url} [${this.socket?.id}]`,
-                    );
-                    if (typeof globalThis.clearTimeout !== 'undefined') {
-                        globalThis.clearTimeout(timeout);
-                    }
-                    this.forceCleanup();
-                    resolve();
-                });
-                socket.disconnect();
-            } else {
-                this.forceCleanup();
-                if (typeof globalThis.clearTimeout !== 'undefined') {
-                    globalThis.clearTimeout(timeout);
-                }
-                resolve();
-            }
-        });
     }
 
     private forceCleanup() {
