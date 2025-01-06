@@ -4,19 +4,17 @@
 
 - [x] manual refactor while writing the happy path tutorial test suite (mainly splitting modules and restructuring code)
 - [x] make previous test suites pass again
-- [-] use AI to refactor all individual code files (to be more readable, performant, maintainable, secure, efficient, etc)
-- [ ] remove // TODO comments from codebase -> transform into tracked issues
-- [ ] use AI to refactor module file paths structure (reorg files) (+ make sure all tests pass)
-    - [ ] extract more submodules: more modular, decoupled, and loosely coupled (make sure all tests pass)
+- [-] refactor all individual code files (to be more readable, performant, maintainable, secure, efficient, etc)
+- [x] remove // TODO comments from codebase -> transform into tracked issues
+- [x] refactor module file paths structure (reorg files) (+ make sure all tests pass)
+- [x] extract more submodules: more modular, decoupled, and loosely coupled (make sure all tests pass)
+
+- [ ] set everything private then resolve issues (ie check strict minimum as public and internal APIs)
 
 ### TESTS REFACTORING (keeping or increasing coverage):
 
-- [ ] set everything private then resolve issues opening strict minimum as public APIs
-- (?) use AI to generate unit .test files with mocks/spies for each module corresponding to the library API reference (**testing only publicly exported**)
-- use AI to refactor functional (.spec) tests files to be more readable, maintainable, comprehensive -> corresponding to the tutorial and how to
-  --> should have 100% functional coverage
-
-test suites combined should have 100% everywhere.
+- generate unit .test files with mocks/spies for each module corresponding to the library API reference (**testing only publicly exported**) --> should have 100% coverage for publicly exposed APIs (public and internal)
+- refactor functional (.spec) tests files to be more readable, maintainable, comprehensive -> corresponding to The Tutorial and the How-Tos --> should have 100% functional coverage (100% of the lines, combined)
 
 ### GENERATE DOCS FROM TESTS:
 

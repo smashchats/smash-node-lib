@@ -15,8 +15,6 @@ describe('DIDManager: Identity Management', () => {
     describe('generate', () => {
         it('generates an identity with default parameters', async () => {
             const identity = await didManager.generate();
-
-            expect(identity).toBeInstanceOf(IMPeerIdentity);
             expect(identity.did).toMatch(/^did:doc:/);
 
             const didDoc = await didManager.resolve(identity.did);

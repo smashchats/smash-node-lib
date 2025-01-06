@@ -1,20 +1,19 @@
-export { Curve } from '2key-ratchet';
+export { SmashMessaging } from '@src/api/SmashMessaging.js';
 
-export * from '@src/types/index.js';
+export { SmashNAB } from '@src/api/role/SmashNAB.js';
+export { SmashUser } from '@src/api/role/SmashUser.js';
 
-export * from '@src/callbacks/index.js';
+export { DIDDocManager } from '@src/api/resolvers/DIDDocManager.js';
 
-export * from '@src/did/index.js';
+export { encapsulateMessage } from '@src/api/tools/encapsulateMessage.js';
+export { sortSmashMessages } from '@src/api/tools/sortSmashMessages.js';
 
-export * from '@src/signal/index.js';
-export * from '@src/utils/index.js';
+export * from '@src/shared/utils/Logger.js';
 
-export * from '@src/SmashMessaging.js';
-export * from '@src/SmashNAB.js';
-export * from '@src/SmashPeer.js';
-export * from '@src/SmashUser.js';
+export * from '@src/shared/constants/index.js';
+export * from '@src/shared/errors/index.js';
+export * from '@src/shared/events/index.js';
+export * from '@src/shared/lexicon/index.js';
+export * from '@src/shared/types/index.js';
 
-export * from '@src/const.js';
-
-export * from '@src/crypto/utils/CryptoManager.js';
-export * from '@src/IMPeerIdentity.js';
+export type { IMPeerIdentity } from '@src/core/identity/IMPeerIdentity.js';

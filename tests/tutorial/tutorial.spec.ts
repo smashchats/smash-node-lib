@@ -1,9 +1,12 @@
+import { ECPublicKey } from '2key-ratchet';
 import { Crypto } from '@peculiar/webcrypto';
+import { BufferUtils } from '@src/core/crypto/utils/BufferUtils.js';
+import { KeyUtils } from '@src/core/crypto/utils/KeyUtils.js';
+import { SigningUtils } from '@src/core/crypto/utils/SigningUtils.js';
 import { SME_PUBLIC_KEY, socketServerUrl } from '@tests/jest.global.js';
 import { TEST_CONFIG, aliasWaitFor, delay } from '@tests/utils/time.utils.js';
 import { defaultDidManager } from '@tests/utils/user.utils.js';
 import {
-    CryptoUtils,
     DID,
     DIDDocManager,
     DIDDocument,
@@ -85,7 +88,7 @@ describe('Smash Tutorial', () => {
 
     beforeEach(async () => {
         didDocumentManager = new DIDDocManager();
-        SmashMessaging.use('doc', didDocumentManager);
+        SmashMessaging.use(didDocumentManager);
         testUtils.logger.info('DIDDocManager initialized');
     });
 
@@ -159,11 +162,17 @@ describe('Smash Tutorial', () => {
             expect(jackDIDDocument.ek).toBeDefined();
             testUtils.logger.info(`EK: ${jackDIDDocument.ek}`);
 
+            const ik = await ECPublicKey.create(
+                await KeyUtils.importSigningPublicKey(jackDIDDocument.ik),
+            );
+            const ek = await ECPublicKey.create(
+                await KeyUtils.importExchangePublicKey(jackDIDDocument.ek),
+            );
             await expect(
-                CryptoUtils.singleton.verifyExportedKey(
-                    jackDIDDocument.ik,
-                    jackDIDDocument.ek,
-                    jackDIDDocument.signature,
+                SigningUtils.verifyOwnedKey(
+                    ik,
+                    ek,
+                    BufferUtils.stringToBuffer(jackDIDDocument.signature),
                 ),
             ).resolves.toBe(true);
         });
@@ -192,7 +201,7 @@ describe('Smash Tutorial', () => {
             test('Restoring a Smash instance from saved identity', async () => {
                 testUtils.logger.info('Deserializing identity...');
                 const restoredIdentity =
-                    await IMPeerIdentity.deserialize(jackExportedIdentity);
+                    await SmashMessaging.importIdentity(jackExportedIdentity);
                 testUtils.logger.info(`> Deserialized ${restoredIdentity.did}`);
 
                 const jack = new SmashUser(restoredIdentity, 'jack', 'INFO');

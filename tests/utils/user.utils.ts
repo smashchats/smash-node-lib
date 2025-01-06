@@ -2,7 +2,6 @@ import { SME_PUBLIC_KEY } from '@tests/jest.global.js';
 import {
     DIDDocManager,
     DIDDocument,
-    DIDManager,
     IMPeerIdentity,
     SmashMessaging,
 } from 'smash-node-lib';
@@ -17,13 +16,13 @@ export interface TestPeer {
 }
 
 export const defaultDidManager = new DIDDocManager();
-SmashMessaging.use('doc', defaultDidManager);
+SmashMessaging.use(defaultDidManager);
 
 export const createPeer = async (
     name: string,
     serverUrl?: string | string[],
     loadIdentity?: IMPeerIdentity,
-    didManager: DIDManager = defaultDidManager,
+    didManager = defaultDidManager,
 ): Promise<TestPeer> => {
     if (!didManager) {
         throw new Error('no DID manager found, cannot generate keys');

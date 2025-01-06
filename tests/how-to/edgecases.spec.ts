@@ -13,7 +13,7 @@ import {
     IMTextMessage,
     IM_CHAT_TEXT,
     Logger,
-    SignalSession,
+    SESSION_TTL_MS,
     SmashMessaging,
     sha256,
     sortSmashMessages,
@@ -128,10 +128,7 @@ describe('SmashMessaging: Edge cases', () => {
                 dateSpy = jest
                     .spyOn(Date, 'now')
                     .mockImplementation(
-                        () =>
-                            new Date().getTime() +
-                            SignalSession.SESSION_TTL_MS +
-                            1000,
+                        () => new Date().getTime() + SESSION_TTL_MS + 1000,
                     );
 
                 // 3. Simulate Bob restart with lost session context
@@ -312,10 +309,7 @@ describe('SmashMessaging: Edge cases', () => {
                     dateSpy = jest
                         .spyOn(Date, 'now')
                         .mockImplementation(
-                            () =>
-                                new Date().getTime() +
-                                SignalSession.SESSION_TTL_MS -
-                                1000,
+                            () => new Date().getTime() + SESSION_TTL_MS - 1000,
                         );
 
                     // 3. Force both peers to trigger resets simultaneously

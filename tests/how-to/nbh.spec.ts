@@ -119,7 +119,10 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
         const customConfig = {
             url: 'http://custom.url',
             smePublicKey: 'customKey==',
-            keyAlgorithm: { name: 'ECDH', namedCurve: 'P-384' } as KeyAlgorithm,
+            keyAlgorithm: {
+                name: 'ECDH' as const,
+                namedCurve: 'P-256' as const,
+            },
             challengeEncoding: 'base64' as const, // Same as default
         };
 
@@ -141,15 +144,18 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
             {
                 url: 'http://sme1.url',
                 smePublicKey: 'key1==',
-                encryptionAlgorithm: { name: 'AES-CBC', length: 128 },
+                encryptionAlgorithm: {
+                    name: 'AES-GCM' as const,
+                    length: 256 as const,
+                },
             },
             {
                 url: 'http://sme2.url',
                 smePublicKey: 'key2==',
                 keyAlgorithm: {
-                    name: 'ECDH',
-                    namedCurve: 'P-384',
-                } as KeyAlgorithm,
+                    name: 'ECDH' as const,
+                    namedCurve: 'P-256' as const,
+                },
             },
         ];
 
