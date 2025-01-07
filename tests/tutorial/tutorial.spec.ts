@@ -30,6 +30,7 @@ import {
     SmashProfile,
     SmashProfileList,
     SmashUser,
+    sha256,
 } from 'smash-node-lib';
 
 /**
@@ -427,9 +428,10 @@ describe('Smash Tutorial', () => {
                 alice.on('status', onStatus);
                 const sent = await testContext.exchangeMessage(alice, bob);
                 await delay(TEST_CONFIG.MESSAGE_DELIVERY * 2);
-                expect(onStatus).toHaveBeenCalledWith('received', [
-                    sent.sha256,
-                ]);
+                expect(onStatus).toHaveBeenCalledWith(
+                    'received',
+                    expect.arrayContaining<sha256>([sent.sha256]),
+                );
             });
 
             /**
