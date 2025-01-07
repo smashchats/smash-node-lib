@@ -148,7 +148,7 @@ export class SmashMessaging extends EventEmitter {
             );
             logger.debug(
                 'Detailed cause:',
-                (reason as { cause?: string }).cause ||
+                (reason as { cause?: string }).cause ??
                     'No additional error cause found',
             );
             return;
