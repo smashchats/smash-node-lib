@@ -11,7 +11,7 @@ import {
     IM_DID_DOCUMENT,
     IM_PROFILE,
 } from '@src/shared/lexicon/improto.lexicon.js';
-import type { DID, DIDDocument } from '@src/shared/types/did.types.js';
+import type { DIDDocument } from '@src/shared/types/did.types.js';
 import type { Firehose } from '@src/shared/types/firehose.types.js';
 import type { EncapsulatedIMProtoMessage } from '@src/shared/types/message.types.js';
 import { DLQ } from '@src/shared/utils/DLQ.js';
