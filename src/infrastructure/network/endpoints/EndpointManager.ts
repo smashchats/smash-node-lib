@@ -16,9 +16,9 @@ import type { Logger } from '@src/shared/utils/Logger.js';
 export class EndpointManager extends Map<string, SmashEndpoint> {
     constructor(
         protected readonly logger: Logger,
-        private identity: IMPeerIdentity,
-        private smeSocketManager: SMESocketManager,
-        private sessionManager: SessionManager,
+        private readonly identity: IMPeerIdentity,
+        private readonly smeSocketManager: SMESocketManager,
+        private readonly sessionManager: SessionManager,
     ) {
         super();
     }

@@ -1,5 +1,5 @@
 export class Timeout {
-    private timeout: NodeJS.Timeout | undefined;
+    private readonly timeout: NodeJS.Timeout | undefined;
 
     constructor(callback: () => void, delay: number) {
         this.timeout =

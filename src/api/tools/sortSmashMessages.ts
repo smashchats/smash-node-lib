@@ -29,5 +29,3 @@ export const sortSmashMessages = (
 
     return orderedMessages;
 };
-
-// TODO, how to best export it? Rename?

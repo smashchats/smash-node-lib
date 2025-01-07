@@ -10,7 +10,7 @@ import type {
 } from '@src/shared/types/identity.types.js';
 
 export class GenerateKeyPatcher extends CryptoManager {
-    private static jwkMap = new WeakMap<CryptoKey, JsonWebKey>();
+    private static readonly jwkMap = new WeakMap<CryptoKey, JsonWebKey>();
     private static patchedGenerateKey?: IRestrictedCryptoEngine;
 
     public static patch() {
