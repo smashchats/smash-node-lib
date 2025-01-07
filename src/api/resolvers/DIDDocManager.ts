@@ -29,7 +29,7 @@ export class DIDDocManager implements IDIDResolver {
                 new Error(`DID resolver not implemented for (${did})`),
             );
         }
-        this.set(did as DIDDocument);
+        this.set(did);
         return Promise.resolve(did);
     }
 

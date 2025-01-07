@@ -184,7 +184,7 @@ export class EndpointManager extends Map<string, SmashEndpoint> {
     ): Promise<void> {
         const failedConnections = results.filter(
             (r) => r.status === 'rejected',
-        ) as PromiseRejectedResult[];
+        );
         if (failedConnections.length) {
             const errors = failedConnections.map((r) => r.reason).join(', ');
             this.logger.warn(`Failed to initialize some endpoints: ${errors}`);

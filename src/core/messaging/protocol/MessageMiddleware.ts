@@ -100,7 +100,7 @@ export class MessageMiddleware {
         peerIk: string,
         message: IMDIDDocumentMessage,
     ): Promise<DIDDocument> {
-        const did = await DIDManager.resolve(message.data as DIDDocument);
+        const did = await DIDManager.resolve(message.data);
         await this.validateDIDMatchesIk(did, peerIk);
         this.logger.debug(`Resolved DID from DID message: ${did.id}`);
         return did;
@@ -110,7 +110,7 @@ export class MessageMiddleware {
         peerIk: string,
         message: IMProfileMessage,
     ): Promise<DIDDocument> {
-        const did = await DIDManager.resolve(message.data.did as DID);
+        const did = await DIDManager.resolve(message.data.did);
         await this.validateDIDMatchesIk(did, peerIk);
         this.logger.debug(`Resolved DID from profile: ${did.id}`);
         return did;
