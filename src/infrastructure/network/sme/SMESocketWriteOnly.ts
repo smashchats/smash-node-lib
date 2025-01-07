@@ -114,13 +114,13 @@ export class SMESocketWriteOnly {
 
     private ensureSocketConnection(): boolean {
         if (this.socket?.connected) {
-            this.logger.info(
-                `Creating write-only socket for ${this.url} [prev: ${this.socket?.id}]`,
-            );
-            this.initSocket();
-            return !!this.socket;
+            return true;
         }
-        return true;
+        this.logger.info(
+            `Creating write-only socket for ${this.url} [prev: ${this.socket?.id}]`,
+        );
+        this.initSocket();
+        return !!this.socket;
     }
 
     private sendWithTimeout(
