@@ -70,24 +70,22 @@ describe('SmashMessaging: Edge cases', () => {
     beforeAll(async () => {
         const crypto = new Crypto();
         SmashMessaging.setCrypto(crypto);
-        await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
     });
 
     beforeEach(async () => {
-        alice = await createPeer('alice', socketServerUrl);
-        bob = await createPeer('bob', socketServerUrl);
-        await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
+        [alice, bob] = await Promise.all([
+            createPeer('alice', socketServerUrl),
+            createPeer('bob', socketServerUrl),
+        ]);
     }, TEST_CONFIG.TEST_TIMEOUT_MS * 2);
 
     afterEach(async () => {
-        await alice?.messaging.close();
-        await bob?.messaging.close();
-        await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
+        await Promise.all([alice?.messaging.close(), bob?.messaging.close()]);
         waitForEventCancelFns.forEach((cancel) => cancel());
         waitForEventCancelFns.length = 0;
         jest.resetAllMocks();
         dateSpy?.mockRestore();
-    });
+    }, TEST_CONFIG.TEST_TIMEOUT_MS * 2);
 
     describe('Session recovery', () => {
         it(
@@ -165,9 +163,6 @@ describe('SmashMessaging: Edge cases', () => {
                     'received',
                     expect.arrayContaining([sent2.sha256]),
                 );
-
-                logger.info('>> Cleanup');
-                await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
             },
             TEST_CONFIG.MESSAGE_DELIVERY_TIMEOUT,
         );
@@ -253,9 +248,6 @@ describe('SmashMessaging: Edge cases', () => {
                     bob.did.id,
                     expect.objectContaining({ sha256: sent3.sha256 }),
                 );
-
-                logger.info('>> Cleanup');
-                await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
             },
             TEST_CONFIG.MESSAGE_DELIVERY_TIMEOUT,
         );
@@ -342,7 +334,6 @@ describe('SmashMessaging: Edge cases', () => {
                             },
                         ]),
                     ]);
-                    await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
 
                     logger.info('>> Wait for both peers to reset');
                     await delay(4 * TEST_CONFIG.MESSAGE_DELIVERY);
@@ -392,9 +383,6 @@ describe('SmashMessaging: Edge cases', () => {
                     expect(bob.onData.mock.calls.length).toBeLessThanOrEqual(
                         secondMessageCount * 2,
                     );
-
-                    logger.info('>> Cleanup');
-                    await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
                 },
                 TEST_CONFIG.MESSAGE_DELIVERY_TIMEOUT * 3,
             );
@@ -402,83 +390,82 @@ describe('SmashMessaging: Edge cases', () => {
     });
 
     describe('Alice sends multiple messages and they get delayed', () => {
-        it('Bob receives them unordered and reorders them', async () => {
-            if (!bob || !alice) throw new Error('Bob or Alice not found');
-            logger.info(
-                '>>> Bob receives unordered messages and reorders them',
-            );
+        it(
+            'Bob receives them unordered and reorders them',
+            async () => {
+                if (!bob || !alice) throw new Error('Bob or Alice not found');
+                logger.info(
+                    '>>> Bob receives unordered messages and reorders them',
+                );
 
-            const activateDelay = async () => {
-                logger.info('>> Activating delay on the mocked SME');
-                if (!bob) throw new Error('Bob not found');
-                const url = `${apiServerUrl}/delay-next-messages?peerId=${encodeURIComponent(bob.did.endpoints[0].preKey)}`;
-                try {
-                    const response = await fetch(url);
-                    if (!response.ok) {
-                        logger.error(
-                            `Error response: ${await response.text()}`,
-                        );
-                        throw new Error(
-                            `HTTP error! status: ${response.status}`,
-                        );
+                const activateDelay = async () => {
+                    logger.info('>> Activating delay on the mocked SME');
+                    if (!bob) throw new Error('Bob not found');
+                    const url = `${apiServerUrl}/delay-next-messages?peerId=${encodeURIComponent(bob.did.endpoints[0].preKey)}`;
+                    try {
+                        const response = await fetch(url);
+                        if (!response.ok) {
+                            logger.error(
+                                `Error response: ${await response.text()}`,
+                            );
+                            throw new Error(
+                                `HTTP error! status: ${response.status}`,
+                            );
+                        }
+                        return;
+                    } catch (error) {
+                        logger.error('Fetch error:', error);
+                        throw error;
                     }
-                    return;
-                } catch (error) {
-                    logger.error('Fetch error:', error);
-                    throw error;
+                };
+                await activateDelay();
+
+                const originalOrder = ['1', '2', '3', '4', '5'];
+                const messageCount = originalOrder.length;
+                const waitForMessages = waitFor(bob.messaging, 'data', {
+                    count: messageCount + TEST_CONFIG.PROTOCOL_OVERHEAD_SIZE,
+                    timeout: TEST_CONFIG.MESSAGE_DELIVERY_TIMEOUT,
+                });
+
+                logger.info(`>> Alice sends ${messageCount} messages to Bob`);
+                let prevSha256: string = '0';
+                for (let i = 0; i < messageCount; i++) {
+                    prevSha256 = (
+                        await alice.messaging.send(
+                            bob.did,
+                            new IMText(originalOrder[i], prevSha256 as sha256),
+                        )
+                    ).sha256;
+                    await delay(100);
                 }
-            };
-            await activateDelay();
 
-            await delay(500);
+                logger.info('>> Wait for messages to be received');
+                await waitForMessages;
+                await delay(4 * TEST_CONFIG.MESSAGE_DELIVERY);
+                logger.info('>> Received messages');
 
-            const originalOrder = ['1', '2', '3', '4', '5'];
-            const messageCount = originalOrder.length;
-            const waitForMessages = waitFor(bob.messaging, 'data', {
-                count: messageCount + TEST_CONFIG.PROTOCOL_OVERHEAD_SIZE,
-                timeout: TEST_CONFIG.MESSAGE_DELIVERY_TIMEOUT,
-            });
+                const receivedMessages = bob.onData.mock.calls.map(
+                    (args: EncapsulatedIMProtoMessage[]) => args[1],
+                );
+                const textMessages = receivedMessages.filter(
+                    (message: IMProtoMessage) => message.type === IM_CHAT_TEXT,
+                );
 
-            logger.info(`>> Alice sends ${messageCount} messages to Bob`);
-            let prevSha256: string = '0';
-            for (let i = 0; i < messageCount; i++) {
-                prevSha256 = (
-                    await alice.messaging.send(
-                        bob.did,
-                        new IMText(originalOrder[i], prevSha256 as sha256),
-                    )
-                ).sha256;
-                await delay(100);
-            }
-
-            logger.info('>> Wait for messages to be received');
-            await waitForMessages;
-            await delay(3 * TEST_CONFIG.MESSAGE_DELIVERY);
-            logger.info('>> Received messages');
-
-            const receivedMessages = bob.onData.mock.calls.map(
-                (args: EncapsulatedIMProtoMessage[]) => args[1],
-            );
-            const textMessages = receivedMessages.filter(
-                (message: IMProtoMessage) => message.type === IM_CHAT_TEXT,
-            );
-
-            logger.info('>> Verify the order of the messages');
-            expect(textMessages.length).toBe(messageCount);
-            expect(
-                (
-                    textMessages.filter(
-                        (message: IMProtoMessage) =>
-                            message.type === IM_CHAT_TEXT,
-                    ) as IMTextMessage[]
-                ).map((text: IMTextMessage) => text.data),
-            ).not.toEqual(originalOrder);
-            expect(
-                sortSmashMessages(textMessages).map((text) => text.data),
-            ).toEqual(originalOrder);
-
-            logger.info('>> Cleanup');
-            await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
-        }, 15000);
+                logger.info('>> Verify the order of the messages');
+                expect(textMessages.length).toBe(messageCount);
+                expect(
+                    (
+                        textMessages.filter(
+                            (message: IMProtoMessage) =>
+                                message.type === IM_CHAT_TEXT,
+                        ) as IMTextMessage[]
+                    ).map((text: IMTextMessage) => text.data),
+                ).not.toEqual(originalOrder);
+                expect(
+                    sortSmashMessages(textMessages).map((text) => text.data),
+                ).toEqual(originalOrder);
+            },
+            TEST_CONFIG.MESSAGE_DELIVERY_TIMEOUT,
+        );
     });
 });

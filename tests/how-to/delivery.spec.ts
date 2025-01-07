@@ -33,7 +33,6 @@ describe('[Message Delivery] Message delivery and acknowledgment', () => {
     beforeAll(async () => {
         const crypto = new Crypto();
         SmashMessaging.setCrypto(crypto);
-        await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
     });
 
     afterEach(async () => {
@@ -42,7 +41,6 @@ describe('[Message Delivery] Message delivery and acknowledgment', () => {
         waitForEventCancelFns.length = 0;
         logger.debug('>> resetting mocks');
         jest.resetAllMocks();
-        await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
     });
 
     afterAll(async () => {
@@ -67,7 +65,6 @@ describe('[Message Delivery] Message delivery and acknowledgment', () => {
 
         afterEach(async () => {
             await alice?.messaging.close();
-            await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
         }, TEST_CONFIG.TEST_TIMEOUT_MS * 2);
 
         describe('sends a message to Bob on a valid SME', () => {
@@ -79,7 +76,6 @@ describe('[Message Delivery] Message delivery and acknowledgment', () => {
 
             afterEach(async () => {
                 await bob?.messaging.close();
-                await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
             }, TEST_CONFIG.TEST_TIMEOUT_MS * 2);
 
             it('should receive a DELIVERED ack on SME delivery', async () => {
@@ -105,7 +101,7 @@ describe('[Message Delivery] Message delivery and acknowledgment', () => {
                 });
             });
 
-            it('message ACKs should not loop', async () => {
+            it('message ACKs should NOT loop', async () => {
                 const waitForBobToReceive = waitFor(bob.messaging, 'data');
                 await sendMsgTo(bob);
                 await waitForBobToReceive;
@@ -122,7 +118,6 @@ describe('[Message Delivery] Message delivery and acknowledgment', () => {
             let bob: TestPeer;
             afterEach(async () => {
                 await bob?.messaging.close();
-                await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
             }, TEST_CONFIG.TEST_TIMEOUT_MS * 2);
 
             it(
@@ -153,7 +148,6 @@ describe('[Message Delivery] Message delivery and acknowledgment', () => {
             let bob: TestPeer;
             afterEach(async () => {
                 await bob?.messaging.close();
-                await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
             }, TEST_CONFIG.TEST_TIMEOUT_MS * 2);
             it(
                 'should stop trying to send the message upon RECEIVED ack',
@@ -163,7 +157,6 @@ describe('[Message Delivery] Message delivery and acknowledgment', () => {
 
                     logger.info('>> Creating Bob with quiet endpoint');
                     bob = await createPeer('bob', quietSocketServerUrl);
-                    await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
 
                     logger.info('>> Alice sends a message to Bob');
                     alice?.messaging
@@ -190,7 +183,7 @@ describe('[Message Delivery] Message delivery and acknowledgment', () => {
 
                     logger.info('>> Waiting for potential retries to complete');
                     // we need to let long enough for exponential retries to be obviously never ending
-                    await delay(TEST_CONFIG.MESSAGE_DELIVERY * 40);
+                    await delay(TEST_CONFIG.MESSAGE_DELIVERY * 30);
 
                     logger.info('>> Verify that bob received message');
                     expect(bob?.onData).toHaveBeenCalledWith(
@@ -224,7 +217,6 @@ describe('[Message Delivery] Message delivery and acknowledgment', () => {
             beforeEach(async () => {
                 logger.debug('>> Creating Bob with invalid SME');
                 bob = await createPeer('bob', emptySocketServerUrl);
-                await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
 
                 logger.debug('>> Alice sends a message to Bob ');
                 const oldBobDid = bob.did;
@@ -242,12 +234,10 @@ describe('[Message Delivery] Message delivery and acknowledgment', () => {
                 } as DIDDocument;
                 defaultDidManager.set(bob.did);
                 sent = await sendMsgTo(bob);
-                await delay(TEST_CONFIG.MESSAGE_DELIVERY);
             }, TEST_CONFIG.TEST_TIMEOUT_MS * 6);
 
             afterEach(async () => {
                 await bob?.messaging.close();
-                await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
             }, TEST_CONFIG.TEST_TIMEOUT_MS * 4);
 
             it('should NOT receive a DELIVERED ack (no SME mailbox)', async () => {
@@ -297,6 +287,7 @@ describe('[Message Delivery] Message delivery and acknowledgment', () => {
 
                         await aliceReceivedStatusUpate;
                         await delay(TEST_CONFIG.MESSAGE_DELIVERY);
+
                         expect(alice?.onStatus).toHaveBeenCalledWith(
                             'received',
                             expect.arrayContaining([sent.sha256]),
@@ -311,35 +302,3 @@ describe('[Message Delivery] Message delivery and acknowledgment', () => {
 
 // TODO: similar test than below but asserting upon DID reception incl. new endpoints
 // TODO: later is this would require a fetch::DID method that isnt yet available
-// describe('Bob comes back online with different endpoints', () => {
-//     fit('should retry the message after some time', async () => {
-//         const baseUrl = socketServerUrl.endsWith('/')
-//             ? socketServerUrl
-//             : socketServerUrl + '/';
-//         const uniqueModifier = Math.random()
-//             .toString(36)
-//             .substring(2, 15);
-//         const uniqueUrl = `${baseUrl}?unique=${uniqueModifier}`;
-//         logger.debug(
-//             '>> Reconnecting Bob with a different, unique endpoint URL',
-//         );
-//         bob.messaging.setEndpoints([
-//             {
-//                 url: uniqueUrl,
-//                 smePublicKey: 'smePublicKey==',
-//             } as SMEConfigJSONWithoutDefaults,
-//         ]);
-//         bob.did = await bob.messaging.getDID();
-//         await delay(5000);
-//         expect(bob.onData).toHaveBeenCalledWith(
-//             alice?.did.id,
-//             expect.objectContaining({
-//                 data: uniqueMessage,
-//             }),
-//         );
-//         expect(alice?.onStatus).toHaveBeenCalledWith(
-//             'received',
-//             expect.arrayContaining([sent.sha256]),
-//         );
-//     }, 10000);
-// });

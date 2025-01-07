@@ -11,6 +11,7 @@ import {
     NBH_ADDED,
     NBH_PROFILE_LIST,
     Relationship,
+    SMASH_NBH_DISCOVER,
     SMASH_NBH_JOIN,
     SMASH_NBH_RELATIONSHIP,
     SMASH_PROFILE_LIST,
@@ -48,8 +49,10 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
         SmashMessaging.setCrypto(crypto);
     });
 
+    const logger = new Logger('nbh.spec');
     const waitForEventCancelFns: (() => void)[] = [];
-    const waitFor = aliasWaitFor(waitForEventCancelFns, new Logger('nbh.spec'));
+    const waitFor = aliasWaitFor(waitForEventCancelFns, logger);
+
     let nab: SmashNAB;
     let nabDid: DIDDocument;
     let nabSMEConfig: SMEConfigJSONWithoutDefaults[];
@@ -66,17 +69,15 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
         const preKeyPair =
             await defaultDidManager.generateNewPreKeyPair(identity);
         await nab.endpoints.connect(nabSMEConfig[0], preKeyPair);
-        await delay(100);
         nabDid = await nab.getDIDDocument();
     });
 
     afterEach(async () => {
         await nab.close();
-        await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
         waitForEventCancelFns.forEach((cancel) => cancel());
         waitForEventCancelFns.length = 0;
         jest.resetAllMocks();
-    });
+    }, TEST_CONFIG.TEST_TIMEOUT_MS * 2);
 
     afterAll(async () => {
         await nab?.close();
@@ -190,7 +191,6 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
 
         afterEach(async () => {
             await user.close();
-            await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
         });
 
         // TODO Poste Restante scenario with NAB (either here or in the Peer tests)
@@ -201,7 +201,7 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
             // TODO lib event (updated profile/SME config)
             expect((await user.getDIDDocument()).endpoints.length).toBe(0);
             await user.join(await nab.getJoinInfo(nabSMEConfig));
-            await delay(1500);
+            await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
             expect((await user.getDIDDocument()).endpoints.length).toBe(1);
         });
 
@@ -216,13 +216,19 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
                 },
             },
         ];
+
         const sendDiscoveredProfiles = async () => {
+            const userReceivedDisoveredProfiles = waitFor(
+                user,
+                SMASH_PROFILE_LIST,
+            );
             await nab.send(await user.getDIDDocument(), {
                 type: SMASH_PROFILE_LIST,
                 data: discovered,
                 after: '',
             } as IMProtoMessage);
-            return await delay(TEST_CONFIG.MESSAGE_DELIVERY);
+
+            return userReceivedDisoveredProfiles;
         };
 
         describe('joining the NBH', () => {
@@ -238,25 +244,31 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
                     },
                     preKeyPair,
                 );
-                nabReceivedJoin = waitFor(nab, SMASH_NBH_JOIN);
+                defaultDidManager.set(await user.getDIDDocument());
+                nabReceivedJoin = waitFor(nab, SMASH_NBH_JOIN, {
+                    timeout: TEST_CONFIG.TEST_TIMEOUT_MS * 2,
+                });
                 await user.join(await nab.getJoinInfo());
-                await delay(TEST_CONFIG.MESSAGE_DELIVERY * 2);
-            });
+            }, TEST_CONFIG.TEST_TIMEOUT_MS * 2);
 
             // TODO JOIN with data (eg, social graph ((oneway hash did only)), TOTP, etc)
-            it('sends a JOIN message to the NAB', async () => {
-                const userDid = await user.getDIDDocument();
-                await nabReceivedJoin;
-                expect(nab.onJoin).toHaveBeenCalledWith(
-                    expect.objectContaining({
-                        id: userDid.id,
-                        ik: userDid.ik,
-                        ek: userDid.ek,
-                    }),
-                    expect.anything(),
-                    expect.anything(),
-                );
-            });
+            it(
+                'sends a JOIN message to the NAB',
+                async () => {
+                    await nabReceivedJoin;
+                    const userDid = await user.getDIDDocument();
+                    expect(nab.onJoin).toHaveBeenCalledWith(
+                        expect.objectContaining({
+                            id: userDid.id,
+                            ik: userDid.ik,
+                            ek: userDid.ek,
+                        }),
+                        expect.anything(),
+                        expect.anything(),
+                    );
+                },
+                TEST_CONFIG.TEST_TIMEOUT_MS * 3,
+            );
 
             it('triggers a nbh_added user event', async () => {
                 // TODO useless if there's no kind of confirmation
@@ -269,7 +281,7 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
                 beforeEach(async () => {
                     await nabReceivedJoin;
                     await sendDiscoveredProfiles();
-                });
+                }, TEST_CONFIG.TEST_TIMEOUT_MS * 3);
 
                 it('triggers a nbh_profiles event with the discovered profiles', async () => {
                     // TODO duplicate test with 'refresh'
@@ -283,14 +295,20 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
             });
 
             describe('on User discover profiles', () => {
-                beforeEach(async () => {
-                    await user.discover();
-                    await delay(500);
-                });
-
-                it('triggers a discover event on the NAB side', async () => {
-                    expect(nab.onDiscover).toHaveBeenCalledTimes(1);
-                });
+                it(
+                    'triggers a discover event on the NAB side',
+                    async () => {
+                        await nabReceivedJoin;
+                        const nabReceivedDiscoverRequest = waitFor(
+                            nab,
+                            SMASH_NBH_DISCOVER,
+                        );
+                        await user.discover();
+                        await nabReceivedDiscoverRequest;
+                        expect(nab.onDiscover).toHaveBeenCalledTimes(1);
+                    },
+                    TEST_CONFIG.TEST_TIMEOUT_MS * 4,
+                );
             });
 
             describe('User Actions', () => {
@@ -299,28 +317,28 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
                 let counter: number;
 
                 beforeEach(async () => {
+                    await nabReceivedJoin;
                     const identity = await defaultDidManager.generate();
                     targetUser = new SmashUser(identity, 'targetUser');
                     targetDid = targetUser.did;
                     counter = 0;
                     (nab.onRelationship as jest.Mock).mockClear();
-                });
+                }, TEST_CONFIG.TEST_TIMEOUT_MS * 3);
 
                 afterEach(async () => {
                     await targetUser?.close();
-                    await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
                 });
 
                 const testAction = async (
                     action: Relationship,
                     expectFailure: boolean = false,
                 ) => {
+                    logger.info(
+                        `>>> performing ${action} action (expectFailure: ${expectFailure})`,
+                    );
                     const nabReceivedAction = waitFor(
                         nab,
                         SMASH_NBH_RELATIONSHIP,
-                        {
-                            timeout: TEST_CONFIG.TEST_TIMEOUT_MS,
-                        },
                     );
                     await user[action as 'smash' | 'pass' | 'clear'](targetDid);
                     if (expectFailure) {
@@ -370,18 +388,21 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
                     'should perform successive actions',
                     async () => {
                         await testAction('pass');
+                        await delay(50);
                         await testAction('clear');
+                        await delay(50);
                         await testAction('smash');
+                        await delay(50);
                         await testAction('pass');
                     },
-                    TEST_CONFIG.TEST_TIMEOUT_MS * 5,
+                    TEST_CONFIG.TEST_TIMEOUT_MS * 6,
                 );
 
                 it(
                     'same successive actions shouldnt trigger twice',
                     async () => {
                         await testAction('pass');
-                        await delay(100);
+                        await delay(50);
                         await testAction('pass', true);
                     },
                     TEST_CONFIG.TEST_TIMEOUT_MS * 3,
@@ -391,7 +412,19 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
 
         describe('on not-a-NAB discovered profiles', () => {
             it('doesnt trigger a discover event', async () => {
+                const preKeyPair =
+                    await defaultDidManager.generateNewPreKeyPair(userIdentity);
+                await user.endpoints.connect(
+                    {
+                        url: socketServerUrl,
+                        smePublicKey: SME_PUBLIC_KEY,
+                    },
+                    preKeyPair,
+                );
+                defaultDidManager.set(await user.getDIDDocument());
+                const userReceivedNBHEvent = waitFor(user, NBH_PROFILE_LIST);
                 await sendDiscoveredProfiles();
+                await expect(userReceivedNBHEvent).rejects.toThrow();
                 expect(onUserDiscover).not.toHaveBeenCalled();
             });
         });
@@ -401,96 +434,4 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
 // TODO profile propogation tests according to trust levels (ie, on Smash -> fuller profile)
 // TODO block user tests (shouldnt even come through)
 // TODO send past relationship updates to new NABs
-
 // TODO: ID/PreKey Management
-// describe('Pre-Key Management when joining a Neighborhood', () => {
-//     it('generates a new Pre-Key when registering a new SME', async () => {
-//         const initialPreKeys = [...identity.signedPreKeys];
-//         const join: SmashActionJson = {
-//             action: 'join',
-//             did: 'any',
-//             config: {
-//                 sme: [
-//                     {
-//                         url: socketServerUrl,
-//                         smePublicKey: 'any',
-//                         // preKeyPair: identity.signedPreKeys[0],
-//                     },
-//                 ],
-//             },
-//         };
-//         await user.join(join);
-
-//         // After joining, a new Pre-Key should be generated
-//         const updatedPreKeys = user.identity.signedPreKeys;
-
-//         expect(updatedPreKeys.length).toBeGreaterThan(
-//             initialPreKeys.length,
-//         );
-
-//         // The new Pre-Key should be used in the SME configuration
-//         const lastPreKey = updatedPreKeys[updatedPreKeys.length - 1];
-//         const smePreKey =
-//             user.endpoints[user.endpoints.length - 1].preKey;
-
-//         const exportedPreKey = await SmashMessaging.exportKey(
-//             lastPreKey.publicKey.key,
-//         );
-
-//         expect(smePreKey).toEqual(exportedPreKey);
-//     });
-
-//     it('does not reuse Pre-Keys across different SMEs', async () => {
-//         const joinFirstSME: SmashActionJson = {
-//             action: 'join',
-//             did: 'any',
-//             config: {
-//                 sme: `${socketServerUrl}/sme1`,
-//             },
-//         };
-//         await user.join(joinFirstSME);
-
-//         const firstSMEPreKey =
-//             user.endpoints[user.endpoints.length - 1].preKey;
-
-//         const joinSecondSME: SmashActionJson = {
-//             action: 'join',
-//             did: 'any',
-//             config: {
-//                 sme: `${socketServerUrl}/sme2`,
-//             },
-//         };
-//         await user.join(joinSecondSME);
-
-//         const secondSMEPreKey =
-//             user.endpoints[user.endpoints.length - 1].preKey;
-
-//         expect(firstSMEPreKey).not.toEqual(secondSMEPreKey);
-//     });
-
-//     it('includes correct Pre-Key information in the DID for each endpoint', async () => {
-//         const join: SmashActionJson = {
-//             action: 'join',
-//             did: 'any',
-//             config: {
-//                 sme: socketServerUrl,
-//             },
-//         };
-//         await user.join(join);
-
-//         const userDID = await user.getDID();
-//         const endpoint =
-//             userDID.endpoints[userDID.endpoints.length - 1];
-
-//         // The endpoint's Pre-Key should match the user's last Pre-Key
-//         const lastPreKey =
-//             user.identity.signedPreKeys[
-//                 user.identity.signedPreKeys.length - 1
-//             ];
-//         const exportedPreKey = await SmashMessaging.exportKey(
-//             lastPreKey.publicKey.key,
-//         );
-
-//         expect(endpoint.preKey).toEqual(exportedPreKey);
-//     });
-// });
