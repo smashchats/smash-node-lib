@@ -43,4 +43,6 @@ export type IMProtoEventMap = {
 };
 
 export type IMProtoEventType<T extends reverseDNS> =
-    T extends keyof IMProtoEventMap ? IMProtoEventMap[T] : EncapsulatedIMProtoMessage;
+    T extends keyof IMProtoEventMap
+        ? IMProtoEventMap[T]
+        : EncapsulatedIMProtoMessage;
