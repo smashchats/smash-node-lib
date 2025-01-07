@@ -4,12 +4,28 @@ interface WithURL {
     url: string;
 }
 
+/**
+ * https://dev.smashchats.com/messaging%20endpoints
+ */
 export interface SmashEndpoint extends WithURL {
+    /**
+     * Pre-key for use with this Endpoint
+     * https://dev.smashchats.com/messaging%20endpoints
+     */
     preKey: string;
+    /**
+     * Signature of preKey by peer's IK
+     */
     signature: string;
 }
 
+/**
+ * SMEv1: https://dev.smashchats.com/Smash%20Messaging%20Endpoint%20(SMEv1)
+ */
 interface SMEConfigBase extends WithURL {
+    /**
+     * SME's public key used for authentication
+     */
     smePublicKey: string;
 }
 

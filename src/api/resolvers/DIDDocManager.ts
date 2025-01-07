@@ -21,7 +21,7 @@ export class DIDDocManager implements IDIDResolver {
     public readonly method: DIDMethod = 'doc';
     private readonly cache: Map<DIDString, DIDDocument> = new Map();
 
-    resolve(did: DID): Promise<DIDDocument> {
+    public async resolve(did: DID): Promise<DIDDocument> {
         if (typeof did === 'string') {
             const cached = this.cache.get(did);
             if (cached) return Promise.resolve(cached);
@@ -67,7 +67,7 @@ export class DIDDocManager implements IDIDResolver {
         return preKeyPair;
     }
 
-    set(didDocument: DIDDocument) {
+    public set(didDocument: DIDDocument) {
         this.cache.set(didDocument.id, didDocument);
     }
 }

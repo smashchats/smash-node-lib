@@ -40,8 +40,8 @@ type ProfileMeta = Omit<IMProfile, 'did'>;
  * @public
  */
 export class SmashMessaging extends EventEmitter {
-    protected readonly logger: Logger;
     public readonly endpoints: EndpointManager;
+    protected readonly logger: Logger;
     protected readonly peers: PeerRegistry;
     private readonly sessionManager: SessionManager;
     private readonly smeSocketManager: SMESocketManager;

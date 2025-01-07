@@ -19,36 +19,14 @@ import type { ISO8601, sha256 } from '@src/shared/types/string.types.js';
 /**
  * Abstract base class for implementing a Neighborhood Admin Bot (NAB)
  * Handles neighborhood membership, discovery, and relationships between peers
+ * https://dev.smashchats.com/Smash%20Neighborhoods%20(NBH)
+ * https://dev.smashchats.com/Neighborhood%20Admin%20Bot%20(NAB)
  * @public
  */
 export abstract class SmashNAB extends SmashMessaging {
     /**
-     * Gets the non-default SME config values
-     */
-    private static getCustomSMEConfig(
-        config: SMEConfigJSONWithoutDefaults,
-    ): SMEConfigJSONWithoutDefaults {
-        const customConfig: SMEConfigJSONWithoutDefaults = {
-            url: config.url,
-            smePublicKey: config.smePublicKey,
-        };
-        const requiredKeys = new Set(Object.keys(customConfig));
-        const defaultKeys = Object.keys(SME_DEFAULT_CONFIG) as Array<
-            keyof typeof SME_DEFAULT_CONFIG
-        >;
-        for (const key of defaultKeys) {
-            if (
-                !requiredKeys.has(key) &&
-                config[key] !== SME_DEFAULT_CONFIG[key]
-            ) {
-                customConfig[key] = config[key] as never;
-            }
-        }
-        return customConfig;
-    }
-
-    /**
      * Generates join info for new neighborhood members
+     * https://dev.smashchats.com/join%20procedure
      */
     public async getJoinInfo(
         smeConfigs?: SMEConfigJSONWithoutDefaults[],
@@ -71,6 +49,7 @@ export abstract class SmashNAB extends SmashMessaging {
 
     /**
      * Handle new member join requests
+     * https://dev.smashchats.com/join%20procedure
      * @param didDocument - The DID document of the new member
      * @param messageHash - The SHA-256 hash of the join message
      * @param timestamp - The timestamp of the join message
@@ -83,6 +62,7 @@ export abstract class SmashNAB extends SmashMessaging {
 
     /**
      * Handle peer discovery requests
+     * https://dev.smashchats.com/message%20lexicon
      * @param fromDID - The DID url of the peer that is discovering
      * @param messageHash - The SHA-256 hash of the discover message
      * @param timestamp - The timestamp of the discover message
@@ -95,6 +75,7 @@ export abstract class SmashNAB extends SmashMessaging {
 
     /**
      * Handle relationship updates between peers
+     * https://dev.smashchats.com/smash%20or%20pass
      * @param fromDID - The DID url of the peer that is updating the relationship
      * @param toDID - The DID url of the peer that is being updated
      * @param relationship - The relationship to update
@@ -109,18 +90,42 @@ export abstract class SmashNAB extends SmashMessaging {
         timestamp?: ISO8601,
     ): Promise<unknown>;
 
+    /**
+     * configure a Neighborhood Admin Bot using the SmashMessaging interface
+     * @see SmashMessaging
+     * https://dev.smashchats.com/Neighborhood%20Admin%20Bot%20(NAB)
+     */
     constructor(...args: ConstructorParameters<typeof SmashMessaging>) {
         super(...args);
         this.setupEventHandlers();
     }
 
-    /**
-     * Set up event handlers for NAB messages
-     */
     private setupEventHandlers(): void {
         this.on(SMASH_NBH_JOIN, this.handleJoin.bind(this));
         this.on(SMASH_NBH_DISCOVER, this.handleDiscover.bind(this));
         this.on(SMASH_NBH_RELATIONSHIP, this.handleRelationship.bind(this));
+    }
+
+    private static getCustomSMEConfig(
+        config: SMEConfigJSONWithoutDefaults,
+    ): SMEConfigJSONWithoutDefaults {
+        const customConfig: SMEConfigJSONWithoutDefaults = {
+            url: config.url,
+            smePublicKey: config.smePublicKey,
+        };
+        const requiredKeys = new Set(Object.keys(customConfig));
+        const defaultKeys = Object.keys(SME_DEFAULT_CONFIG) as Array<
+            keyof typeof SME_DEFAULT_CONFIG
+        >;
+        for (const key of defaultKeys) {
+            if (
+                !requiredKeys.has(key) &&
+                config[key] !== SME_DEFAULT_CONFIG[key]
+            ) {
+                customConfig[key] = config[key] as never;
+            }
+        }
+        return customConfig;
     }
 
     private async handleJoin(

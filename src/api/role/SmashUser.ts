@@ -29,9 +29,61 @@ declare module '@src/shared/events/MessagingEventMap.js' {
 export class SmashUser extends SmashMessaging {
     private readonly neighborhoodAdmins = new Map<string, SmashPeer>();
 
+    constructor(...args: ConstructorParameters<typeof SmashMessaging>) {
+        super(...args);
+        this.initializeProfileListHandler();
+    }
+
+    /**
+     * Joining a Neighborhood
+     * https://dev.smashchats.com/join%20procedure
+     * @param joinAction
+     */
     public async join(joinAction: SmashActionJson) {
         await this.connectToSMEEndpoints(joinAction);
         await this.joinNeighborhood(joinAction.did);
+    }
+
+    /**
+     * Smash a user
+     * https://dev.smashchats.com/Smashing
+     * @param userDid the user to smash
+     * @returns a promise that resolves when the relationship has been shared with any existing NAB
+     */
+    public smash(userDid: DID) {
+        return this.setRelationship(userDid, 'smash');
+    }
+
+    /**
+     * Pass a user
+     * https://dev.smashchats.com/Passing
+     * @param userDid the user to pass
+     * @returns a promise that resolves when the relationship has been shared with any existing NAB
+     */
+    public pass(userDid: DID) {
+        return this.setRelationship(userDid, 'pass');
+    }
+
+    /**
+     * Clearing any existing relationship with a user
+     * https://dev.smashchats.com/smash%20or%20pass
+     * @param userDid the user to clear
+     * @returns a promise that resolves when the relationship has been shared with any existing NAB
+     */
+    public clear(userDid: DID) {
+        return this.setRelationship(userDid, 'clear');
+    }
+
+    /**
+     * Request a profile discovery to the joined NAB
+     * TODO: handle for multiple NABs
+     * @returns void but will trigger a NBH_PROFILE_LIST event when the NAB responds
+     */
+    public async discover() {
+        const firstNab = this.neighborhoodAdmins.values().next().value;
+        if (firstNab) {
+            await firstNab.send(SMASH_NBH_DISCOVER_MESSAGE);
+        }
     }
 
     private async connectToSMEEndpoints(joinAction: SmashActionJson) {
@@ -73,31 +125,6 @@ export class SmashUser extends SmashMessaging {
             action,
             Array.from(this.neighborhoodAdmins.values()),
         );
-    }
-
-    public smash(userDid: DID) {
-        return this.setRelationship(userDid, 'smash');
-    }
-
-    public pass(userDid: DID) {
-        return this.setRelationship(userDid, 'pass');
-    }
-
-    public clear(userDid: DID) {
-        return this.setRelationship(userDid, 'clear');
-    }
-
-    public async discover() {
-        // TODO: handle for multiple NABs
-        const firstNab = this.neighborhoodAdmins.values().next().value;
-        if (firstNab) {
-            await firstNab.send(SMASH_NBH_DISCOVER_MESSAGE);
-        }
-    }
-
-    constructor(...args: ConstructorParameters<typeof SmashMessaging>) {
-        super(...args);
-        this.initializeProfileListHandler();
     }
 
     private initializeProfileListHandler() {

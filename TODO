@@ -8,7 +8,7 @@
 - [x] remove // TODO comments from codebase -> transform into tracked issues
 - [x] refactor module file paths structure (reorg files) (+ make sure all tests pass)
 - [x] extract more submodules: more modular, decoupled, and loosely coupled (make sure all tests pass)
-- [ ] set everything private then resolve issues (ie check strict minimum as public and internal APIs)
+- [-] set everything private then resolve issues (ie check strict minimum as public and internal APIs)
 
 ## HAPPY PATH
 
