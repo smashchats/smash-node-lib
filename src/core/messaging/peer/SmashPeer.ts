@@ -327,7 +327,7 @@ export class SmashPeer {
         );
 
         const results = await Promise.allSettled(
-            this.endpoints.map((endpoint) => endpoint.flush(undefined)),
+            this.endpoints.map((endpoint) => endpoint.flush()),
         );
 
         this.handleFlushResults(results);
