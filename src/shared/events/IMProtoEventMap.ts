@@ -24,7 +24,7 @@ import type {
     SmashChatProfileListMessage,
     SmashChatRelationshipMessage,
 } from '@src/shared/lexicon/smashchats.lexicon.js';
-import type { IMProtoMessage } from '@src/shared/types/message.types.js';
+import type { EncapsulatedIMProtoMessage } from '@src/shared/types/message.types.js';
 import type { reverseDNS } from '@src/shared/types/string.types.js';
 
 // Map of known event types to their corresponding message types
@@ -43,4 +43,4 @@ export type IMProtoEventMap = {
 };
 
 export type IMProtoEventType<T extends reverseDNS> =
-    T extends keyof IMProtoEventMap ? IMProtoEventMap[T] : IMProtoMessage;
+    T extends keyof IMProtoEventMap ? IMProtoEventMap[T] : EncapsulatedIMProtoMessage;
