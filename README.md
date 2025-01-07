@@ -11,7 +11,7 @@ It powers the free and open digital neighborhoods of tomorrow, promoting decentr
 > And, in general, documentation is deemed **not yet available**.
 
 ![License](https://img.shields.io/badge/license-AGPL--3.0-blue)
-![Version](https://img.shields.io/badge/version-0.0.1-alpha)
+![Version](https://img.shields.io/badge/version-0.0.0-alpha)
 
 <!-- ![License](https://img.shields.io/github/license/smashchats/smash-node-lib)
 ![Version](https://img.shields.io/github/package-json/v/smashchats/smash-node-lib) -->
@@ -20,6 +20,8 @@ It powers the free and open digital neighborhoods of tomorrow, promoting decentr
 ![Security Rating](https://sonar.smashchats.com/api/project_badges/measure?project=smashchats_smash-node-lib_95e1cd27-ea3b-492e-9c3a-ebf35949ed3f&metric=software_quality_security_rating&token=sqb_4c16baf0e3f3ff02d308510f50b8b5e8d80f2eb8)
 ![Maintainability Rating](https://sonar.smashchats.com/api/project_badges/measure?project=smashchats_smash-node-lib_95e1cd27-ea3b-492e-9c3a-ebf35949ed3f&metric=software_quality_maintainability_rating&token=sqb_4c16baf0e3f3ff02d308510f50b8b5e8d80f2eb8)
 ![Lines of Code](https://sonar.smashchats.com/api/project_badges/measure?project=smashchats_smash-node-lib_95e1cd27-ea3b-492e-9c3a-ebf35949ed3f&metric=ncloc&token=sqb_4c16baf0e3f3ff02d308510f50b8b5e8d80f2eb8)
+
+**By using this repository, you agree to the terms of the [Smash License](./LICENSE).**
 
 ---
 
@@ -68,8 +70,6 @@ Follow these steps to start using the Smash-Node-Lib:
 
 Using Radicle:
 
-> **WARNING**: The Smash-Node-Lib repository is currently private.
-> You'll need to ask a maintainer to add you to the 'allow list'.
 > Read more in our [CONTRIBUTING.md](./docs/CONTRIBUTING.md).
 
 ```bash
@@ -78,11 +78,7 @@ rad clone rad:zZ6oTFp8JrVyhEQmrcfkQkQgmoQJ # RID for the Smash-Node-Lib repo
 
 > You can find an updated list of all Smash's repository IDs (RIDs) on our [developer notes](https://dev.smashchats.com/radicle%20repos).
 
-Using our GitHub mirror repository:
-
-> **WARNING**: The Smash-Node-Lib repository is currently private.
-> You'll need to ask a maintainer to grant you access to the repository.
-> Read more in our [CONTRIBUTING.md](./docs/CONTRIBUTING.md).
+Using our GitHub mirror **repository**:
 
 ```bash
 git clone https://github.com/smashchats/smash-node-lib.git
@@ -114,10 +110,16 @@ Tests have been written using [Jest](https://jestjs.io/) and designed to provide
 npm test
 ```
 
+You'll also find a 'Tutorial' test suite that is designed to cover the general use of this library.
+
+```
+npm run tutorial
+```
+
 ## **Usage**
 
-> **WARNING**: The Smash-Node-Lib has not yet been published.
-> The following examples are not yet fully functional.
+> **WARNING**: The Smash-Node-Lib has not yet been published to a stable repository.
+> As a consequence, the following examples are not yet fully functional.
 
 **ATTENTION**: Have a look at our 'Smash Simple Neighborhood' repository for a working example of how to use the `Smash-Node-Lib` library in its current state.
 
@@ -144,6 +146,10 @@ This property is used to detect duplicates.
 Already processed messages can safely be discarded if a duplicate is detected.
 
 #### Re-ordering
+
+> **Hint**: you can use the exported
+> `sortSmashMessages(messages: EncapsulatedIMProtoMessage[]): EncapsulatedIMProtoMessage[])`
+> function to sort a set of potentially unordered messages.
 
 Two properties of the message protocol ensure that messages can get re-ordered:
 
@@ -179,7 +185,9 @@ We welcome contributions from the community! Check out our [Contributing Guide](
 
 Contributions are managed through [Radicle](https://radicle.xyz/), a decentralized Git collaboration network. Learn more in our [CONTRIBUTING.md](./docs/CONTRIBUTING.md).
 
-[Browse open issues](https://app.radicle.xyz/nodes/seed.radicle.garden/rad:zZ6oTFp8JrVyhEQmrcfkQkQgmoQJ/issues).
+### Issues
+
+[Browse open issues on Radicle!](https://app.radicle.xyz/nodes/seed.radicle.garden/rad:zZ6oTFp8JrVyhEQmrcfkQkQgmoQJ/issues).
 
 ## **License**
 
