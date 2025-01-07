@@ -113,7 +113,7 @@ export class SMESocketWriteOnly {
     }
 
     private ensureSocketConnection(): boolean {
-        if (!this.socket || !this.socket.connected) {
+        if (this.socket?.connected) {
             this.logger.info(
                 `Creating write-only socket for ${this.url} [prev: ${this.socket?.id}]`,
             );
