@@ -76,13 +76,13 @@ export class MessageMiddleware {
         for (const message of messages) {
             try {
                 if (message.type === IM_DID_DOCUMENT) {
-                    return this.resolveDIDFromDIDMessage(
+                    return await this.resolveDIDFromDIDMessage(
                         peerIk,
                         message as IMDIDDocumentMessage,
                     );
                 }
                 if (message.type === IM_PROFILE) {
-                    return this.resolveDIDFromProfile(
+                    return await this.resolveDIDFromProfile(
                         peerIk,
                         message as IMProfileMessage,
                     );
