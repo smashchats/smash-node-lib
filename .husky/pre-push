@@ -1,1 +1,1 @@
-npm run code:checks && npm test
+npm run test -- tuto

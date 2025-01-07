@@ -11,14 +11,16 @@ const VALID_PATH = 'valid';
 const SECONDARY_PATH = 'secondary';
 const EMPTY_PATH = 'empty';
 const QUIET_PATH = 'quiet';
-const log = console.log;
+// const log = console.log;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const log = (...args: unknown[]) => {};
 
-log(`Starting mock SME server on port ${PORT}`);
-log(`API path: /${API_PATH}`);
-log(`Valid WS path: /${VALID_PATH}`);
-log(`Secondary WS path: /${SECONDARY_PATH}`);
-log(`Empty WS path: /${EMPTY_PATH}`);
-log(`Quiet WS path: /${QUIET_PATH}`);
+log(`Starting mock SME server on port ${PORT} with hostname ${HOSTNAME}`);
+log(`API endpoint path: /${API_PATH}`);
+log(`Valid WebSocket namespace path: /${VALID_PATH}`);
+log(`Secondary WebSocket namespace path: /${SECONDARY_PATH}`);
+log(`Empty WebSocket namespace path: /${EMPTY_PATH}`);
+log(`Quiet WebSocket namespace path: /${QUIET_PATH}`);
 
 export const apiServerUrl = `http://${HOSTNAME}:${PORT}/${API_PATH}`;
 export const socketServerUrl = `http://${HOSTNAME}:${PORT}/${VALID_PATH}`;
@@ -50,7 +52,9 @@ const initChallengeEndpoint = async (
     clientPublicKey: CryptoKey,
     socketClient: Socket,
 ) => {
-    log('Initializing challenge endpoint for client');
+    log(
+        `Initializing challenge endpoint for client with socket ID: ${socketClient.id}`,
+    );
     try {
         const symKey = await subtle.deriveKey(
             {
@@ -69,7 +73,9 @@ const initChallengeEndpoint = async (
             false,
             ['encrypt', 'decrypt'],
         );
-        log('Successfully derived symmetric key');
+        log(
+            `Successfully derived symmetric key using ${SME_CONFIG.encryptionAlgorithm.name} algorithm with ${SME_CONFIG.encryptionAlgorithm.length}-bit length`,
+        );
 
         // A random iv is generated and used for encryption
         const iv = crypto.getRandomValues(new Uint8Array(12));
@@ -88,16 +94,22 @@ const initChallengeEndpoint = async (
             symKey,
             challengeBuf,
         );
-        log('Successfully encrypted challenge');
+        log(
+            `Successfully encrypted challenge using ${SME_CONFIG.encryptionAlgorithm.name} with IV length: ${iv.length} bytes`,
+        );
 
         const encryptedChallengeBuf = Buffer.from(encryptedChallenge);
 
         socketClient.on(
             'register',
             async (_: unknown, ack: () => void | undefined) => {
-                log('Client registration received');
+                log(
+                    `Client registration received for socket ID: ${socketClient.id}`,
+                );
                 ack();
-                log('Registration acknowledged');
+                log(
+                    `Registration acknowledged for socket ID: ${socketClient.id}`,
+                );
             },
         );
 
@@ -107,9 +119,14 @@ const initChallengeEndpoint = async (
                 SME_CONFIG.challengeEncoding,
             ),
         });
-        log('Challenge emitted to client');
+        log(
+            `Challenge emitted to client (socket ID: ${socketClient.id}) using ${SME_CONFIG.challengeEncoding} encoding`,
+        );
     } catch (error) {
-        console.error('Error in initChallengeEndpoint:', error);
+        console.error(
+            `Error in initChallengeEndpoint for socket ID ${socketClient.id}:`,
+            error,
+        );
     }
 };
 
@@ -118,10 +135,12 @@ const exportKey = async (key: CryptoKey, encoding = ENCODING) => {
         const exported = Buffer.from(
             await subtle.exportKey(EXPORTABLE, key),
         ).toString(encoding);
-        log('Successfully exported key');
+        log(
+            `Successfully exported key using ${EXPORTABLE} format and ${encoding} encoding`,
+        );
         return exported;
     } catch (error) {
-        console.error('Error exporting key:', error);
+        console.error(`Error exporting key with format ${EXPORTABLE}:`, error);
         throw error;
     }
 };
@@ -142,16 +161,23 @@ const importKey = async (
             exportable,
             usages,
         );
-        log('Successfully imported key');
+        log(
+            `Successfully imported key with algorithm ${keyAlgorithm?.name}, format ${format}, usages: [${usages.join(', ')}]`,
+        );
         return imported;
     } catch (error) {
-        console.error('Error importing key:', error);
+        console.error(
+            `Error importing key with algorithm ${keyAlgorithm?.name}:`,
+            error,
+        );
         throw error;
     }
 };
 
 const importClientPublicKey = async (socket: Socket) => {
-    log('Importing client public key');
+    log(
+        `Importing client public key (${socket.handshake.auth.key}) for socket ID ${socket.id} with algorithm ${socket.handshake.auth.keyAlgorithm?.name}, curve: ${socket.handshake.auth.keyAlgorithm?.namedCurve}`,
+    );
     return await importKey(
         socket.handshake.auth.key,
         socket.handshake.auth.keyAlgorithm,
@@ -161,7 +187,7 @@ const importClientPublicKey = async (socket: Socket) => {
 const getPeerIdFromUrl = (reqUrl: string) => {
     const url = new NodeURL(reqUrl, 'http://localhost');
     const peerId = url.searchParams.get('peerId');
-    log(`Extracted peerId from URL: ${peerId}`);
+    log(`Extracted peerId from URL ${reqUrl}: ${peerId || 'none'}`);
     return peerId;
 };
 
@@ -187,16 +213,22 @@ export default async function setup(): Promise<void> {
                 : 'ANONYMOUS';
 
             if (clientPublicKey) {
-                log(`Client identified as: ${clientKeyId}`);
+                log(
+                    `Client identified with key ID: ${clientKeyId}, socket ID: ${client.id}`,
+                );
                 activeSockets[clientKeyId] = client;
 
                 client.on('disconnect', async () => {
-                    log(`Client ${clientKeyId} disconnected`);
+                    log(
+                        `Client ${clientKeyId} disconnected (socket ID: ${client.id})`,
+                    );
                     delete activeSockets[clientKeyId];
-                    log(`Removed ${clientKeyId} from active sockets`);
+                    log(
+                        `Removed client ${clientKeyId} from active sockets (total active: ${Object.keys(activeSockets).length})`,
+                    );
                 });
             } else {
-                log(`Anonymous client`);
+                log(`Anonymous client connected with socket ID: ${client.id}`);
             }
 
             client.on(
@@ -205,11 +237,15 @@ export default async function setup(): Promise<void> {
                     peerId: string,
                     sessionId: string,
                     data: unknown,
-                    acknowledge: () => void | undefined,
+                    acknowledge: () => void,
                 ) => {
-                    log(`>> data: ${clientKeyId} --> ${peerId} (${sessionId})`);
+                    log(
+                        `>> Received data: ${clientKeyId} --> ${peerId} (session: ${sessionId}, endpoint: ${endpoint})`,
+                    );
                     if (!activeSockets[peerId]) {
-                        log(`No active socket found for peer ${peerId}`);
+                        log(
+                            `No active socket found for peer ${peerId} (total active sockets: ${Object.keys(activeSockets).length})`,
+                        );
                         return;
                     }
                     let delayMs = 0;
@@ -217,7 +253,7 @@ export default async function setup(): Promise<void> {
                         delayMs = messagesToDelay[peerId] * 250;
                         messagesToDelay[peerId] = messagesToDelay[peerId] - 1;
                         log(
-                            `Delaying message to peer ${peerId} by ${delayMs}ms`,
+                            `Delaying message to peer ${peerId} by ${delayMs}ms (${messagesToDelay[peerId]} delays remaining)`,
                         );
                     }
                     dataEvents.push({
@@ -226,23 +262,35 @@ export default async function setup(): Promise<void> {
                         data,
                         endpoint,
                     });
-                    log(`Queued data event for peer ${peerId}`);
+                    log(
+                        `Queued data event for peer ${peerId} (total events: ${dataEvents.length})`,
+                    );
                     setTimeout(() => {
+                        if (!activeSockets[peerId]) {
+                            log(
+                                `No active socket found for peer ${peerId} (total active sockets: ${Object.keys(activeSockets).length}) (delayed)`,
+                            );
+                            return;
+                        }
                         log(
-                            `Emitting data to peer ${peerId} (delay ${delayMs}ms)`,
+                            `Emitting data to peer ${peerId} (delay: ${delayMs}ms, session: ${sessionId})`,
                         );
                         activeSockets[peerId].emit('data', sessionId, data);
                     }, delayMs);
                     if (shouldAck) {
+                        log(
+                            `Sending delivery ack (socket ID: ${client.id}, session: ${sessionId})`,
+                        );
                         acknowledge();
-                        log('Data acknowledged');
                     }
                 },
             );
         };
 
         const httpServer = createServer((req, res) => {
-            log(`Received ${req.method} request for ${req.url}`);
+            log(
+                `Received ${req.method} request for ${req.url} with headers: ${JSON.stringify(req.headers)}`,
+            );
 
             // Add this debug log for upgrade requests
             if (req.headers.upgrade === 'websocket') {
@@ -258,7 +306,7 @@ export default async function setup(): Promise<void> {
 
             // Handle preflight requests
             if (req.method === 'OPTIONS') {
-                log('Handling OPTIONS request');
+                log('Handling OPTIONS request with CORS headers');
                 res.writeHead(204);
                 res.end();
                 return;
@@ -268,17 +316,21 @@ export default async function setup(): Promise<void> {
                 req.method === 'GET' &&
                 req.url?.startsWith(`/${API_PATH}/delay-next-messages`)
             ) {
-                log('Handling GET /delay-next-messages request');
+                log(
+                    `Handling GET /delay-next-messages request for URL: ${req.url}`,
+                );
                 const peerId = getPeerIdFromUrl(req.url);
                 if (!peerId) {
-                    log('Missing peerId parameter');
+                    log(
+                        'Missing peerId parameter in delay-next-messages request',
+                    );
                     res.writeHead(400);
                     res.end('Missing peerId parameter');
                     return;
                 }
                 messagesToDelay[peerId] = 10;
                 log(
-                    `Set delay for peerId ${peerId}: ${messagesToDelay[peerId]} messages`,
+                    `Set delay for peerId ${peerId}: next ${messagesToDelay[peerId]} messages will be delayed`,
                 );
                 res.writeHead(200);
                 res.end();
@@ -289,12 +341,14 @@ export default async function setup(): Promise<void> {
                 req.method === 'GET' &&
                 req.url?.startsWith(`/${API_PATH}/data-events`)
             ) {
-                log('Handling GET /data-events request');
+                log(`Handling GET /data-events request for URL: ${req.url}`);
                 const peerId = getPeerIdFromUrl(req.url);
                 const filteredEvents = peerId
                     ? dataEvents.filter((event) => event.peerId === peerId)
                     : dataEvents;
-                log(`Returning ${filteredEvents.length} events`);
+                log(
+                    `Returning ${filteredEvents.length} events${peerId ? ` for peerId ${peerId}` : ' (all events)'}`,
+                );
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify(filteredEvents));
                 return;
@@ -304,7 +358,7 @@ export default async function setup(): Promise<void> {
                 req.method === 'DELETE' &&
                 req.url?.startsWith(`/${API_PATH}/data-events`)
             ) {
-                log('Handling DELETE /data-events request');
+                log(`Handling DELETE /data-events request for URL: ${req.url}`);
                 const peerId = getPeerIdFromUrl(req.url);
                 if (peerId) {
                     let index = dataEvents.length;
@@ -315,9 +369,13 @@ export default async function setup(): Promise<void> {
                             deletedCount++;
                         }
                     }
-                    log(`Deleted ${deletedCount} events for peerId ${peerId}`);
+                    log(
+                        `Deleted ${deletedCount} events for peerId ${peerId} (remaining events: ${dataEvents.length})`,
+                    );
                 } else {
-                    log(`Clearing all ${dataEvents.length} events`);
+                    log(
+                        `Clearing all ${dataEvents.length} events from data store`,
+                    );
                     dataEvents.length = 0;
                 }
                 res.writeHead(200);
@@ -326,14 +384,14 @@ export default async function setup(): Promise<void> {
             }
 
             // Handle unknown routes
-            log(`Unknown route: ${req.method} ${req.url}`);
+            log(`Unknown route requested: ${req.method} ${req.url}`);
             res.writeHead(404);
             res.end('Not found');
         });
 
         // Also add this to catch upgrade events
         httpServer.on('upgrade', (req) => {
-            log('Upgrade request received:', {
+            log('WebSocket upgrade request received:', {
                 url: req.url,
                 headers: req.headers,
             });
@@ -347,8 +405,10 @@ export default async function setup(): Promise<void> {
             },
         });
 
-        log('Socket.IO server created with config:', {
+        log('Socket.IO server created with configuration:', {
             path: socketServer.path(),
+            cors: 'enabled for all origins',
+            methods: ['GET', 'POST', 'DELETE'],
         });
 
         socketServer.on('connection_error', (err) => {
@@ -359,19 +419,33 @@ export default async function setup(): Promise<void> {
             console.error('Socket.IO connect error:', err);
         });
 
+        // Add this debug log for upgrade requests
+        httpServer.on('request', (req) => {
+            if (req.headers.upgrade === 'websocket') {
+                log('Received WebSocket upgrade request:', {
+                    url: req.url,
+                    headers: req.headers,
+                });
+            }
+        });
+
         const mainNamespace = socketServer.of('/' + VALID_PATH);
         const secondaryNamespace = socketServer.of('/' + SECONDARY_PATH);
         const emptyNamespace = socketServer.of('/' + EMPTY_PATH);
         const quietNamespace = socketServer.of('/' + QUIET_PATH);
 
         quietNamespace.on('connection', async (client) => {
-            log('>>> New connection on quiet namespace');
+            log(
+                `>>> New connection on quiet namespace (socket ID: ${client.id})`,
+            );
             const auth = !!client.handshake.auth.key;
-            log('> Client authentication:', auth ? 'present' : 'absent');
+            log(
+                `> Client authentication status: ${auth ? 'authenticated' : 'anonymous'}`,
+            );
             const clientPublicKey = auth
                 ? await importClientPublicKey(client)
                 : undefined;
-            log('>> Initializing data endpoint without ack');
+            log('>> Initializing data endpoint without acknowledgment');
             await initDataEndpoint(
                 quietSocketServerUrl,
                 clientPublicKey,
@@ -379,15 +453,19 @@ export default async function setup(): Promise<void> {
                 false,
             );
             if (clientPublicKey) {
-                log('>> Initializing challenge');
+                log('>> Initializing challenge for authenticated client');
                 await initChallengeEndpoint(clientPublicKey, client);
             }
         });
 
         emptyNamespace.on('connection', async (client) => {
-            log('>>> New connection on empty namespace');
+            log(
+                `>>> New connection on empty namespace (socket ID: ${client.id})`,
+            );
             const auth = !!client.handshake.auth.key;
-            log('> Client authentication:', auth ? 'present' : 'absent');
+            log(
+                `> Client authentication status: ${auth ? 'authenticated' : 'anonymous'}`,
+            );
             const clientPublicKey = auth
                 ? await importClientPublicKey(client)
                 : undefined;
@@ -398,43 +476,83 @@ export default async function setup(): Promise<void> {
         });
 
         mainNamespace.on('connection', async (client) => {
-            log('>>> New connection on main namespace');
+            log(
+                `>>> New connection on main namespace (socket ID: ${client.id})`,
+            );
             const auth = !!client.handshake.auth.key;
-            log('> Client authentication:', auth ? 'present' : 'absent');
+            log(
+                `> Client authentication status: ${auth ? 'authenticated' : 'anonymous'}`,
+            );
             const clientPublicKey = auth
                 ? await importClientPublicKey(client)
                 : undefined;
 
-            log('>> Initializing data endpoint');
-            await initDataEndpoint(socketServerUrl, clientPublicKey, client);
+            log('>> Initializing data endpoint with acknowledgment');
+            await initDataEndpoint(
+                socketServerUrl,
+                clientPublicKey,
+                client,
+                true,
+            );
             if (clientPublicKey) {
-                log('>> Initializing challenge');
+                log('>> Initializing challenge for authenticated client');
                 await initChallengeEndpoint(clientPublicKey, client);
             }
         });
 
         secondaryNamespace.on('connection', async (client) => {
-            log('>>> New connection on secondary namespace');
+            log(
+                `>>> New connection on secondary namespace (socket ID: ${client.id})`,
+            );
             const auth = !!client.handshake.auth.key;
-            log('> Client authentication:', auth ? 'present' : 'absent');
+            log(
+                `> Client authentication status: ${auth ? 'authenticated' : 'anonymous'}`,
+            );
             const clientPublicKey = auth
                 ? await importClientPublicKey(client)
                 : undefined;
 
-            log('>> Initializing data endpoint');
+            log('>> Initializing data endpoint with acknowledgment');
             await initDataEndpoint(
                 secondarySocketServerUrl,
                 clientPublicKey,
                 client,
             );
             if (clientPublicKey) {
-                log('>> Initializing challenge');
+                log('>> Initializing challenge for authenticated client');
                 await initChallengeEndpoint(clientPublicKey, client);
             }
         });
 
+        // Add namespace-specific logging
+        socketServer.of('/valid').on('connection', (socket) => {
+            log('Namespace /valid connection:', socket.id);
+
+            socket.on('disconnect', (reason) => {
+                log('Namespace /valid disconnect:', {
+                    id: socket.id,
+                    reason,
+                    remainingSockets: Object.keys(socket.nsp.sockets).length,
+                });
+            });
+        });
+
+        socketServer.of('/empty').on('connection', (socket) => {
+            log('Namespace /empty connection:', socket.id);
+
+            socket.on('disconnect', (reason) => {
+                log('Namespace /empty disconnect:', {
+                    id: socket.id,
+                    reason,
+                    remainingSockets: Object.keys(socket.nsp.sockets).length,
+                });
+            });
+        });
+
         httpServer.listen(PORT, () => {
-            log(`HTTP server listening on port ${PORT}`);
+            log(
+                `HTTP server listening on port ${PORT} with Socket.IO server attached`,
+            );
             (
                 globalThis as unknown as { __socketServer: Server }
             ).__socketServer = socketServer;

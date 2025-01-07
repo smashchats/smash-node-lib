@@ -9,6 +9,7 @@ module.exports = {
     coverageDirectory: './coverage',
     testMatch: ['<rootDir>/tests/**/*.spec.ts'],
     testPathIgnorePatterns: ['node_modules'],
+    coveragePathIgnorePatterns: ['/node_modules/', '/tests/'],
     moduleNameMapper: {
         '^@src/(.*)\\.js$': '<rootDir>/src/$1',
         '^@src/(.*)': '<rootDir>/src/$1',
