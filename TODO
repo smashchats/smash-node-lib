@@ -1,21 +1,4 @@
-## Refactoring plan
-
-### BIG REFACTORING (with possible functional changes):
-
-- [x] manual refactor while writing the happy path tutorial test suite (mainly splitting modules and restructuring code)
-- [x] make previous test suites pass again
-- [x] refactor all individual code files (to be more readable, performant, maintainable, secure, efficient, etc)
-- [x] remove // TODO comments from codebase -> transform into tracked issues
-- [x] refactor module file paths structure (reorg files) (+ make sure all tests pass)
-- [x] extract more submodules: more modular, decoupled, and loosely coupled (make sure all tests pass)
-- [-] set everything private then resolve issues (ie check strict minimum as public and internal APIs)
-
 ## HAPPY PATH
-
-> Refactoring from the public APIs PoV, exploring deep into the codebase
-> (starting point is the public API, then refactoring the codebase to match)
-
-Tutorial = Covers entire product but HAPPY PATH ONLY
 
 - [x] generating a peer identity / DID
 - [x] exporting a peer identity / DID
@@ -36,21 +19,46 @@ Tutorial = Covers entire product but HAPPY PATH ONLY
 - [x] passing another user from the neighborhood
 - [x] clearing another user from the neighborhood
 
-then, next feats
-
 - [ ] update message status more granular (sending, delivered, received, read, failed, retrying)
+- [ ] profile updates using diff strategy & tracking current state/requesting new state?
 - [ ] loading the library with existing _data_ (tbd)
-- [ ] (un)blocking another peer
+- [ ] trust levels -> privacy
+- [ ] blocking/unblocking another peer
+- [ ] report peer to admins
+
+- [ ] split NAB backend / frontend
+- [ ] NAB persistent data
+
+- [ ] DID standard : format and generic resolvers
+  - https://medium.com/danube-tech/the-power-of-dids-5-a-deep-dive-into-service-endpoints-and-digital-product-passports-2c60f3e68f8d
+  - https://github.com/w3c/did-core?tab=readme-ov-file
+  - https://w3c.github.io/did-core/#dfn-service
+  - https://atproto.com/specs/blob
+  - https://www.ietf.org/archive/id/draft-mayrhofer-did-dns-05.txt
+  - https://github.com/decentralized-identity/did-spec-extensions/blob/main/parameters/signed-ietf-json-patch.md
+  - https://github.com/w3c/did-resolution/issues/7
+  - https://atproto.com/specs/data-model
+  - https://www.w3.org/TR/did-extensions-resolution/#signedIetfJsonPatch-param
+  - https://www.w3.org/TR/did-extensions-properties/#serviceendpoint
+  - https://identity.foundation/peer-did-method-spec/
+  - https://learn.mattr.global/docs/cwt/dids
+
+- [ ] DID::fetch:: key
+- [ ] DID::fetch:: web
+- [ ] DID re-fetch strategy on failure (re-fetch patch vs fetch replace (truth/canonical))
+- [ ] DID expiry (to sync with session TTL)
+
+- [ ] investigate performance and memory usage (eg, dangling sessions, dlqs)
 
 ### TESTS REFACTORING (keeping or increasing coverage):
 
-- generate unit .test files with mocks/spies for each module corresponding to the library API reference (**testing only publicly exported**) --> should have 100% coverage for publicly exposed APIs (public and internal)
-- refactor functional (.spec) tests files to be more readable, maintainable, comprehensive -> corresponding to The Tutorial and the How-Tos --> should have 100% functional coverage (100% of the lines, combined)
+- [ ] generate unit .test files with mocks/spies for each module corresponding to the library API reference (**testing only publicly exported**) --> should have 100% coverage for publicly exposed APIs (public and internal)
+- [ ] refactor functional (.spec) tests files to be more readable, maintainable, comprehensive -> and corresponding to The Tutorial and the How-Tos --> should have 100% functional coverage (100% of the lines, combined)
 
 ### GENERATE DOCS FROM TESTS:
 
-- convert back and forth between tests and docs (GPT API?)
-- publish docs along with tests results and links to source code
+- [ ] convert back and forth between tests and docs (GPT API?)
+- [ ] publish docs along with tests results and links to source code
 
 use ReSpec for protocol specs repo
 
@@ -81,7 +89,3 @@ https://www.ietf.org/archive/id/draft-mayrhofer-did-dns-05.txt
 Note: a DID is PII as per the GDPR.
 
 investigate JWE for the challenge
-
-### TODO
-
-retrieve the old TODO from dropped branch
