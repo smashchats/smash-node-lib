@@ -1,6 +1,7 @@
 import type { onMessagesStatusFn } from '@src/shared/types/callbacks.types.js';
 import type { sha256 } from '@src/shared/types/string.types.js';
 import type { Logger } from '@src/shared/utils/Logger.js';
+import { Timeout } from '@src/shared/utils/Timeout.js';
 import { type Socket, io } from 'socket.io-client';
 
 type SMEAuthParams = {
@@ -38,42 +39,30 @@ export class SMESocketWriteOnly {
     }
 
     private createCloseTimeout(timeoutMs: number, resolve: () => void) {
-        return typeof globalThis.setTimeout !== 'undefined'
-            ? globalThis.setTimeout(() => {
-                  this.logger.warn(
-                      `Timeout exceeded while closing socket (${timeoutMs}ms), forcing cleanup [${this.socket?.id}]`,
-                  );
-                  this.forceCleanup();
-                  resolve();
-              }, timeoutMs)
-            : undefined;
+        return new Timeout(() => {
+            this.logger.warn(
+                `Timeout exceeded while closing socket (${timeoutMs}ms), forcing cleanup [${this.socket?.id}]`,
+            );
+            this.forceCleanup();
+            resolve();
+        }, timeoutMs);
     }
 
-    private handleConnectedClose(
-        timeout: NodeJS.Timeout | undefined,
-        resolve: () => void,
-    ) {
+    private handleConnectedClose(timeout: Timeout, resolve: () => void) {
         this.socket!.once('disconnect', () => {
             this.logger.info(
                 `> Disconnected from SME ${this.url} [${this.socket?.id}]`,
             );
-            if (typeof globalThis.clearTimeout !== 'undefined') {
-                globalThis.clearTimeout(timeout);
-            }
+            timeout.clear();
             this.forceCleanup();
             resolve();
         });
         this.socket!.disconnect();
     }
 
-    private handleDisconnectedClose(
-        timeout: NodeJS.Timeout | undefined,
-        resolve: () => void,
-    ) {
+    private handleDisconnectedClose(timeout: Timeout, resolve: () => void) {
         this.forceCleanup();
-        if (typeof globalThis.clearTimeout !== 'undefined') {
-            globalThis.clearTimeout(timeout);
-        }
+        timeout.clear();
         resolve();
     }
 
@@ -146,21 +135,16 @@ export class SMESocketWriteOnly {
                 `> sending ${buffer.byteLength} bytes (${messageIds.length} messages) to ${this.url} [${this.socket?.id}]`,
             );
 
-            const timeout =
-                typeof globalThis.setTimeout !== 'undefined'
-                    ? globalThis.setTimeout(() => {
-                          reject(
-                              new Error(
-                                  `Timeout exceeded while sending data to ${this.url} [${this.socket?.id}]`,
-                              ),
-                          );
-                      }, TIMEOUT_MS)
-                    : undefined;
+            const timeout = new Timeout(() => {
+                reject(
+                    new Error(
+                        `Timeout exceeded while sending data to ${this.url} [${this.socket?.id}]`,
+                    ),
+                );
+            }, TIMEOUT_MS);
 
             this.socket!.emit('data', preKey, sessionId, buffer, () => {
-                if (typeof globalThis.clearTimeout !== 'undefined') {
-                    globalThis.clearTimeout(timeout);
-                }
+                timeout.clear();
                 this.logger.debug(
                     `> ${buffer.byteLength} bytes (${messageIds.length} messages) sent to ${this.url} [${this.socket?.id}]`,
                 );

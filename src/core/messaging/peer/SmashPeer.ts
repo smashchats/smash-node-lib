@@ -23,6 +23,7 @@ import type {
     undefinedString,
 } from '@src/shared/types/string.types.js';
 import type { Logger } from '@src/shared/utils/Logger.js';
+import { Timeout } from '@src/shared/utils/Timeout.js';
 import AsyncLock from 'async-lock';
 
 interface PeerConfig {
@@ -43,7 +44,7 @@ export class SmashPeer {
     private readonly alreadyProcessedSessionReset: Set<string> = new Set();
 
     private preferredEndpoint?: SmashPeerEndpoint;
-    private retryTimeout?: NodeJS.Timeout;
+    private retryTimeout?: Timeout;
     private relationship: Relationship = 'clear';
     private lastRelationshipSha256: sha256 | undefinedString = '';
     private closed = false;
@@ -269,20 +270,16 @@ export class SmashPeer {
             this.logger.debug('Skipping scheduling flush - peer is closed');
             return;
         }
-        this.retryTimeout =
-            typeof globalThis.setTimeout !== 'undefined'
-                ? globalThis.setTimeout(async () => {
-                      // Get the canonical instance when the timeout fires
-                      const peer = this.peerRegistry.get(peerId);
-                      if (!peer || peer.closed) {
-                          this.logger.debug(
-                              'Skipping scheduled flush - peer was closed or disposed',
-                          );
-                          return;
-                      }
-                      await peer.flushQueue(attempt, delay, true);
-                  }, delay)
-                : undefined;
+        this.retryTimeout = new Timeout(async () => {
+            const peer = this.peerRegistry.get(peerId);
+            if (!peer || peer.closed) {
+                this.logger.debug(
+                    'Skipping scheduled flush - peer was closed or disposed',
+                );
+                return;
+            }
+            await peer.flushQueue(attempt, delay, true);
+        }, delay);
     }
 
     setPreferredEndpoint(endpoint: SmashEndpoint): Promise<void> {
@@ -386,9 +383,7 @@ export class SmashPeer {
         this.logger.debug(
             `SmashPeer::clearRetryTimeout ${this.retryTimeout} for peer ${this.id}`,
         );
-        if (typeof globalThis.clearTimeout !== 'undefined') {
-            globalThis.clearTimeout(this.retryTimeout);
-        }
+        this.retryTimeout?.clear();
         this.retryTimeout = undefined;
     }
 
