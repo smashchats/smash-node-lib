@@ -16,9 +16,9 @@ import type { Logger } from '@src/shared/utils/Logger.js';
 export class EndpointManager extends Map<string, SmashEndpoint> {
     constructor(
         protected readonly logger: Logger,
-        private identity: IMPeerIdentity,
-        private smeSocketManager: SMESocketManager,
-        private sessionManager: SessionManager,
+        private readonly identity: IMPeerIdentity,
+        private readonly smeSocketManager: SMESocketManager,
+        private readonly sessionManager: SessionManager,
     ) {
         super();
     }
@@ -184,7 +184,7 @@ export class EndpointManager extends Map<string, SmashEndpoint> {
     ): Promise<void> {
         const failedConnections = results.filter(
             (r) => r.status === 'rejected',
-        ) as PromiseRejectedResult[];
+        );
         if (failedConnections.length) {
             const errors = failedConnections.map((r) => r.reason).join(', ');
             this.logger.warn(`Failed to initialize some endpoints: ${errors}`);

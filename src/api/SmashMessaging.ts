@@ -148,7 +148,7 @@ export class SmashMessaging extends EventEmitter {
             );
             logger.debug(
                 'Detailed cause:',
-                (reason as { cause?: string }).cause ||
+                (reason as { cause?: string }).cause ??
                     'No additional error cause found',
             );
             return;
@@ -265,7 +265,7 @@ export class SmashMessaging extends EventEmitter {
         if (failures.length > 0) {
             this.logger.warn(
                 `Failed to initialize ${failures.length} chats: ${failures
-                    .map((f) => (f as PromiseRejectedResult).reason)
+                    .map((f) => f.reason)
                     .join(', ')}`,
             );
         }

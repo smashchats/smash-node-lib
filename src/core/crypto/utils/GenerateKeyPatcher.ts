@@ -10,7 +10,7 @@ import type {
 } from '@src/shared/types/identity.types.js';
 
 export class GenerateKeyPatcher extends CryptoManager {
-    private static jwkMap = new WeakMap<CryptoKey, JsonWebKey>();
+    private static readonly jwkMap = new WeakMap<CryptoKey, JsonWebKey>();
     private static patchedGenerateKey?: IRestrictedCryptoEngine;
 
     public static patch() {
@@ -88,7 +88,8 @@ export class GenerateKeyPatcher extends CryptoManager {
         };
     }
 
-    public static jsonStringifyReplacer = this.jsonStringifyReplace.bind(this);
+    public static readonly jsonStringifyReplacer =
+        this.jsonStringifyReplace.bind(this);
 
     private static jsonStringifyReplace(_key: string, value: unknown) {
         if (typeof value === 'object' && value && 'algorithm' in value) {

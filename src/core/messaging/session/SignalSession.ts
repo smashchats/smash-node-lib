@@ -180,9 +180,7 @@ export class SignalSession {
     ): Promise<EncapsulatedIMProtoMessage[]> {
         try {
             const decrypted = await this.cipher.decrypt(message);
-            return BufferUtils.bufferToObject(
-                decrypted,
-            ) as EncapsulatedIMProtoMessage[];
+            return BufferUtils.bufferToObject(decrypted);
         } catch (err) {
             this.logger.warn('Cannot decrypt messages.');
             throw err;

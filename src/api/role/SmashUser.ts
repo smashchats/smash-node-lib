@@ -131,11 +131,7 @@ export class SmashUser extends SmashMessaging {
         this.on(SMASH_PROFILE_LIST, (did, message) => {
             this.logger.debug(`onProfileList ${did} ${message.sha256}`);
             if (this.neighborhoodAdmins.has(did)) {
-                this.emit(
-                    NBH_PROFILE_LIST,
-                    did,
-                    message.data as SmashProfileList,
-                );
+                this.emit(NBH_PROFILE_LIST, did, message.data);
             }
         });
     }

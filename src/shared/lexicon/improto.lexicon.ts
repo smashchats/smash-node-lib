@@ -37,7 +37,6 @@ export class IMText implements IMTextMessage {
 
 export interface IMProfile {
     version?: 1;
-    // TODO: is it useful to have a DID here?
     did: DID;
     title: string;
     description: string;
