@@ -1,9 +1,9 @@
 import type { IMProfile } from '@src/shared/lexicon/improto.lexicon.js';
-import type { DIDDocument } from '@src/shared/types/did.types.js';
+import type { DID } from '@src/shared/types/did.types.js';
 
 export interface SmashProfile {
-    did: DIDDocument;
-    meta?: IMProfile;
+    did: DID;
+    meta?: Partial<IMProfile>;
     scores?: Record<string, number>;
 }
 

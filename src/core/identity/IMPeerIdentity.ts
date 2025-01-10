@@ -2,7 +2,8 @@ import type { IECKeyPair } from '2key-ratchet';
 import { Curve, Identity } from '2key-ratchet';
 import type { ECKeyType } from '2key-ratchet/dist/types/type.js';
 import { GenerateKeyPatcher } from '@src/core/crypto/utils/GenerateKeyPatcher.js';
-import { DIDManager } from '@src/core/identity/did/DIDManager.js';
+import { KeyUtils } from '@src/core/crypto/utils/KeyUtils.js';
+import { SigningUtils } from '@src/core/crypto/utils/SigningUtils.js';
 import type { DIDDocument, DIDString } from '@src/shared/types/did.types.js';
 import type {
     IIMPeerIdentity,
@@ -79,14 +80,11 @@ export class IMPeerIdentity extends Identity {
 
     // Serialization & Deserialization
     public static async deserialize(
-        serializedIdentity: string,
+        identityJSON: IIMPeerIdentity,
         ecKeyPairFromJson?: (keys: IJWKJsonKeyPair) => Promise<IECKeyPair>,
         logger?: Logger,
     ): Promise<IMPeerIdentity> {
         try {
-            const identityJSON = JSON.parse(
-                serializedIdentity,
-            ) as IIMPeerIdentity;
             if (ecKeyPairFromJson) {
                 Curve.ecKeyPairFromJson = ecKeyPairFromJson;
             }
@@ -133,19 +131,33 @@ export class IMPeerIdentity extends Identity {
         };
     }
 
-    public async serialize(): Promise<string> {
+    public async serialize(): Promise<IIMPeerIdentity> {
         const json = await this.toJSON();
-        return JSON.stringify(json, GenerateKeyPatcher.jsonStringifyReplacer);
+        return JSON.parse(
+            JSON.stringify(json, GenerateKeyPatcher.jsonStringifyReplacer),
+        );
     }
 
     public async getDIDDocument(): Promise<DIDDocument> {
-        const doc = await DIDManager.resolve(this.did);
-        if (!doc) {
-            throw new Error(`Could not resolve DID document for ${this.did}`);
-        }
-
-        this.mergeEndpointsIntoDocument(doc);
-        return doc;
+        // TODO?
+        // const doc = await DIDManager.resolve(this.did);
+        // if (!doc) {
+        //     throw new Error(`Could not resolve DID document for ${this.did}`);
+        // }
+        // this.mergeEndpointsIntoDocument(doc);
+        // return doc;
+        const encode = (key: IECKeyPair) =>
+            KeyUtils.encodeKeyAsString(key.publicKey.key);
+        return {
+            id: this.did,
+            ik: await encode(this.signingKey),
+            ek: await encode(this.exchangeKey),
+            signature: await SigningUtils.signAsString(
+                this.signingKey.privateKey,
+                this.exchangeKey.publicKey.serialize(),
+            ),
+            endpoints: this.endpoints,
+        };
     }
 
     private mergeEndpointsIntoDocument(doc: DIDDocument): void {

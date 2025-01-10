@@ -8,6 +8,8 @@ export { DIDDocManager } from '@src/api/resolvers/DIDDocManager.js';
 export { encapsulateMessage } from '@src/api/tools/encapsulateMessage.js';
 export { sortSmashMessages } from '@src/api/tools/sortSmashMessages.js';
 
+export { ECPublicKey } from '2key-ratchet';
+
 export * from '@src/shared/utils/Logger.js';
 
 export * from '@src/shared/constants/index.js';

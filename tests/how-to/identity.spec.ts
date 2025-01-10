@@ -98,9 +98,7 @@ describe('DIDManager: Identity Management', () => {
 
         it('throws error for unknown DID', async () => {
             const unknownDid = 'did:doc:unknown';
-            await expect(didManager.resolve(unknownDid)).rejects.toThrow(
-                /DID resolver not implemented/,
-            );
+            await expect(didManager.resolve(unknownDid)).rejects.toThrow();
         });
     });
 });

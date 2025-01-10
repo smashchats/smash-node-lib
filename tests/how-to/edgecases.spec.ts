@@ -25,6 +25,8 @@ const restartTestPeer = async (logger: Logger, peer: TestPeer) => {
     const peerExportedIdentity = await peer.messaging.exportIdentity();
     logger.debug('> Exported', JSON.stringify(peerExportedIdentity, null, 2));
 
+    const oldEndpoints = [...peer.did.endpoints];
+
     logger.debug('>> Closing peer messaging');
     await peer.messaging.close();
     await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
@@ -43,7 +45,7 @@ const restartTestPeer = async (logger: Logger, peer: TestPeer) => {
         [],
         peerIdentity,
     );
-    const peerEndpointsReconfig = peer.did.endpoints.map((endpoint, index) => ({
+    const peerEndpointsReconfig = oldEndpoints.map((endpoint, index) => ({
         ...endpoint,
         smePublicKey: SME_PUBLIC_KEY,
         preKeyPair: peer.identity.signedPreKeys[index],

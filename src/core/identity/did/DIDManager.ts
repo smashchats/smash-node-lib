@@ -34,6 +34,6 @@ export class DIDManager {
         if (!resolver) {
             throw new Error(`No resolver found for ${didString}`);
         }
-        return resolver.resolve(didString);
+        return resolver.resolve(did);
     }
 }

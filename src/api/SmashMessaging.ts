@@ -26,6 +26,7 @@ import type {
     DIDString,
     EncapsulatedIMProtoMessage,
     IDIDResolver,
+    IIMPeerIdentity,
     IMProtoMessage,
     reverseDNS,
     sha256,
@@ -126,9 +127,9 @@ export class SmashMessaging extends EventEmitter {
      * @returns The imported identity
      */
     public static async importIdentity(
-        serialized: string,
+        ...params: Parameters<typeof IMPeerIdentity.deserialize>
     ): Promise<IMPeerIdentity> {
-        return IMPeerIdentity.deserialize(serialized);
+        return IMPeerIdentity.deserialize(...params);
     }
 
     /**
@@ -301,7 +302,7 @@ export class SmashMessaging extends EventEmitter {
     /**
      * Export identity (warning: contains secrets)
      */
-    public async exportIdentity(): Promise<string> {
+    public async exportIdentity(): Promise<IIMPeerIdentity> {
         this.logger.warn('EXPORTED IDENTITY CONTAINS SECRETS: DO NOT SHARE!');
         return this.identity.serialize();
     }

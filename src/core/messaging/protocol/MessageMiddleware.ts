@@ -61,6 +61,7 @@ export class MessageMiddleware {
         this.logger.debug(
             `Queued ${messages.length} messages from unknown peer (IK: ${peerIk})`,
         );
+        this.logger.debug(JSON.stringify(messages, null, 2));
 
         const did = await this.resolvePeerDID(peerIk, messages);
         if (did) {
@@ -100,6 +101,8 @@ export class MessageMiddleware {
         peerIk: string,
         message: IMDIDDocumentMessage,
     ): Promise<DIDDocument> {
+        this.logger.debug('resolving DID from DID message');
+        this.logger.debug(JSON.stringify(message.data, null, 2));
         const did = await DIDManager.resolve(message.data);
         await this.validateDIDMatchesIk(did, peerIk);
         this.logger.debug(`Resolved DID from DID message: ${did.id}`);

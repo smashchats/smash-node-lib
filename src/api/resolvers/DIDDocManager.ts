@@ -25,9 +25,7 @@ export class DIDDocManager implements IDIDResolver {
         if (typeof did === 'string') {
             const cached = this.cache.get(did);
             if (cached) return Promise.resolve(cached);
-            return Promise.reject(
-                new Error(`DID resolver not implemented for (${did})`),
-            );
+            return Promise.reject(new Error(`DID doc not cached for (${did})`));
         }
         this.set(did);
         return Promise.resolve(did);

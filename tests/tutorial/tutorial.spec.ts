@@ -140,7 +140,9 @@ describe('Smash Tutorial', () => {
 
         beforeEach(async () => {
             jackIdentity = await didDocumentManager.generate();
-            jackExportedIdentity = await jackIdentity.serialize();
+            jackExportedIdentity = JSON.stringify(
+                await jackIdentity.serialize(),
+            );
         });
 
         /**
@@ -201,8 +203,9 @@ describe('Smash Tutorial', () => {
              */
             test('Restoring a Smash instance from saved identity', async () => {
                 testUtils.logger.info('Deserializing identity...');
-                const restoredIdentity =
-                    await SmashMessaging.importIdentity(jackExportedIdentity);
+                const restoredIdentity = await SmashMessaging.importIdentity(
+                    JSON.parse(jackExportedIdentity),
+                );
                 testUtils.logger.info(`> Deserialized ${restoredIdentity.did}`);
 
                 const jack = new SmashUser(restoredIdentity, 'jack', 'INFO');
@@ -817,7 +820,10 @@ describe('Smash Tutorial', () => {
                 // Verify that the specified NAB received the join request
                 const lolaDIDDocument = await lola.getDIDDocument();
                 expect(nab.onJoin).toHaveBeenCalledWith(
-                    lolaDIDDocument,
+                    expect.objectContaining<DIDDocument>({
+                        ...lolaDIDDocument,
+                        signature: expect.any(String),
+                    }),
                     expect.any(String),
                     expect.any(String),
                 );
@@ -947,7 +953,10 @@ describe('Smash Tutorial', () => {
                         }, TEST_CONFIG.TEST_TIMEOUT_MS * 2);
                         bob.once(NBH_PROFILE_LIST, (_, profiles) => {
                             const aliceProfile = profiles.find(
-                                (profile) => profile.did.id === alice.did,
+                                (profile) =>
+                                    (typeof profile.did === 'string'
+                                        ? profile.did
+                                        : profile.did.id) === alice.did,
                             );
                             clearTimeout(timeout);
                             resolve(aliceProfile?.scores?.distance ?? Infinity);
