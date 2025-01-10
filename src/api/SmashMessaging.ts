@@ -34,8 +34,6 @@ import type {
 import { LogLevel, Logger } from '@src/shared/utils/Logger.js';
 import { EventEmitter } from 'events';
 
-type ProfileMeta = Omit<IMProfile, 'did'>;
-
 /**
  * Main public API for the Smash Protocol
  * @public
@@ -46,7 +44,7 @@ export class SmashMessaging extends EventEmitter {
     protected readonly peers: PeerRegistry;
     private readonly sessionManager: SessionManager;
     private readonly smeSocketManager: SMESocketManager;
-    private meta: Partial<ProfileMeta> = {};
+    private meta: Partial<IMProfile> = {};
 
     /**
      * Create a new SmashMessaging instance to start using the Smash Protocol
@@ -317,7 +315,7 @@ export class SmashMessaging extends EventEmitter {
     /**
      * Update profile metadata
      */
-    public async updateMeta(meta?: Partial<ProfileMeta>): Promise<void> {
+    public async updateMeta(meta?: Partial<IMProfile>): Promise<void> {
         this.meta = meta || {};
         await this.peers.updateUserProfile(this.profile);
     }
