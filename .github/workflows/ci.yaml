@@ -251,7 +251,7 @@ jobs:
             - name: Send Success Email
               uses: dawidd6/action-send-mail@v3
               with:
-                  server_address: '100.115.61.18'
+                  server_address: '100.103.0.14'
                   server_port: '2525'
                   username: 'github-actions@unstaticlabs.com'
                   password: 'not_required'
