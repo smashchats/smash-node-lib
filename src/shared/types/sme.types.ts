@@ -1,6 +1,6 @@
 import type { IECKeyPair } from '2key-ratchet';
 
-interface WithURL {
+export interface WithURL {
     url: string;
 }
 
