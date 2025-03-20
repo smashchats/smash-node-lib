@@ -9,6 +9,7 @@ import type { SMESocketManager } from '@src/infrastructure/network/sme/SMESocket
 import type {
     SMEConfigJSONWithoutDefaults,
     SmashEndpoint,
+    WithURL,
 } from '@src/shared/types/sme.types.js';
 import type { Logger } from '@src/shared/utils/Logger.js';
 
@@ -29,7 +30,7 @@ export class EndpointManager extends Map<string, SmashEndpoint> {
      * @param endpoints configuration of the endpoints to set (add or keep)
      */
     async reset(
-        endpoints: (SmashEndpoint & SMEConfigJSONWithoutDefaults)[],
+        endpoints: (WithURL & SMEConfigJSONWithoutDefaults)[],
     ): Promise<void> {
         const { endpointsToConnect, endpointsToDisconnect } =
             this.categorizeEndpoints(endpoints);
@@ -39,7 +40,7 @@ export class EndpointManager extends Map<string, SmashEndpoint> {
     }
 
     private categorizeEndpoints(
-        endpoints: (SmashEndpoint & SMEConfigJSONWithoutDefaults)[],
+        endpoints: (WithURL & SMEConfigJSONWithoutDefaults)[],
     ) {
         const endpointsToConnect = endpoints.filter(
             (endpoint) => !super.has(endpoint.url),
@@ -71,7 +72,7 @@ export class EndpointManager extends Map<string, SmashEndpoint> {
     }
 
     private async connectNewEndpoints(
-        endpointsToConnect: (SmashEndpoint & SMEConfigJSONWithoutDefaults)[],
+        endpointsToConnect: (WithURL & SMEConfigJSONWithoutDefaults)[],
     ) {
         if (endpointsToConnect.length) {
             const prekeyPair = this.getPrekeyPair();
