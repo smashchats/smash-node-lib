@@ -28,7 +28,7 @@ jobs:
 
             - name: Check Cache
               id: cache-check
-              uses: actions/cache/restore@v4
+              uses: actions/cache/restore@v4.2.3
               with:
                   path: |
                       node_modules
@@ -41,7 +41,7 @@ jobs:
 
             - name: Cache Dependencies
               if: steps.cache-check.outputs.cache-hit != 'true'
-              uses: actions/cache/save@v4
+              uses: actions/cache/save@v4.2.3
               with:
                   path: |
                       node_modules
@@ -70,7 +70,7 @@ jobs:
                   node-version: '22.x'
 
             - name: Restore Cache # Restore cached dependencies
-              uses: actions/cache/restore@v4
+              uses: actions/cache/restore@v4.2.3
               with:
                   path: |
                       node_modules
@@ -121,7 +121,7 @@ jobs:
                   node-version: '22.x'
 
             - name: Restore Cache
-              uses: actions/cache/restore@v4
+              uses: actions/cache/restore@v4.2.3
               with:
                   path: |
                       node_modules
@@ -147,7 +147,7 @@ jobs:
                   node-version: '22.x'
 
             - name: Restore Cache
-              uses: actions/cache/restore@v4
+              uses: actions/cache/restore@v4.2.3
               with:
                   path: |
                       node_modules
