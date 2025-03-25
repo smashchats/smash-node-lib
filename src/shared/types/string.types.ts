@@ -5,3 +5,8 @@ export const reverseDNSRegex =
 export type reverseDNS = `${string}.${string}.${string}`;
 export type sha256 = `${string & { length: 64 }}`;
 export type undefinedString = '' | '0';
+
+// TODO: better restrict type
+export type base64Content = string;
+
+// TODO: align with https://atproto.blue/en/latest/atproto/atproto_client.models.string_formats.html

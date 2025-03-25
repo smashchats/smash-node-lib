@@ -8,3 +8,4 @@ export * from '@src/shared/types/message.types.js';
 export * from '@src/shared/types/smash.types.js';
 export * from '@src/shared/types/sme.types.js';
 export * from '@src/shared/types/string.types.js';
+export * from '@src/shared/types/messages/index.js';

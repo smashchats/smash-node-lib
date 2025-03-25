@@ -3,6 +3,14 @@ import { Crypto } from '@peculiar/webcrypto';
 import { BufferUtils } from '@src/core/crypto/utils/BufferUtils.js';
 import { KeyUtils } from '@src/core/crypto/utils/KeyUtils.js';
 import { SigningUtils } from '@src/core/crypto/utils/SigningUtils.js';
+import {
+    AspectRatio,
+    IMMediaEmbedded,
+    IMMediaEmbeddedMessage,
+    IMProfile,
+    IMProfileMessage,
+    IMText,
+} from '@src/shared/types/messages/index.js';
 import { SME_PUBLIC_KEY, socketServerUrl } from '@tests/jest.global.js';
 import { TEST_CONFIG, aliasWaitFor, delay } from '@tests/utils/time.utils.js';
 import { defaultDidManager } from '@tests/utils/user.utils.js';
@@ -12,11 +20,9 @@ import {
     DIDDocument,
     DIDString,
     IMPeerIdentity,
-    IMProfile,
-    IMProfileMessage,
     IMProtoMessage,
-    IMText,
     IM_CHAT_TEXT,
+    IM_MEDIA_EMBEDDED,
     IM_PROFILE,
     Logger,
     NBH_ADDED,
@@ -1050,6 +1056,167 @@ describe('Smash Tutorial', () => {
                         expect(newDistance).toEqual(initialDistance);
                     },
                     TEST_CONFIG.TEST_TIMEOUT_MS * 10,
+                );
+            });
+        });
+    });
+
+    /**
+     * @tutorial-section 6. Media Messages
+     * @concepts
+     * - Media message types
+     * - Binary content handling
+     * - Media metadata
+     * - File handling
+     * - Base64 conversion
+     *
+     * @context
+     * Smash supports sending media content directly in messages.
+     * Media messages include metadata for proper display and accessibility.
+     * The library provides convenient methods to create media messages from various sources.
+     */
+    describe('6. Media Messages', () => {
+        const fileContent = new Uint8Array([
+            0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00,
+            0x0d, 0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00,
+            0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4, 0x89,
+            0x00, 0x00, 0x00, 0x0a, 0x49, 0x44, 0x41, 0x54, 0x08, 0xd7, 0x63,
+            0x60, 0x00, 0x00, 0x00, 0x02, 0x00, 0x01, 0xe2, 0x21, 0xbc, 0x33,
+            0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60,
+            0x82,
+        ]);
+
+        /**
+         * @tutorial-section 6.1 Creating Media Messages
+         * @concepts
+         * - File API integration
+         * - Blob handling
+         * - Base64 conversion
+         * - Image metadata
+         */
+        describe('6.1 Creating Media Messages', () => {
+            const base64Content = BufferUtils.mediaToBase64(fileContent);
+            const imageMimeType = 'image/png';
+            const imageAlt = 'Test image';
+            const imageRatio: AspectRatio = {
+                width: 1,
+                height: 1,
+            };
+
+            const assertMessageContent = (
+                fileMessage: IMMediaEmbeddedMessage,
+            ) => {
+                expect(fileMessage.data.mimeType).toBe(imageMimeType);
+                expect(fileMessage.data.content).toEqual(base64Content);
+                expect(fileMessage.data.alt).toBe(imageAlt);
+                expect(fileMessage.data.aspectRatio).toBe(imageRatio);
+            };
+
+            test('6.1.1 Creating Media Message from File or a Blob', async () => {
+                const file = new File([fileContent], 'test.png', {
+                    type: imageMimeType,
+                });
+                assertMessageContent(
+                    await IMMediaEmbedded.fromFile(file, imageAlt, imageRatio),
+                );
+            });
+
+            test('6.1.2 Creating Media Message from Raw Bytes', () => {
+                assertMessageContent(
+                    IMMediaEmbedded.fromUint8Array(
+                        fileContent,
+                        imageMimeType,
+                        imageAlt,
+                        imageRatio,
+                    ),
+                );
+            });
+
+            test('6.1.3 From a base64 string', () => {
+                assertMessageContent(
+                    IMMediaEmbedded.fromBase64(
+                        base64Content,
+                        imageMimeType,
+                        imageAlt,
+                        imageRatio,
+                    ),
+                );
+            });
+        });
+
+        /**
+         * @tutorial-step 6.2
+         * @task Send and receive media messages
+         * @concepts
+         * - Message sending
+         * - Event handling
+         * - Message validation
+         */
+        describe('Sending and receiving media messages', () => {
+            // TODO: add section numbers to all previous tests
+            // TODO: refactor test file preserving readability
+            // TODO: update generated docs from tutorial (with GPT, save prompt)
+
+            const testContext = {
+                async initializePeer(name: string) {
+                    const identity = await didDocumentManager.generate();
+                    const messaging = new SmashUser(identity, name);
+                    await messaging.updateMeta({ title: name });
+
+                    const preKeyPair =
+                        await defaultDidManager.generateNewPreKeyPair(identity);
+                    await messaging.endpoints.connect(
+                        {
+                            url: socketServerUrl,
+                            smePublicKey: SME_PUBLIC_KEY,
+                        },
+                        preKeyPair,
+                    );
+
+                    didDocumentManager.set(await messaging.getDIDDocument());
+                    return messaging;
+                },
+            };
+
+            let alice: SmashMessaging;
+            let bob: SmashMessaging;
+
+            beforeEach(async () => {
+                [alice, bob] = await Promise.all([
+                    testContext.initializePeer('Alice'),
+                    testContext.initializePeer('Bob'),
+                ]);
+            }, TEST_CONFIG.TEST_TIMEOUT_MS * 2);
+
+            afterEach(async () => {
+                await Promise.allSettled([alice.close(), bob.close()]);
+                await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
+            }, TEST_CONFIG.TEST_TIMEOUT_MS * 2);
+
+            test('6.2. Sending and receiving media messages', async () => {
+                const onBobMediaMessage = jest.fn();
+                bob.on(IM_MEDIA_EMBEDDED, onBobMediaMessage);
+
+                const imageData = {
+                    mimeType: 'image/png',
+                    content:
+                        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVQI12NgAAAAAgAB4iG8MwAAAABJRU5ErkJggg==',
+                    alt: 'Test image',
+                };
+
+                const bobReceivedMessage = waitFor(bob, IM_MEDIA_EMBEDDED);
+                await alice.send(bob.did, new IMMediaEmbedded(imageData));
+                await bobReceivedMessage;
+
+                expect(onBobMediaMessage).toHaveBeenCalledWith(
+                    alice.did,
+                    expect.objectContaining<IMMediaEmbeddedMessage>({
+                        type: IM_MEDIA_EMBEDDED,
+                        data: expect.objectContaining(imageData),
+                        sha256: expect.any(String),
+                        timestamp: expect.any(String),
+                        after: expect.any(String),
+                    }),
                 );
             });
         });

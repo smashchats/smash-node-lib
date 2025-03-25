@@ -1,6 +1,6 @@
-import type { MessageStatus } from '@src/shared/lexicon/improto.lexicon.js';
 import type { DIDString } from '@src/shared/types/did.types.js';
 import type { EncapsulatedIMProtoMessage } from '@src/shared/types/message.types.js';
+import type { MessageStatus } from '@src/shared/types/messages/index.js';
 import type { sha256 } from '@src/shared/types/string.types.js';
 
 // Custom events map their names to tuple types of their arguments

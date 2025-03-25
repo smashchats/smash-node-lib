@@ -12,13 +12,10 @@ import { OperationError } from '@src/shared/errors/OperationError.js';
 import type { EventArgs } from '@src/shared/events/EventArgs.js';
 import type { MessagingEventMap } from '@src/shared/events/MessagingEventMap.js';
 import {
-    type IMProfile,
-    type IMReadACKMessage,
     IM_ACK_READ,
     IM_ACK_RECEIVED,
     IM_SESSION_ENDPOINT,
     IM_SESSION_RESET,
-    type MessageStatus,
 } from '@src/shared/lexicon/improto.lexicon.js';
 import type {
     DID,
@@ -31,6 +28,11 @@ import type {
     reverseDNS,
     sha256,
 } from '@src/shared/types/index.js';
+import {
+    IMProfile,
+    IMReadACKMessage,
+    MessageStatus,
+} from '@src/shared/types/messages/index.js';
 import { LogLevel, Logger } from '@src/shared/utils/Logger.js';
 import { EventEmitter } from 'events';
 

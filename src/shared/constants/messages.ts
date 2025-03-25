@@ -1,13 +1,12 @@
-import {
-    type IMSessionResetMessage,
-    IM_SESSION_RESET,
-} from '@src/shared/lexicon/improto.lexicon.js';
+import { IM_SESSION_RESET } from '@src/shared/lexicon/improto.lexicon.js';
 import {
     SMASH_NBH_DISCOVER,
     SMASH_NBH_JOIN,
     type SmashChatDiscoverMessage,
     type SmashChatJoinMessage,
 } from '@src/shared/lexicon/smashchats.lexicon.js';
+
+import { IMSessionResetMessage } from '../types/messages/index.js';
 
 export const IM_RESET_SESSION_MESSAGE = {
     type: IM_SESSION_RESET,

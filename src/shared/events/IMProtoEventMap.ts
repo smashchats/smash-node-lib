@@ -1,15 +1,9 @@
 import type {
-    IMDIDDocumentMessage,
-    IMProfileMessage,
-    IMReadACKMessage,
-    IMReceivedACKMessage,
-    IMSessionEndpointMessage,
-    IMSessionResetMessage,
-    IMTextMessage,
     IM_ACK_READ,
     IM_ACK_RECEIVED,
     IM_CHAT_TEXT,
     IM_DID_DOCUMENT,
+    IM_MEDIA_EMBEDDED,
     IM_PROFILE,
     IM_SESSION_ENDPOINT,
     IM_SESSION_RESET,
@@ -25,11 +19,22 @@ import type {
     SmashChatRelationshipMessage,
 } from '@src/shared/lexicon/smashchats.lexicon.js';
 import type { EncapsulatedIMProtoMessage } from '@src/shared/types/message.types.js';
+import type {
+    IMDIDDocumentMessage,
+    IMMediaEmbeddedMessage,
+    IMProfileMessage,
+    IMReadACKMessage,
+    IMReceivedACKMessage,
+    IMSessionEndpointMessage,
+    IMSessionResetMessage,
+    IMTextMessage,
+} from '@src/shared/types/messages/index.js';
 import type { reverseDNS } from '@src/shared/types/string.types.js';
 
 // Map of known event types to their corresponding message types
 export type IMProtoEventMap = {
     [IM_CHAT_TEXT]: IMTextMessage;
+    [IM_MEDIA_EMBEDDED]: IMMediaEmbeddedMessage;
     [IM_PROFILE]: IMProfileMessage;
     [IM_DID_DOCUMENT]: IMDIDDocumentMessage;
     [IM_SESSION_RESET]: IMSessionResetMessage;

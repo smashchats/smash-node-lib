@@ -23,4 +23,22 @@ export class BufferUtils {
     static objectToBuffer(object: unknown): ArrayBuffer {
         return this.stringToBuffer(JSON.stringify(object), 'utf8');
     }
+
+    /**
+     * Converts binary media content to base64 for transmission
+     * @param content Raw media content
+     * @returns Base64 encoded string
+     */
+    static mediaToBase64(content: Uint8Array): string {
+        return Buffer.from(content).toString('base64');
+    }
+
+    /**
+     * Converts base64 media content back to binary
+     * @param base64 Base64 encoded media content
+     * @returns Raw media content
+     */
+    static base64ToMedia(base64: string): Uint8Array {
+        return new Uint8Array(Buffer.from(base64, 'base64'));
+    }
 }

@@ -1,13 +1,13 @@
 import { encapsulateMessage } from '@src/api/tools/encapsulateMessage.js';
 import { DIDManager } from '@src/core/identity/did/DIDManager.js';
 import type { SmashPeer } from '@src/core/messaging/peer/SmashPeer.js';
-import type {
-    IMProfile,
-    IMProfileMessage,
-} from '@src/shared/lexicon/improto.lexicon.js';
 import { IM_PROFILE } from '@src/shared/lexicon/improto.lexicon.js';
 import type { DID, DIDString } from '@src/shared/types/did.types.js';
 import type { EncapsulatedIMProtoMessage } from '@src/shared/types/message.types.js';
+import type {
+    IMProfile,
+    IMProfileMessage,
+} from '@src/shared/types/messages/index.js';
 import type { Logger } from '@src/shared/utils/Logger.js';
 
 export class PeerRegistry extends Map<DIDString, SmashPeer> {

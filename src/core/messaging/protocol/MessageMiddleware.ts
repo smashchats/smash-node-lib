@@ -1,11 +1,6 @@
 import { DIDManager } from '@src/core/identity/did/DIDManager.js';
 import type { PeerRegistry } from '@src/core/messaging/peer/PeerRegistry.js';
 import type { SmashPeer } from '@src/core/messaging/peer/SmashPeer.js';
-import type {
-    IMDIDDocumentMessage,
-    IMProfileMessage,
-    IMReceivedACKMessage,
-} from '@src/shared/lexicon/improto.lexicon.js';
 import {
     IM_ACK_RECEIVED,
     IM_DID_DOCUMENT,
@@ -14,6 +9,11 @@ import {
 import type { DIDDocument } from '@src/shared/types/did.types.js';
 import type { Firehose } from '@src/shared/types/firehose.types.js';
 import type { EncapsulatedIMProtoMessage } from '@src/shared/types/message.types.js';
+import type {
+    IMDIDDocumentMessage,
+    IMProfileMessage,
+    IMReceivedACKMessage,
+} from '@src/shared/types/messages/index.js';
 import { DLQ } from '@src/shared/utils/DLQ.js';
 import type { Logger } from '@src/shared/utils/Logger.js';
 

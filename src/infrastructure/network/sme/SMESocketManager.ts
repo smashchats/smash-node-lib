@@ -3,10 +3,10 @@ import { encapsulateMessage } from '@src/api/tools/encapsulateMessage.js';
 import type { SessionManager } from '@src/core/messaging/session/SessionManager.js';
 import { SMESocketReadWrite } from '@src/infrastructure/network/sme/SMESocketReadWrite.js';
 import { SMESocketWriteOnly } from '@src/infrastructure/network/sme/SMESocketWriteOnly.js';
-import type { IMSessionEndpointMessage } from '@src/shared/lexicon/improto.lexicon.js';
 import { IM_SESSION_ENDPOINT } from '@src/shared/lexicon/improto.lexicon.js';
 import type { onMessagesStatusFn } from '@src/shared/types/callbacks.types.js';
 import type { EncapsulatedIMProtoMessage } from '@src/shared/types/message.types.js';
+import type { IMSessionEndpointMessage } from '@src/shared/types/messages/index.js';
 import type {
     SMEConfigJSONWithoutDefaults,
     SmashEndpoint,
