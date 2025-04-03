@@ -2,6 +2,7 @@ import { encapsulateMessage } from '@src/api/tools/encapsulateMessage.js';
 import { DIDManager } from '@src/core/identity/did/DIDManager.js';
 import type { PeerRegistry } from '@src/core/messaging/peer/PeerRegistry.js';
 import { SmashPeerEndpoint } from '@src/core/messaging/peer/SmashPeerEndpoint.js';
+import { MessageSplitter } from '@src/core/messaging/protocol/MessageSplitter.js';
 import type { SessionManager } from '@src/core/messaging/session/SessionManager.js';
 import { SignalSession } from '@src/core/messaging/session/SignalSession.js';
 import type { SMESocketManager } from '@src/infrastructure/network/sme/SMESocketManager.js';
@@ -17,6 +18,7 @@ import type {
     EncapsulatedIMProtoMessage,
     IMProtoMessage,
 } from '@src/shared/types/message.types.js';
+import type { IMPartData } from '@src/shared/types/messages/IMPartMessage.js';
 import type { SmashEndpoint } from '@src/shared/types/sme.types.js';
 import type {
     sha256,
@@ -49,6 +51,8 @@ export class SmashPeer {
     private lastRelationshipSha256: sha256 | undefinedString = '';
     private closed = false;
 
+    private messageSplitter: MessageSplitter;
+
     constructor(
         private readonly logger: Logger,
         private readonly did: DID,
@@ -60,6 +64,7 @@ export class SmashPeer {
     ) {
         this.id = typeof did === 'string' ? did : did.id;
         this.config = this.initializeConfig(config);
+        this.messageSplitter = new MessageSplitter(this.logger);
     }
 
     private initializeConfig(config: PeerConfig): Required<PeerConfig> {
@@ -145,8 +150,34 @@ export class SmashPeer {
         message: IMProtoMessage | EncapsulatedIMProtoMessage,
     ): Promise<EncapsulatedIMProtoMessage> {
         const encapsulatedMessage = await this.encapsulateIfNeeded(message);
-        await this.queueMessage(encapsulatedMessage);
-        await this.flushQueue();
+
+        if (this.messageSplitter.needsSplitting(encapsulatedMessage)) {
+            const parts = this.messageSplitter.split(encapsulatedMessage);
+            this.logger.debug(`Sending ${parts.length} message parts`);
+
+            const sentParts: EncapsulatedIMProtoMessage[] = [];
+            for (const part of parts) {
+                try {
+                    const encapsulatedPart = await encapsulateMessage(part);
+                    await this.queueMessage(encapsulatedPart);
+                    await this.flushQueue();
+
+                    this.logger.debug(
+                        `Sent part ${(part.data as IMPartData).partNumber + 1}/${parts.length} with SHA256 ${encapsulatedPart.sha256}`,
+                    );
+
+                    sentParts.push(encapsulatedPart);
+                } catch (error) {
+                    this.logger.error(
+                        `Failed to send part ${(part.data as IMPartData).partNumber + 1}/${parts.length}: ${error}`,
+                    );
+                    throw error;
+                }
+            }
+        } else {
+            await this.queueMessage(encapsulatedMessage);
+            await this.flushQueue();
+        }
         return encapsulatedMessage;
     }
 

@@ -5,6 +5,7 @@ import { DIDManager } from '@src/core/identity/did/DIDManager.js';
 import { PeerRegistry } from '@src/core/messaging/peer/PeerRegistry.js';
 import { SmashPeer } from '@src/core/messaging/peer/SmashPeer.js';
 import { MessageMiddleware } from '@src/core/messaging/protocol/MessageMiddleware.js';
+import { MessageReassembler } from '@src/core/messaging/protocol/MessageReassembler.js';
 import { SessionManager } from '@src/core/messaging/session/SessionManager.js';
 import { EndpointManager } from '@src/infrastructure/network/endpoints/EndpointManager.js';
 import { SMESocketManager } from '@src/infrastructure/network/sme/SMESocketManager.js';
@@ -14,6 +15,7 @@ import type { MessagingEventMap } from '@src/shared/events/MessagingEventMap.js'
 import {
     IM_ACK_READ,
     IM_ACK_RECEIVED,
+    IM_PART,
     IM_SESSION_ENDPOINT,
     IM_SESSION_RESET,
 } from '@src/shared/lexicon/improto.lexicon.js';
@@ -28,6 +30,7 @@ import type {
     reverseDNS,
     sha256,
 } from '@src/shared/types/index.js';
+import type { IMPartData } from '@src/shared/types/messages/IMPartMessage.js';
 import {
     IMProfile,
     IMReadACKMessage,
@@ -46,6 +49,7 @@ export class SmashMessaging extends EventEmitter {
     protected readonly peers: PeerRegistry;
     private readonly sessionManager: SessionManager;
     private readonly smeSocketManager: SMESocketManager;
+    private readonly messageReassembler: MessageReassembler;
     private meta: Partial<IMProfile> = {};
 
     /**
@@ -89,6 +93,8 @@ export class SmashMessaging extends EventEmitter {
             this.smeSocketManager,
             this.sessionManager,
         );
+
+        this.messageReassembler = new MessageReassembler(this.logger);
 
         this.registerEventHandlers();
         this.logger.info(
@@ -191,25 +197,69 @@ export class SmashMessaging extends EventEmitter {
         );
     }
 
+    private async notifyNewMessage(
+        sender: DIDString,
+        message: EncapsulatedIMProtoMessage,
+    ): Promise<void> {
+        this.logger.debug(
+            `notifyNewMessage (${message.type}) for sender ${sender}`,
+        );
+        this.logger.debug(message);
+        if (this.isValidMessageType(message.type)) {
+            this.logger.debug(
+                `Emitting message of type ${message.type} for sender ${sender}`,
+            );
+            this.emit(message.type, sender, message);
+        } else {
+            this.logger.warn(
+                `Invalid message type format received: ${message.type} from sender ${sender}`,
+            );
+        }
+        this.logger.debug(
+            `Emitting 'data' event for message ${message.sha256} from sender ${sender}`,
+        );
+        this.emit('data', sender, message);
+    }
+
     private async notifyNewMessages(
         sender: DIDString,
         messages: EncapsulatedIMProtoMessage[],
     ): Promise<void> {
-        if (!messages?.length) return;
+        if (!messages?.length) {
+            this.logger.debug('No messages to notify');
+            return;
+        }
+        this.logger.debug(
+            `Processing ${messages.length} new messages from sender ${sender}`,
+        );
 
-        this.logger.debug(`notifyNewMessages (${messages?.length})`);
-        this.logger.debug(JSON.stringify(messages, null, 2));
+        for (const message of messages) {
+            this.logger.debug(
+                `Processing message ${message.sha256} of type ${message.type}`,
+            );
 
-        messages.forEach((message) => {
-            if (this.isValidMessageType(message.type)) {
-                this.emit(message.type, sender, message);
-            } else {
-                this.logger.warn(
-                    `Invalid message type format received: ${message.type}`,
+            if (message.type === IM_PART) {
+                this.logger.debug(
+                    `Received part message ${message.sha256} for original message ${(message.data as IMPartData).originalSha256}`,
                 );
+                this.logger.debug(message);
+
+                const reassembledMessage =
+                    this.messageReassembler.addPart(message);
+                if (reassembledMessage) {
+                    this.logger.info(
+                        `Successfully reassembled message ${reassembledMessage.sha256} from parts`,
+                    );
+                    await this.notifyNewMessage(sender, reassembledMessage);
+                } else {
+                    this.logger.debug(
+                        `Waiting for more parts for message ${(message.data as IMPartData).originalSha256}`,
+                    );
+                }
+            } else {
+                await this.notifyNewMessage(sender, message);
             }
-            this.emit('data', sender, message);
-        });
+        }
     }
 
     private isValidMessageType(type: string): boolean {

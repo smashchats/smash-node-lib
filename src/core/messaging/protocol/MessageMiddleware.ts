@@ -59,9 +59,9 @@ export class MessageMiddleware {
         // TODO: handle profile/DID updates (for now only handles IK updates)
         this.dlq.push(peerIk, ...messages);
         this.logger.debug(
-            `Queued ${messages.length} messages from unknown peer (IK: ${peerIk})`,
+            `> queued ${messages.length} incoming messages FROM unknown peer (IK: ${peerIk})`,
         );
-        this.logger.debug(JSON.stringify(messages, null, 2));
+        // this.logger.debug(JSON.stringify(messages, null, 2));
 
         const did = await this.resolvePeerDID(peerIk, messages);
         if (did) {

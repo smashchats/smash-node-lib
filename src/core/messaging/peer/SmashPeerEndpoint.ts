@@ -157,7 +157,7 @@ export class SmashPeerEndpoint {
             this.logger.debug(
                 `> flushed ${messages.length} messages to ${this.config.url} (cleared queue)`,
             );
-            this.logger.debug(JSON.stringify(messages, null, 2));
+            this.logger.debug(messages);
         } catch (error) {
             await this.handleFlushError(error as Error);
         }

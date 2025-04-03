@@ -3,6 +3,8 @@ import { EventEmitter } from 'events';
 export type LogLevel = 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
 
 export class Logger extends EventEmitter {
+    private static readonly MAX_STRING_LENGTH = 72;
+
     constructor(
         private readonly logID: string = 'Logger',
         private readonly logLevel: LogLevel = 'INFO',
@@ -15,13 +17,42 @@ export class Logger extends EventEmitter {
         return levels.indexOf(level) >= levels.indexOf(this.logLevel);
     }
 
-    private log(level: LogLevel, message: string, ...args: unknown[]): void {
+    private shortenLongFields(obj: unknown): unknown {
+        if (typeof obj === 'string') {
+            return obj.length > Logger.MAX_STRING_LENGTH
+                ? `${obj.substring(0, Logger.MAX_STRING_LENGTH)}...`
+                : obj;
+        }
+
+        if (Array.isArray(obj)) {
+            return obj.map((item) => this.shortenLongFields(item));
+        }
+
+        if (obj && typeof obj === 'object') {
+            const result: Record<string, unknown> = {};
+            for (const [key, value] of Object.entries(obj)) {
+                result[key] = this.shortenLongFields(value);
+            }
+            return result;
+        }
+
+        return obj;
+    }
+
+    private formatMessage(message: unknown): string {
+        if (typeof message === 'string') {
+            return message;
+        }
+        return JSON.stringify(this.shortenLongFields(message), null, 2);
+    }
+
+    private log(level: LogLevel, message: unknown, ...args: unknown[]): void {
         if (
             this.shouldLog(level) &&
             typeof globalThis.console !== 'undefined'
         ) {
             const timestamp = new Date().toISOString();
-            const formattedMessage = `[${this.logID}] [${timestamp}] [${level}] ${message}`;
+            const formattedMessage = `[${this.logID}] [${timestamp}] [${level}] ${this.formatMessage(message)}`;
 
             // Color codes for different log levels
             const colors = {
@@ -36,7 +67,7 @@ export class Logger extends EventEmitter {
 
             // Apply color to both message and args
             const coloredArgs = args.map(
-                (arg) => `${colorCode}${arg}${resetCode}`,
+                (arg) => `${colorCode}${this.formatMessage(arg)}${resetCode}`,
             );
 
             switch (level) {
@@ -66,23 +97,28 @@ export class Logger extends EventEmitter {
                     break;
             }
 
-            this.emit('log', { level, message, args, timestamp });
+            this.emit('log', {
+                level,
+                message: this.shortenLongFields(message),
+                args: this.shortenLongFields(args),
+                timestamp,
+            });
         }
     }
 
-    debug(message: string, ...args: unknown[]): void {
+    debug(message: unknown, ...args: unknown[]): void {
         this.log('DEBUG', message, ...args);
     }
 
-    info(message: string, ...args: unknown[]): void {
+    info(message: unknown, ...args: unknown[]): void {
         this.log('INFO', message, ...args);
     }
 
-    warn(message: string, ...args: unknown[]): void {
+    warn(message: unknown, ...args: unknown[]): void {
         this.log('WARN', message, ...args);
     }
 
-    error(message: string, ...args: unknown[]): void {
+    error(message: unknown, ...args: unknown[]): void {
         this.log('ERROR', message, ...args);
     }
 }

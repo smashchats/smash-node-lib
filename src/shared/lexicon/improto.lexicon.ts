@@ -5,6 +5,7 @@ export const IM_CHAT_TEXT = 'org.improto.chat.text' as const;
 export const IM_MEDIA_EMBEDDED = 'org.improto.media.embedded' as const;
 export const IM_PROFILE = 'org.improto.profile' as const;
 export const IM_DID_DOCUMENT = 'org.improto.did.document' as const;
+export const IM_PART = 'org.improto.part' as const;
 
 // System message types
 export const IM_ACK_RECEIVED = 'org.improto.ack.received' as const;
