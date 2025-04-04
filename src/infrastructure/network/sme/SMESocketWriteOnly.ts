@@ -174,12 +174,12 @@ export class SMESocketWriteOnly {
             transports: ['websocket', 'polling', 'webtransport'],
             // TODO: test reconnection/transport failure scenarios
             reconnection: true,
-            reconnectionAttempts: 3,
-            reconnectionDelay: 500,
-            reconnectionDelayMax: 1000,
-            timeout: 5000,
-            ackTimeout: 5000,
-            retries: 10,
+            reconnectionAttempts: 20,
+            reconnectionDelay: 1000,
+            reconnectionDelayMax: 5000,
+            timeout: 30000,
+            ackTimeout: 10000,
+            retries: 20,
         });
     }
 
