@@ -18,7 +18,7 @@ jobs:
                   persist-credentials: false
 
             - name: Setup Node.js
-              uses: actions/setup-node@v4
+              uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
               with:
                   node-version: '22.x'
 
@@ -28,7 +28,7 @@ jobs:
 
             - name: Check Cache
               id: cache-check
-              uses: actions/cache/restore@v4.2.3
+              uses: actions/cache/restore@v4
               with:
                   path: |
                       node_modules
@@ -41,7 +41,7 @@ jobs:
 
             - name: Cache Dependencies
               if: steps.cache-check.outputs.cache-hit != 'true'
-              uses: actions/cache/save@v4.2.3
+              uses: actions/cache/save@v4
               with:
                   path: |
                       node_modules
@@ -65,12 +65,12 @@ jobs:
                   persist-credentials: false
 
             - name: Setup Node.js
-              uses: actions/setup-node@v4
+              uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
               with:
                   node-version: '22.x'
 
             - name: Restore Cache # Restore cached dependencies
-              uses: actions/cache/restore@v4.2.3
+              uses: actions/cache/restore@v4
               with:
                   path: |
                       node_modules
@@ -85,7 +85,7 @@ jobs:
             - name: Process Coverage Report
               id: coverageComment
               if: github.ref_name == 'main'
-              uses: MishaKav/jest-coverage-comment@main
+              uses: MishaKav/jest-coverage-comment@v1
               continue-on-error: true
               with:
                   github-token: ${{ secrets.TOKEN }}
@@ -99,7 +99,7 @@ jobs:
 
             - name: Analyze with SonarQube
               if: github.ref_name == 'main'
-              uses: SonarSource/sonarqube-scan-action@v4.1.0
+              uses: SonarSource/sonarqube-scan-action@v5.1.0
               continue-on-error: true
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -116,12 +116,12 @@ jobs:
                   persist-credentials: false
 
             - name: Setup Node.js
-              uses: actions/setup-node@v4
+              uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
               with:
                   node-version: '22.x'
 
             - name: Restore Cache
-              uses: actions/cache/restore@v4.2.3
+              uses: actions/cache/restore@v4
               with:
                   path: |
                       node_modules
@@ -142,12 +142,12 @@ jobs:
                   persist-credentials: false
 
             - name: Setup Node.js
-              uses: actions/setup-node@v4
+              uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
               with:
                   node-version: '22.x'
 
             - name: Restore Cache
-              uses: actions/cache/restore@v4.2.3
+              uses: actions/cache/restore@v4
               with:
                   path: |
                       node_modules
