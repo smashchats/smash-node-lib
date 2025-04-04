@@ -20,7 +20,14 @@ export interface IMReceivedACKMessage extends IMACKMessage {
     type: typeof IM_ACK_RECEIVED;
 }
 
-export type MessageStatus = 'delivered' | 'received' | 'read';
+export type MessageStatus =
+    | 'sending'
+    | 'delivered'
+    | 'received'
+    | 'read'
+    | 'error';
+// TODO: double check status lifecycle implementation accross lib
+// in particular, error states and (re)sending states
 
 /**
  * Read ACK message
