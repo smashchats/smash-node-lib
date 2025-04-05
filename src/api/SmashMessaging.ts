@@ -1,3 +1,4 @@
+import { encapsulateMessage } from '@src/api/tools/encapsulateMessage.js';
 import type { IRestrictedCryptoEngine } from '@src/core/crypto/engine/CryptoEngine.js';
 import { CryptoManager } from '@src/core/crypto/engine/CryptoManager.js';
 import { IMPeerIdentity } from '@src/core/identity/IMPeerIdentity.js';
@@ -333,7 +334,12 @@ export class SmashMessaging extends EventEmitter {
         message: IMProtoMessage | EncapsulatedIMProtoMessage,
     ): Promise<EncapsulatedIMProtoMessage> {
         const peer = await this.peers.getOrCreate(peerDid);
-        return peer.send(message);
+        const encapsulatedMessage =
+            'sha256' in message
+                ? (message as EncapsulatedIMProtoMessage)
+                : await encapsulateMessage(message);
+        await peer.send(encapsulatedMessage);
+        return encapsulatedMessage;
     }
 
     /**

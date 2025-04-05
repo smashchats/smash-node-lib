@@ -61,6 +61,8 @@ export class DIDDocManager implements IDIDResolver {
     ): Promise<IECKeyPair> {
         const preKeyPair =
             await IMPeerIdentity.generateExchangeKeys(exportable);
+        // TODO: do not add prekey pair to identity from here!!! not the responsibility of the DIDDocManager
+        // instead, let the caller handle it AND also make sure the join action handles it correctly
         identity.addPreKeyPair(preKeyPair);
         return preKeyPair;
     }

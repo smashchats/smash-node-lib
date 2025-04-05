@@ -8,8 +8,6 @@ import { base64Content, sha256 } from '@src/shared/types/string.types.js';
 export interface IMPartData {
     /** The original message type */
     originalType: string;
-    /** The original message data */
-    originalData: unknown;
     /** The part number (0-based) */
     partNumber: number;
     /** Total number of parts */

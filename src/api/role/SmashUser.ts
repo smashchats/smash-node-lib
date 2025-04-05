@@ -1,4 +1,5 @@
 import { SmashMessaging } from '@src/api/SmashMessaging.js';
+import { encapsulateMessage } from '@src/api/tools/encapsulateMessage.js';
 import { DIDManager } from '@src/core/identity/did/DIDManager.js';
 import type { SmashPeer } from '@src/core/messaging/peer/SmashPeer.js';
 import {
@@ -82,13 +83,16 @@ export class SmashUser extends SmashMessaging {
     public async discover() {
         const firstNab = this.neighborhoodAdmins.values().next().value;
         if (firstNab) {
-            await firstNab.send(SMASH_NBH_DISCOVER_MESSAGE);
+            await firstNab.send(
+                await encapsulateMessage(SMASH_NBH_DISCOVER_MESSAGE),
+            );
         }
     }
 
     private async connectToSMEEndpoints(joinAction: SmashActionJson) {
         if (!joinAction.config?.sme?.length) return;
 
+        // TODO: currently, we lose the SME config from the join action
         await Promise.all(
             joinAction.config.sme.map(async (smeConfig) => {
                 const didManager = DIDManager.get(
@@ -113,7 +117,7 @@ export class SmashUser extends SmashMessaging {
 
     private async joinNeighborhood(nabDid: DID) {
         const nabPeer = await this.peers.getOrCreate(nabDid);
-        await nabPeer.send(SMASH_NBH_JOIN_MESSAGE);
+        await nabPeer.send(await encapsulateMessage(SMASH_NBH_JOIN_MESSAGE));
 
         this.neighborhoodAdmins.set(nabPeer.id, nabPeer);
         this.emit(NBH_ADDED, nabPeer.id);

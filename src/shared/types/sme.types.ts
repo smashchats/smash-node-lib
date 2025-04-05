@@ -1,5 +1,8 @@
 import type { IECKeyPair } from '2key-ratchet';
 
+import { EncapsulatedIMProtoMessage } from './message.types.js';
+import { sha256 } from './string.types.js';
+
 export interface WithURL {
     url: string;
 }
@@ -49,3 +52,10 @@ export type SMEConfigJSONWithoutDefaults = Required<SMEConfigBase> &
 
 export type SMEConfigWithoutDefaults = SMEConfigJSONWithoutDefaults &
     Pick<SMEConfig, 'preKeyPair'>;
+
+export type MessageQueueItem = {
+    message: EncapsulatedIMProtoMessage;
+    size: number;
+};
+
+export type MessageQueueMap = Map<sha256, MessageQueueItem>;

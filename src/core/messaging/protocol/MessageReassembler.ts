@@ -4,7 +4,6 @@ import { Logger } from '@src/shared/utils/Logger.js';
 
 interface PartMessage {
     data: IMPartData;
-    sha256: string;
     after: string;
     timestamp: string;
 }
@@ -49,7 +48,6 @@ export class MessageReassembler {
 
         messageParts.push({
             data: partData,
-            sha256: part.sha256,
             after: part.after,
             timestamp: part.timestamp,
         });

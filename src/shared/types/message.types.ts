@@ -24,14 +24,9 @@ export interface EncapsulatedIMProtoMessage extends TimedIMProtoMessage {
     sha256: sha256;
 }
 
+export interface EncapsulatedWithSize extends EncapsulatedIMProtoMessage {
+    size?: number;
+}
+
 export type IMProtoMessage = Partial<EncapsulatedIMProtoMessage> &
     Required<BaseIMProtoMessage>;
-export class IMEncapsulatedMessage implements EncapsulatedIMProtoMessage {
-    constructor(
-        public type: reverseDNS,
-        public data: unknown,
-        public after: sha256 | undefinedString = '',
-        public timestamp: ISO8601 = new Date().toISOString() as ISO8601,
-        public sha256: sha256,
-    ) {}
-}

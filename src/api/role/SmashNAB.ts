@@ -1,4 +1,5 @@
 import { SmashMessaging } from '@src/api/SmashMessaging.js';
+import { encapsulateMessage } from '@src/api/tools/encapsulateMessage.js';
 import { SME_DEFAULT_CONFIG } from '@src/shared/constants/sme.js';
 import {
     type Relationship,
@@ -148,11 +149,13 @@ export abstract class SmashNAB extends SmashMessaging {
             message.sha256,
             message.timestamp,
         );
-        await this.peers.get(did)?.send({
-            type: SMASH_PROFILE_LIST,
-            data: discovered,
-            after: '0', // TODO: Implement meaningful 'after' value handling
-        });
+        await this.peers.get(did)?.send(
+            await encapsulateMessage({
+                type: SMASH_PROFILE_LIST,
+                data: discovered,
+                after: '0', // TODO: Implement meaningful 'after' value handling
+            }),
+        );
     }
 
     private async handleRelationship(

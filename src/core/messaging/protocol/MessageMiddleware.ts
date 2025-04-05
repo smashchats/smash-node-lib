@@ -1,3 +1,4 @@
+import { encapsulateMessage } from '@src/api/tools/encapsulateMessage.js';
 import { DIDManager } from '@src/core/identity/did/DIDManager.js';
 import type { PeerRegistry } from '@src/core/messaging/peer/PeerRegistry.js';
 import type { SmashPeer } from '@src/core/messaging/peer/SmashPeer.js';
@@ -173,9 +174,11 @@ export class MessageMiddleware {
         this.logger.debug(
             `Sending ${messagesToAck.length} received acknowledgements`,
         );
-        await peer.send({
-            type: IM_ACK_RECEIVED,
-            data: messagesToAck.map((m) => m.sha256),
-        } as IMReceivedACKMessage);
+        await peer.send(
+            await encapsulateMessage({
+                type: IM_ACK_RECEIVED,
+                data: messagesToAck.map((m) => m.sha256),
+            } as IMReceivedACKMessage),
+        );
     }
 }

@@ -7,6 +7,7 @@ import type { SessionManager } from '@src/core/messaging/session/SessionManager.
 import { SignalSession } from '@src/core/messaging/session/SignalSession.js';
 import type { SMESocketManager } from '@src/infrastructure/network/sme/SMESocketManager.js';
 import { IM_RESET_SESSION_MESSAGE } from '@src/shared/constants/messages.js';
+import { MAX_MESSAGE_SIZE } from '@src/shared/constants/protocol.js';
 import type { Relationship } from '@src/shared/lexicon/smashchats.lexicon.js';
 import { SMASH_NBH_RELATIONSHIP } from '@src/shared/lexicon/smashchats.lexicon.js';
 import type {
@@ -14,12 +15,11 @@ import type {
     DIDDocument,
     DIDString,
 } from '@src/shared/types/did.types.js';
+import type { EncapsulatedIMProtoMessage } from '@src/shared/types/message.types.js';
 import type {
-    EncapsulatedIMProtoMessage,
-    IMProtoMessage,
-} from '@src/shared/types/message.types.js';
-import type { IMPartData } from '@src/shared/types/messages/IMPartMessage.js';
-import type { SmashEndpoint } from '@src/shared/types/sme.types.js';
+    MessageQueueMap,
+    SmashEndpoint,
+} from '@src/shared/types/sme.types.js';
 import type {
     sha256,
     undefinedString,
@@ -37,10 +37,7 @@ interface PeerConfig {
 export class SmashPeer {
     public readonly id: DIDString;
     private readonly endpoints: SmashPeerEndpoint[] = [];
-    private readonly messageQueue = new Map<
-        sha256,
-        EncapsulatedIMProtoMessage
-    >();
+    private readonly messageQueue: MessageQueueMap = new Map();
     private readonly mutex = new AsyncLock();
     private readonly config: Required<PeerConfig>;
     private readonly alreadyProcessedSessionReset: Set<string> = new Set();
@@ -50,8 +47,6 @@ export class SmashPeer {
     private relationship: Relationship = 'clear';
     private lastRelationshipSha256: sha256 | undefinedString = '';
     private closed = false;
-
-    private messageSplitter: MessageSplitter;
 
     constructor(
         private readonly logger: Logger,
@@ -64,7 +59,6 @@ export class SmashPeer {
     ) {
         this.id = typeof did === 'string' ? did : did.id;
         this.config = this.initializeConfig(config);
-        this.messageSplitter = new MessageSplitter(this.logger);
     }
 
     private initializeConfig(config: PeerConfig): Required<PeerConfig> {
@@ -83,11 +77,13 @@ export class SmashPeer {
         if (this.relationship === relationship) return;
 
         const [nab] = nabs; // ASSUMPTION#4: for now, we assume we only have one NAB to update
-        const updateNabMessage = await nab.send({
-            type: SMASH_NBH_RELATIONSHIP,
-            data: { target: this.id, action: relationship },
-            after: this.lastRelationshipSha256,
-        });
+        const updateNabMessage = await nab.send(
+            await encapsulateMessage({
+                type: SMASH_NBH_RELATIONSHIP,
+                data: { target: this.id, action: relationship },
+                after: this.lastRelationshipSha256,
+            }),
+        );
 
         this.updateRelationshipState(relationship, updateNabMessage.sha256);
     }
@@ -146,61 +142,52 @@ export class SmashPeer {
         });
     }
 
-    async send(
-        message: IMProtoMessage | EncapsulatedIMProtoMessage,
-    ): Promise<EncapsulatedIMProtoMessage> {
-        const encapsulatedMessage = await this.encapsulateIfNeeded(message);
-
-        if (this.messageSplitter.needsSplitting(encapsulatedMessage)) {
-            const parts = this.messageSplitter.split(encapsulatedMessage);
-            this.logger.debug(`Sending ${parts.length} message parts`);
-
-            const sentParts: EncapsulatedIMProtoMessage[] = [];
-            for (const part of parts) {
-                try {
-                    const encapsulatedPart = await encapsulateMessage(part);
-                    await this.queueMessage(encapsulatedPart);
-                    await this.flushQueue();
-
-                    this.logger.debug(
-                        `Sent part ${(part.data as IMPartData).partNumber + 1}/${parts.length} with SHA256 ${encapsulatedPart.sha256}`,
-                    );
-
-                    sentParts.push(encapsulatedPart);
-                } catch (error) {
-                    this.logger.error(
-                        `Failed to send part ${(part.data as IMPartData).partNumber + 1}/${parts.length}: ${error}`,
-                    );
-                    throw error;
-                }
-            }
-        } else {
-            await this.queueMessage(encapsulatedMessage);
-            await this.flushQueue();
-        }
+    /**
+     * Send a message to the peer.
+     * If the message is too large, it will be split into multiple parts.
+     * @param encapsulatedMessage - The already-encapsulated message to send.
+     * @returns Once successfully sent, returns the encapsulated message that was sent–for chaining.
+     */
+    public async send(encapsulatedMessage: EncapsulatedIMProtoMessage) {
+        await this.queueMessage(encapsulatedMessage);
+        await this.flushQueue();
         return encapsulatedMessage;
     }
 
-    private async encapsulateIfNeeded(
-        message: IMProtoMessage | EncapsulatedIMProtoMessage,
-    ): Promise<EncapsulatedIMProtoMessage> {
-        return 'sha256' in message
-            ? (message as EncapsulatedIMProtoMessage)
-            : await encapsulateMessage(message);
-    }
-
-    async queueMessage(message: EncapsulatedIMProtoMessage) {
+    /**
+     * Queue a message to be sent to the peer.
+     * If the message is too large, it will be split into multiple parts.
+     * (We acquire the mutex to ensure that the message queue is not modified/flushed while we are processing it)
+     * @param encapsulatedMessage - The already-encapsulated message to send.
+     */
+    public async queueMessage(encapsulatedMessage: EncapsulatedIMProtoMessage) {
+        const messageSize = MessageSplitter.getMessageSize(encapsulatedMessage);
+        const queue =
+            messageSize > MAX_MESSAGE_SIZE
+                ? await MessageSplitter.split(this.logger, encapsulatedMessage)
+                : [encapsulatedMessage];
         return this.mutex.acquire(`flushQueue-${this.id}`, async () => {
-            this.messageQueue.set(message.sha256, message);
-            await this.queueMessageToAllEndpoints(message);
+            for (let i = 0; i < queue.length; i++) {
+                const message = queue[i];
+                const isLastMessage = i === queue.length - 1;
+                const size = isLastMessage
+                    ? messageSize % MAX_MESSAGE_SIZE
+                    : MAX_MESSAGE_SIZE;
+                this.messageQueue.set(message.sha256, {
+                    message,
+                    size,
+                });
+                await this.queueMessageToAllEndpoints(message, size);
+            }
         });
     }
 
     private async queueMessageToAllEndpoints(
         message: EncapsulatedIMProtoMessage,
+        size: number,
     ) {
         await Promise.allSettled(
-            this.endpoints.map((endpoint) => endpoint.queue(message)),
+            this.endpoints.map((endpoint) => endpoint.queue(message, size)),
         );
         this.logger.debug(
             `> queued ${message.sha256} (${this.messageQueue.size}) for all endpoints (${this.endpoints.length})`,

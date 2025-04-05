@@ -8,7 +8,12 @@ import { IMText } from '@src/shared/types/messages/IMTextMessage.js';
 import { socketServerUrl } from '@tests/jest.global.js';
 import { TEST_CONFIG, aliasWaitFor, delay } from '@tests/utils/time.utils.js';
 import { TestPeer, createPeer } from '@tests/utils/user.utils.js';
-import { IMProtoMessage, Logger, SmashMessaging } from 'smash-node-lib';
+import {
+    IMProtoMessage,
+    Logger,
+    MAX_MESSAGE_SIZE,
+    SmashMessaging,
+} from 'smash-node-lib';
 
 /**
  * @tutorial-meta
@@ -21,6 +26,9 @@ describe('Message Splitting', () => {
     const logger = new Logger('parts.spec', 'DEBUG');
     const waitForEventCancelFns: (() => void)[] = [];
     const waitFor = aliasWaitFor(waitForEventCancelFns, logger);
+
+    const smallText = 'Hello '.repeat(1000); // ~6KB
+    const largeText = 'Hello '.repeat(MAX_MESSAGE_SIZE / 3); // Over 512KB
 
     beforeAll(async () => {
         const crypto = new Crypto();
@@ -41,7 +49,6 @@ describe('Message Splitting', () => {
 
     describe('Message size limits', () => {
         test('Messages under size limit are not split', async () => {
-            const smallText = 'Hello '.repeat(1000); // ~6KB
             const message = new IMText(smallText);
             const messageJson = JSON.stringify(message);
 
@@ -49,7 +56,6 @@ describe('Message Splitting', () => {
         });
 
         test('Messages over size limit are split', async () => {
-            const largeText = 'Hello '.repeat(200000); // ~750KB
             const message = new IMText(largeText);
             const messageJson = JSON.stringify(message);
 
@@ -72,8 +78,6 @@ describe('Message Splitting', () => {
         }, TEST_CONFIG.TEST_TIMEOUT_MS * 2);
 
         test('Sending a large text message', async () => {
-            // Create a large text message (>512KB)
-            const largeText = 'Hello '.repeat(200000); // ~750KB
             const message = new IMText(largeText);
 
             const onBobMessage = jest.fn();
@@ -97,8 +101,7 @@ describe('Message Splitting', () => {
         });
 
         test('Sending a large media message', async () => {
-            // Create a large media message (>512KB)
-            const largeContent = new Uint8Array(600 * 1024); // 600KB
+            const largeContent = new Uint8Array(2 * MAX_MESSAGE_SIZE);
             const message = IMMediaEmbedded.fromUint8Array(
                 largeContent,
                 'application/octet-stream',
