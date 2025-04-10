@@ -13,6 +13,7 @@ import {
     IMTextMessage,
     IM_CHAT_TEXT,
     Logger,
+    MessageStatusDelivered,
     SESSION_TTL_MS,
     SmashMessaging,
     sha256,
@@ -118,7 +119,7 @@ describe('SmashMessaging: Edge cases', () => {
                 logger.info('>> Verify Alice received the ACK');
                 await delay(TEST_CONFIG.MESSAGE_DELIVERY);
                 expect(alice.onStatus).toHaveBeenCalledWith(
-                    'delivered',
+                    MessageStatusDelivered,
                     expect.arrayContaining([sent.sha256]),
                 );
 

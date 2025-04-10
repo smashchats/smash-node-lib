@@ -20,7 +20,15 @@
 - [x] clearing another user from the neighborhood
 
 - [x] embedded media type
-- [x] message parts
+- [x] message parts & limit message queue size to keep websocket alive
+- [ ] emit sent and delivered status when all parts have been ack'd as such
+
+    - [ ] Parts feedback to Client to allow them to restore queue ??? **OR RATHER**, think through the state restore & queue recovery –> half-a, half-b, full
+    - [ ] add tests for concurrent messages re-assembling
+    - [ ] add tests for out of order parts
+    - [ ] test persistence and resilience (save/load state between restarts)
+
+- [ ] **Investigate INITCHATS: new Date() or new Date(0)–why?? FIX DOCS.**
 
 - [ ] livestream embedded media (snap) (before sharing decryption key at last, then reconstitute) – PARTS IN PARTS??? or binary only for content???
 
@@ -61,6 +69,10 @@
 
 - [ ] investigate performance and memory usage (eg, dangling sessions, dlqs, parts, no redundant compute)
 - [ ] Use UTF8 vs Base64 for raw content encoding??
+
+WARNINGS/DISCLAIMERS
+
+[Warning] AES-CBC and AES-CTR do not provide authentication by default, and implementing it manually can result in minor, but serious mistakes. We recommended using authenticated encryption like AES-GCM to protect against chosen-ciphertext attacks. (2key-ratchet.js, line 6011)
 
 ### TESTS REFACTORING (keeping or increasing coverage):
 

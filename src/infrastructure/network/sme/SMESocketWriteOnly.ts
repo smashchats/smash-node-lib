@@ -1,4 +1,5 @@
 import type { onMessagesStatusFn } from '@src/shared/types/callbacks.types.js';
+import { MessageStatusDelivered } from '@src/shared/types/index.js';
 import type { sha256 } from '@src/shared/types/string.types.js';
 import type { Logger } from '@src/shared/utils/Logger.js';
 import { Timeout } from '@src/shared/utils/Timeout.js';
@@ -148,7 +149,10 @@ export class SMESocketWriteOnly {
                 this.logger.debug(
                     `> ${buffer.byteLength} bytes (${messageIds.length} messages) sent to ${this.url} [${this.socket?.id}]`,
                 );
-                this.onMessagesStatusCallback('delivered', messageIds);
+                this.onMessagesStatusCallback(
+                    MessageStatusDelivered,
+                    messageIds,
+                );
                 resolve();
             });
         });

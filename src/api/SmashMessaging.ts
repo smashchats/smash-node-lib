@@ -7,6 +7,7 @@ import { PeerRegistry } from '@src/core/messaging/peer/PeerRegistry.js';
 import { SmashPeer } from '@src/core/messaging/peer/SmashPeer.js';
 import { MessageMiddleware } from '@src/core/messaging/protocol/MessageMiddleware.js';
 import { MessageReassembler } from '@src/core/messaging/protocol/MessageReassembler.js';
+import { MessageSplitter } from '@src/core/messaging/protocol/MessageSplitter.js';
 import { SessionManager } from '@src/core/messaging/session/SessionManager.js';
 import { EndpointManager } from '@src/infrastructure/network/endpoints/EndpointManager.js';
 import { SMESocketManager } from '@src/infrastructure/network/sme/SMESocketManager.js';
@@ -28,6 +29,7 @@ import type {
     IDIDResolver,
     IIMPeerIdentity,
     IMProtoMessage,
+    IMReceivedACKMessage,
     reverseDNS,
     sha256,
 } from '@src/shared/types/index.js';
@@ -36,6 +38,9 @@ import {
     IMProfile,
     IMReadACKMessage,
     MessageStatus,
+    MessageStatusDelivered,
+    MessageStatusRead,
+    MessageStatusReceived,
 } from '@src/shared/types/messages/index.js';
 import { LogLevel, Logger } from '@src/shared/utils/Logger.js';
 import { EventEmitter } from 'events';
@@ -50,6 +55,7 @@ export class SmashMessaging extends EventEmitter {
     protected readonly peers: PeerRegistry;
     private readonly sessionManager: SessionManager;
     private readonly smeSocketManager: SMESocketManager;
+    private readonly messageSplitter: MessageSplitter;
     private readonly messageReassembler: MessageReassembler;
     private meta: Partial<IMProfile> = {};
 
@@ -66,9 +72,11 @@ export class SmashMessaging extends EventEmitter {
     ) {
         super();
         this.logger = new Logger(logId, logLevel);
+        const messageStatusHandler = this.messagesStatusHandler.bind(this);
+
         this.smeSocketManager = new SMESocketManager(
             this.logger,
-            this.messagesStatusHandler.bind(this),
+            messageStatusHandler,
         );
 
         this.peers = new PeerRegistry(
@@ -96,6 +104,10 @@ export class SmashMessaging extends EventEmitter {
         );
 
         this.messageReassembler = new MessageReassembler(this.logger);
+        this.messageSplitter = new MessageSplitter(
+            this.logger,
+            messageStatusHandler,
+        );
 
         this.registerEventHandlers();
         this.logger.info(
@@ -194,6 +206,7 @@ export class SmashMessaging extends EventEmitter {
             lastMessageTime,
             this.sessionManager,
             this.smeSocketManager,
+            this.messageSplitter,
             this.peers,
         );
     }
@@ -252,6 +265,12 @@ export class SmashMessaging extends EventEmitter {
                         `Successfully reassembled message ${reassembledMessage.sha256} from parts`,
                     );
                     await this.notifyNewMessage(sender, reassembledMessage);
+                    (await this.peers.getOrCreate(sender)).send(
+                        await encapsulateMessage({
+                            type: IM_ACK_RECEIVED,
+                            data: [reassembledMessage.sha256],
+                        } as IMReceivedACKMessage),
+                    );
                 } else {
                     this.logger.debug(
                         `Waiting for more parts for message ${(message.data as IMPartData).originalSha256}`,
@@ -284,11 +303,11 @@ export class SmashMessaging extends EventEmitter {
         };
 
         this.on(IM_ACK_RECEIVED, (from, message) => {
-            handleAck('received', from, message.data);
+            handleAck(MessageStatusReceived, from, message.data);
         });
 
         this.on(IM_ACK_READ, (from, message) => {
-            handleAck('read', from, message.data);
+            handleAck(MessageStatusRead, from, message.data);
         });
     }
 
@@ -300,6 +319,9 @@ export class SmashMessaging extends EventEmitter {
             `messagesStatusHandler ACK:${status} : ${messageIds.join(', ')}`,
         );
         this.emit('status', status, messageIds);
+        if (status === MessageStatusDelivered) {
+            this.messageSplitter.markAsDelivered(messageIds);
+        }
     }
 
     /**

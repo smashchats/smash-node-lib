@@ -20,12 +20,18 @@ export interface IMReceivedACKMessage extends IMACKMessage {
     type: typeof IM_ACK_RECEIVED;
 }
 
+export const MessageStatusSending = 'sending' as const;
+export const MessageStatusDelivered = 'delivered' as const;
+export const MessageStatusReceived = 'received' as const;
+export const MessageStatusRead = 'read' as const;
+export const MessageStatusError = 'error' as const;
+
 export type MessageStatus =
-    | 'sending'
-    | 'delivered'
-    | 'received'
-    | 'read'
-    | 'error';
+    | typeof MessageStatusSending
+    | typeof MessageStatusDelivered
+    | typeof MessageStatusReceived
+    | typeof MessageStatusRead
+    | typeof MessageStatusError;
 // TODO: double check status lifecycle implementation accross lib
 // in particular, error states and (re)sending states
 

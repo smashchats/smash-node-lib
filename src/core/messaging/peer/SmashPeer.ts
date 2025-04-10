@@ -54,6 +54,7 @@ export class SmashPeer {
         private readonly lastMessageTime: number,
         private readonly sessionManager: SessionManager,
         private readonly smeSocketManager: SMESocketManager,
+        private readonly messageSplitter: MessageSplitter,
         private readonly peerRegistry: PeerRegistry,
         config: PeerConfig = {},
     ) {
@@ -164,7 +165,7 @@ export class SmashPeer {
         const messageSize = MessageSplitter.getMessageSize(encapsulatedMessage);
         const queue =
             messageSize > MAX_MESSAGE_SIZE
-                ? await MessageSplitter.split(this.logger, encapsulatedMessage)
+                ? await this.messageSplitter.split(encapsulatedMessage)
                 : [encapsulatedMessage];
         return this.mutex.acquire(`flushQueue-${this.id}`, async () => {
             for (let i = 0; i < queue.length; i++) {

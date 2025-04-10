@@ -9,6 +9,7 @@ import {
     IM_CHAT_TEXT,
     IM_PROFILE,
     Logger,
+    MessageStatusDelivered,
     SmashMessaging,
 } from 'smash-node-lib';
 
@@ -139,7 +140,7 @@ describe('[SmashMessaging] Between peers registered to a SME', () => {
                 await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
 
                 expect(alice.onStatus).toHaveBeenCalledWith(
-                    'delivered',
+                    MessageStatusDelivered,
                     expect.arrayContaining([TEST_MESSAGE.sha256]),
                 );
             },

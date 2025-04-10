@@ -83,11 +83,16 @@ describe('Message Splitting', () => {
             const onBobMessage = jest.fn();
             bob.messaging.on(IM_CHAT_TEXT, onBobMessage);
 
+            const onAliceStatus = jest.fn();
+            alice.messaging.on('status', onAliceStatus);
+
             const bobReceivedMessage = waitFor(bob.messaging, IM_CHAT_TEXT);
 
+            // Alice sends an oversized message to Bob
             const sent = await alice.messaging.send(bob.did, message);
             await bobReceivedMessage;
 
+            // Bob receives the original message and it is correctly handled
             expect(onBobMessage).toHaveBeenCalledWith(
                 alice.did.id,
                 expect.objectContaining<IMProtoMessage>({
@@ -97,6 +102,20 @@ describe('Message Splitting', () => {
                     timestamp: sent.timestamp,
                     after: sent.after,
                 }),
+            );
+
+            await delay(TEST_CONFIG.MESSAGE_DELIVERY);
+
+            // Alice receives a delivered ACK for the original message
+            expect(onAliceStatus).toHaveBeenCalledWith(
+                'delivered',
+                expect.arrayContaining([sent.sha256]),
+            );
+
+            // Alice receives a received ACK for the original message
+            expect(onAliceStatus).toHaveBeenCalledWith(
+                'received',
+                expect.arrayContaining([sent.sha256]),
             );
         });
 
