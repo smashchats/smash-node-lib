@@ -16,11 +16,10 @@ import type { SmashEndpoint } from '@src/shared/types/sme.types.js';
 import type { Logger } from '@src/shared/utils/Logger.js';
 
 export class SignalSession {
-    public readonly createdAtTime: number = Date.now();
-
     // TODO cleanup outdated sessions after a grace period
     // TODO think about coordinated TTL constants
     public static readonly SESSION_TTL_MS = EXPIRATION_TIME_MS;
+    public readonly createdAtTime: number = Date.now();
     public firstUse: boolean = true;
 
     private constructor(
@@ -43,13 +42,10 @@ export class SignalSession {
         logger.debug('SignalSession::create');
 
         try {
-            const bundle = await SignalSession.createPreKeyBundle(
-                peerDidDocument,
-                sme,
-            );
+            const bundle = await this.createPreKeyBundle(peerDidDocument, sme);
             const protocol = await PreKeyBundleProtocol.importProto(bundle);
             const cipher = await AsymmetricRatchet.create(identity, protocol);
-            const sessionId = await SignalSession.generateSessionId(cipher);
+            const sessionId = await this.generateSessionId(cipher);
 
             const session = new SignalSession(
                 sessionId,
@@ -112,7 +108,7 @@ export class SignalSession {
 
         try {
             const preKeyMessage = await PreKeyMessageProtocol.importProto(data);
-            await SignalSession.validateSessionId(sessionId, preKeyMessage);
+            await this.validateSessionId(sessionId, preKeyMessage);
 
             const cipher = await AsymmetricRatchet.create(
                 identity,
