@@ -333,7 +333,7 @@ export class SmashMessaging extends EventEmitter {
      * Initialize chats with peers
      */
     public async initChats(
-        chats: { with: DID; lastMessageTimestamp: string }[],
+        chats: { with: DID; lastMessageTimestamp?: string }[],
     ): Promise<void> {
         if (this.isClosed) {
             throw new Error('SmashMessaging is closed');

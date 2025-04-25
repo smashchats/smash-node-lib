@@ -52,7 +52,7 @@ export class PeerRegistry extends Map<DIDString, SmashPeer> {
 
         const lastMessageTime = lastMessageTimestamp
             ? new Date(lastMessageTimestamp).getTime()
-            : 0;
+            : new Date().getTime();
 
         this.logger.debug(`CreatePeer ${peerDid.id}`);
         const newPeerPromise = this.createNewPeer(peerDid, lastMessageTime);

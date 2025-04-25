@@ -323,18 +323,18 @@ describe('SmashMessaging: Edge cases', () => {
                     logger.info(
                         '>> Init chats for both peers (= triggering parallel SESSION RESET)',
                     );
-                    const currentTime = new Date().toISOString();
+                    const resetTime = new Date(0).toISOString();
                     await Promise.all([
                         alice.messaging.initChats([
                             {
                                 with: bob.did,
-                                lastMessageTimestamp: currentTime,
+                                lastMessageTimestamp: resetTime,
                             },
                         ]),
                         bob.messaging.initChats([
                             {
                                 with: alice.did,
-                                lastMessageTimestamp: currentTime,
+                                lastMessageTimestamp: resetTime,
                             },
                         ]),
                     ]);

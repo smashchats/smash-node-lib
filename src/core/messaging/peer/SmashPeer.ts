@@ -120,11 +120,14 @@ export class SmashPeer {
         }
     }
 
+    // TODO: set lastMessageTime to the last message received from the peer (sent will trigger an ACK, so both ways are covered)
+    // TODO: session should auto reset after time elapsed > TTL
+
     private isSessionResetNeeded(): boolean {
         // if last message is before session TTL,
         // then we need to send a session reset message
         // to let the other peer know that our sessions have been renewed earlier than expected
-        return Date.now() - this.lastMessageTime < SignalSession.SESSION_TTL_MS;
+        return Date.now() - this.lastMessageTime > SignalSession.SESSION_TTL_MS;
     }
 
     private async setupEndpoints(did: DIDDocument) {

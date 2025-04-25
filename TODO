@@ -28,7 +28,7 @@
     - [ ] add tests for out of order parts
     - [ ] test persistence and resilience (save/load state between restarts)
 
-- [ ] **Investigate INITCHATS: new Date() or new Date(0)–why?? FIX DOCS.**
+- [x] FIX - **Investigate INITCHATS: new Date() or new Date(0)–why?? FIX DOCS.**
 
 - [ ] loading the library with existing _data_ : convs, queues, ...
 
