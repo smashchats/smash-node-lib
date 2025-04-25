@@ -366,7 +366,7 @@ export class SmashPeer {
         }
     }
 
-    async close() {
+    async close(): Promise<void> {
         this.logger.debug(`Closing peer ${this.id}`);
         this.closed = true;
         await this.cleanup();

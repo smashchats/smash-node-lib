@@ -14,6 +14,7 @@ export class PeerRegistry extends Map<DIDString, SmashPeer> {
     private ikToId: Record<string, DIDString> = {};
     private cachedEncapsulatedUserProfile?: EncapsulatedIMProtoMessage;
     private closed = false;
+    private pendingPeers: Record<DIDString, Promise<SmashPeer>> = {};
 
     constructor(
         private readonly logger: Logger,
@@ -45,22 +46,30 @@ export class PeerRegistry extends Map<DIDString, SmashPeer> {
             return existingPeer;
         }
 
+        if (peerDid.id in this.pendingPeers) {
+            return this.pendingPeers[peerDid.id];
+        }
+
         const lastMessageTime = lastMessageTimestamp
             ? new Date(lastMessageTimestamp).getTime()
             : 0;
 
         this.logger.debug(`CreatePeer ${peerDid.id}`);
-        const newPeer = await this.createNewPeer(peerDid, lastMessageTime);
+        const newPeerPromise = this.createNewPeer(peerDid, lastMessageTime);
+        this.pendingPeers[peerDid.id] = newPeerPromise;
 
-        if (this.cachedEncapsulatedUserProfile) {
-            await newPeer.queueMessage(this.cachedEncapsulatedUserProfile);
+        try {
+            const newPeer = await newPeerPromise;
+            if (this.cachedEncapsulatedUserProfile) {
+                await newPeer.queueMessage(this.cachedEncapsulatedUserProfile);
+            }
+            await newPeer.configureEndpoints();
+            this.set(newPeer.id, newPeer);
+            this.ikToId[peerDid.ik] = newPeer.id;
+            return newPeer;
+        } finally {
+            delete this.pendingPeers[peerDid.id];
         }
-
-        await newPeer.configureEndpoints();
-        this.set(newPeer.id, newPeer);
-        this.ikToId[peerDid.ik] = newPeer.id;
-
-        return newPeer;
     }
 
     async updateUserProfile(profile: IMProfile) {
