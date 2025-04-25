@@ -58,6 +58,7 @@ export class SmashMessaging extends EventEmitter {
     private readonly messageSplitter: MessageSplitter;
     private readonly messageReassembler: MessageReassembler;
     private meta: Partial<IMProfile> = {};
+    private isClosed = false;
 
     /**
      * Create a new SmashMessaging instance to start using the Smash Protocol
@@ -127,7 +128,6 @@ export class SmashMessaging extends EventEmitter {
      * Resolve a DID to its DID Document using the registered resolver (if any)
      * @param did - The DID to resolve
      * @returns The resolved DID Document
-     * @throws Error if no resolver is found for the DID method or if fails to resolve the DID
      */
     public static resolve(did: DID): Promise<DIDDocument> {
         return DIDManager.resolve(did);
@@ -156,6 +156,7 @@ export class SmashMessaging extends EventEmitter {
      * OperationErrors can happen if the underlying crypto library fails to decrypt a message
      * These shouldnt crash the program, but should be logged as warnings
      * TODO: Add a way to handle these errors in a more graceful way
+     * TODO: Consider emitting a dedicated 'error:decryption' event so users can react, e.g. retire sessions or request rekey.
      */
     public static handleError(
         reason: unknown,
@@ -283,7 +284,11 @@ export class SmashMessaging extends EventEmitter {
     }
 
     private isValidMessageType(type: string): boolean {
-        return /^[a-z]+(\.[a-z]+)*$/.test(type);
+        const isValid = /^[a-z]+(\.[a-z]+)*$/.test(type);
+        if (!isValid) {
+            this.logger.warn(`Invalid message type format received: ${type}`);
+        }
+        return isValid;
     }
 
     private registerAckHandlers(): void {
@@ -330,6 +335,9 @@ export class SmashMessaging extends EventEmitter {
     public async initChats(
         chats: { with: DID; lastMessageTimestamp: string }[],
     ): Promise<void> {
+        if (this.isClosed) {
+            throw new Error('SmashMessaging is closed');
+        }
         const results = await Promise.allSettled(
             chats.map(async (chat) =>
                 this.peers.getOrCreate(chat.with, chat.lastMessageTimestamp),
@@ -355,6 +363,9 @@ export class SmashMessaging extends EventEmitter {
         peerDid: DID,
         message: IMProtoMessage | EncapsulatedIMProtoMessage,
     ): Promise<EncapsulatedIMProtoMessage> {
+        if (this.isClosed) {
+            throw new Error('SmashMessaging is closed');
+        }
         const peer = await this.peers.getOrCreate(peerDid);
         const encapsulatedMessage =
             'sha256' in message
@@ -409,6 +420,7 @@ export class SmashMessaging extends EventEmitter {
      * Close all connections and clean up
      */
     public async close(): Promise<void> {
+        this.isClosed = true;
         this.removeAllListeners();
         const peersResult = await this.peers.closeAll();
         const socketsResult = await this.smeSocketManager.closeAllSockets();

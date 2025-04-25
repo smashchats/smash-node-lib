@@ -170,6 +170,7 @@ export class SignalSession {
             const message = await MessageSignedProtocol.importProto(data);
             return this.decryptMessages(message);
         } catch (err) {
+            // TODO: Consider emitting a dedicated 'error:decryption' event so users can react, e.g. retire sessions or request rekey.
             this.logger.warn('Cannot decrypt data.');
             throw err;
         }
@@ -182,6 +183,7 @@ export class SignalSession {
             const decrypted = await this.cipher.decrypt(message);
             return BufferUtils.bufferToObject(decrypted);
         } catch (err) {
+            // TODO: Consider emitting a dedicated 'error:decryption' event so users can react, e.g. retire sessions or request rekey.
             this.logger.warn('Cannot decrypt messages.');
             throw err;
         }
