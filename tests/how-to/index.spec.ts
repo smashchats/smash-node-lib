@@ -97,7 +97,7 @@ describe('[SmashMessaging] Between peers registered to a SME', () => {
     describe('Alice sends one message to Bob', () => {
         const TEST_MESSAGE: TestMessage = {
             text: 'hello world 1',
-            sha256: '5M5Fsom9c/BefiQKkexx7K+wlMglxoejVcHP6KXKfvI=',
+            sha256: 'Y7PpFmRoz8kb+GBAUY0IypbIYcCQ5tZfOPSGOe0FC3s=',
         };
 
         let aliceSentMessage: EncapsulatedIMProtoMessage;

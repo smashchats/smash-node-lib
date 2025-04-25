@@ -33,8 +33,9 @@ const restartTestPeer = async (logger: Logger, peer: TestPeer) => {
     await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
 
     logger.debug('>> Importing peer identity');
-    const peerIdentity =
-        await SmashMessaging.importIdentity(peerExportedIdentity);
+    const peerIdentity = await SmashMessaging.importIdentity(
+        JSON.parse(peerExportedIdentity),
+    );
     logger.debug(
         '> Imported',
         JSON.stringify(await peerIdentity.serialize(), null, 2),

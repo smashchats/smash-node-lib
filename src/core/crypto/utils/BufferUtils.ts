@@ -1,4 +1,5 @@
 import { ENCODING } from '@src/shared/constants/encoding.js';
+import { JsonUtils } from '@src/shared/utils/JsonUtils.js';
 import { Buffer } from 'buffer';
 
 export class BufferUtils {
@@ -17,11 +18,11 @@ export class BufferUtils {
     }
 
     static bufferToObject<T>(arrayBuffer: ArrayBuffer): T {
-        return JSON.parse(this.bufferToString(arrayBuffer, 'utf8'));
+        return JsonUtils.parse<T>(this.bufferToString(arrayBuffer, 'utf8'));
     }
 
     static objectToBuffer(object: unknown): ArrayBuffer {
-        return this.stringToBuffer(JSON.stringify(object), 'utf8');
+        return this.stringToBuffer(JsonUtils.stringify(object), 'utf8');
     }
 
     /**

@@ -1,5 +1,6 @@
 import type { EncapsulatedIMProtoMessage } from '@src/shared/types/message.types.js';
 import type { IMPartData } from '@src/shared/types/messages/IMPartMessage.js';
+import { JsonUtils } from '@src/shared/utils/JsonUtils.js';
 import { Logger } from '@src/shared/utils/Logger.js';
 
 interface PartMessage {
@@ -102,7 +103,8 @@ export class MessageReassembler {
         const concatenatedContent = parts.map((p) => p.data.content).join('');
 
         // Parse the original message from the concatenated content
-        const originalMessage = JSON.parse(concatenatedContent);
+        const originalMessage =
+            JsonUtils.parse<EncapsulatedIMProtoMessage>(concatenatedContent);
 
         // Clean up parts
         this.logger.debug(`Cleaning up parts for message ${originalSha256}`);

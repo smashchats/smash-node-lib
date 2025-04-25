@@ -62,7 +62,6 @@ export class MessageMiddleware {
         this.logger.debug(
             `> queued ${messages.length} incoming messages FROM unknown peer (IK: ${peerIk})`,
         );
-        // this.logger.debug(JSON.stringify(messages, null, 2));
 
         const did = await this.resolvePeerDID(peerIk, messages);
         if (did) {

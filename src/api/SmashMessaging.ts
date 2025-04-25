@@ -27,7 +27,6 @@ import type {
     DIDString,
     EncapsulatedIMProtoMessage,
     IDIDResolver,
-    IIMPeerIdentity,
     IMProtoMessage,
     IMReceivedACKMessage,
     reverseDNS,
@@ -42,6 +41,7 @@ import {
     MessageStatusRead,
     MessageStatusReceived,
 } from '@src/shared/types/messages/index.js';
+import { JsonUtils } from '@src/shared/utils/JsonUtils.js';
 import { LogLevel, Logger } from '@src/shared/utils/Logger.js';
 import { EventEmitter } from 'events';
 
@@ -378,11 +378,16 @@ export class SmashMessaging extends EventEmitter {
     }
 
     /**
-     * Export identity (warning: contains secrets)
+     * Export identity as a serialized string
+     * @returns A serialized string containing the full identity including private keys
+     * @warning ⚠️ SECURITY RISK: The exported identity contains private keys and secrets.
+     * Never share or expose the exported identity string. It should only be used for
+     * backup/restore purposes in secure storage.
+     * @throws {Error} If serialization fails
      */
-    public async exportIdentity(): Promise<IIMPeerIdentity> {
+    public async exportIdentity(): Promise<string> {
         this.logger.warn('EXPORTED IDENTITY CONTAINS SECRETS: DO NOT SHARE!');
-        return this.identity.serialize();
+        return JsonUtils.stringify(await this.identity.serialize());
     }
 
     /**

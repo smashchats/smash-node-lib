@@ -9,6 +9,7 @@ import type {
     DIDString,
     IDIDResolver,
 } from '@src/shared/types/index.js';
+import { JsonUtils } from '@src/shared/utils/JsonUtils.js';
 
 /**
  * Implementation of the IDIDResolver interface for a dummy 'doc' did method.
@@ -50,7 +51,7 @@ export class DIDDocManager implements IDIDResolver {
             signature,
             endpoints: [],
         };
-        this.set(JSON.parse(JSON.stringify(didDocument)));
+        this.set(didDocument);
         const newIdentity = new IMPeerIdentity(did, ik, ek);
         return newIdentity;
     }
@@ -67,7 +68,7 @@ export class DIDDocManager implements IDIDResolver {
         return preKeyPair;
     }
 
-    public set(didDocument: DIDDocument) {
-        this.cache.set(didDocument.id, didDocument);
+    public set(didDocument: DIDDocument): void {
+        this.cache.set(didDocument.id, JsonUtils.deepCopy(didDocument));
     }
 }

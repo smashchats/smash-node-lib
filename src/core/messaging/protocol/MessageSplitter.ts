@@ -11,6 +11,7 @@ import type {
 } from '@src/shared/types/message.types.js';
 import type { IMPartData } from '@src/shared/types/messages/IMPartMessage.js';
 import { sha256 } from '@src/shared/types/string.types.js';
+import { JsonUtils } from '@src/shared/utils/JsonUtils.js';
 import { Logger } from '@src/shared/utils/Logger.js';
 
 interface PartsCounter {
@@ -37,7 +38,7 @@ export class MessageSplitter {
             throw new Error('Cannot split message: missing SHA256');
         }
 
-        const messageJson = JSON.stringify(message);
+        const messageJson = JsonUtils.stringify(message);
         const totalParts = Math.ceil(messageJson.length / MAX_MESSAGE_SIZE);
 
         this.logger.info(
@@ -83,7 +84,7 @@ export class MessageSplitter {
      * Calculate the size of a message in bytes
      */
     public static getMessageSize(message: IMProtoMessage): number {
-        return JSON.stringify(message).length;
+        return JsonUtils.stringify(message).length;
     }
 
     /**

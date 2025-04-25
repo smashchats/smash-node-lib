@@ -132,9 +132,11 @@ export class IMPeerIdentity extends Identity {
     }
 
     public async serialize(): Promise<IIMPeerIdentity> {
-        const json = await this.toJSON();
         return JSON.parse(
-            JSON.stringify(json, GenerateKeyPatcher.jsonStringifyReplacer),
+            JSON.stringify(
+                await this.toJSON(),
+                GenerateKeyPatcher.jsonStringifyReplacer,
+            ),
         );
     }
 
