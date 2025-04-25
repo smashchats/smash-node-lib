@@ -21,7 +21,7 @@
 
 - [x] embedded media type
 - [x] message parts & limit message queue size to keep websocket alive
-- [ ] emit sent and delivered status when all parts have been ack'd as such
+- [x] emit sent and delivered status when all parts have been ack'd as such
 
     - [ ] Parts feedback to Client to allow them to restore queue ??? **OR RATHER**, think through the state restore & queue recovery –> half-a, half-b, full
     - [ ] add tests for concurrent messages re-assembling
@@ -30,19 +30,17 @@
 
 - [ ] **Investigate INITCHATS: new Date() or new Date(0)–why?? FIX DOCS.**
 
-- [ ] livestream embedded media (snap) (before sharing decryption key at last, then reconstitute) – PARTS IN PARTS??? or binary only for content???
+- [ ] loading the library with existing _data_ : convs, queues, ...
 
-- [ ] CDN-hosted media
-- [ ] media types: images, videos, vocals
+- [ ] PDS to store backup and settings (livesync multi device)
 
-- [ ] update message status more granular (sending, delivered, received, read, failed, retrying)
 - [ ] profile updates using diff strategy & tracking current state/requesting new state?
-- [ ] loading the library with existing _data_ (tbd)
 - [ ] trust levels -> privacy
 - [ ] blocking/unblocking another peer
 - [ ] report peer to admins
 
-- [ ] PDS to store backup and settings (multi device - semaphore)
+- [ ] livestream embedded media (snap) (before sharing decryption key at last, then reconstitute) – PARTS IN PARTS??? or binary only for content???
+- [ ] CDN-hosted media
 
 - [ ] split NAB backend / frontend
 - [ ] NAB persistent data
@@ -66,6 +64,8 @@
 - [ ] DID::fetch:: web
 - [ ] DID re-fetch strategy on failure (re-fetch patch vs fetch replace (truth/canonical))
 - [ ] DID expiry (to sync with session TTL)
+
+- [ ] retry delays: unsent/unreceived - DID re-fetch strategy
 
 - [ ] investigate performance and memory usage (eg, dangling sessions, dlqs, parts, no redundant compute)
 - [ ] Use UTF8 vs Base64 for raw content encoding??
