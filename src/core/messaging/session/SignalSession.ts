@@ -154,7 +154,10 @@ export class SignalSession {
             const data = BufferUtils.objectToBuffer(messages);
             return (await this.cipher.encrypt(data)).exportProto();
         } catch (err) {
-            this.logger.warn('Cannot encrypt messages.');
+            this.logger.warn(
+                'Cannot encrypt messages. ' +
+                    (typeof err === 'object' ? (err as Error).message : err),
+            );
             throw err;
         }
     }
@@ -167,7 +170,10 @@ export class SignalSession {
             return this.decryptMessages(message);
         } catch (err) {
             // TODO: Consider emitting a dedicated 'error:decryption' event so users can react, e.g. retire sessions or request rekey.
-            this.logger.warn('Cannot decrypt data.');
+            this.logger.warn(
+                'Cannot decrypt data. ' +
+                    (typeof err === 'object' ? (err as Error).message : err),
+            );
             throw err;
         }
     }
@@ -180,7 +186,10 @@ export class SignalSession {
             return BufferUtils.bufferToObject(decrypted);
         } catch (err) {
             // TODO: Consider emitting a dedicated 'error:decryption' event so users can react, e.g. retire sessions or request rekey.
-            this.logger.warn('Cannot decrypt messages.');
+            this.logger.warn(
+                'Cannot decrypt messages. ' +
+                    (typeof err === 'object' ? (err as Error).message : err),
+            );
             throw err;
         }
     }

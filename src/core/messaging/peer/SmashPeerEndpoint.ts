@@ -225,7 +225,7 @@ export class SmashPeerEndpoint {
 
     private async handleFlushError(error: Error): Promise<void> {
         this.logger.error(
-            `Failed to flush messages to ${this.config.url}: ${error.message}`,
+            `Failed to flush messages to ${this.config.url}: ${typeof error === 'object' ? error.message : error}`,
         );
         this.logger.info(`Resetting session: ${this.session?.id}`);
         this.session = undefined;
