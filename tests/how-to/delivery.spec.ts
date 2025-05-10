@@ -1,16 +1,16 @@
 import { Crypto } from '@peculiar/webcrypto';
-import {
-    SME_PUBLIC_KEY,
-    emptySocketServerUrl,
-    quietSocketServerUrl,
-    socketServerUrl,
-} from '@tests/jest.global.js';
 import { TEST_CONFIG, aliasWaitFor, delay } from '@tests/utils/time.utils.js';
 import {
     TestPeer,
     createPeer,
     defaultDidManager,
 } from '@tests/utils/user.utils.js';
+import {
+    SME_PUBLIC_KEY,
+    emptySocketServerUrl,
+    quietSocketServerUrl,
+    socketServerUrl,
+} from '@tests/vitest.sme-server.js';
 import {
     DIDDocument,
     EncapsulatedIMProtoMessage,
@@ -19,6 +19,16 @@ import {
     SmashEndpoint,
     SmashMessaging,
 } from 'smash-node-lib';
+import {
+    afterAll,
+    afterEach,
+    beforeAll,
+    beforeEach,
+    describe,
+    expect,
+    it,
+    vi,
+} from 'vitest';
 
 /**
  * **************************************************************
@@ -40,7 +50,7 @@ describe('[Message Delivery] Message delivery and acknowledgment', () => {
         await Promise.all(waitForEventCancelFns.map((cancel) => cancel()));
         waitForEventCancelFns.length = 0;
         logger.debug('>> resetting mocks');
-        jest.resetAllMocks();
+        vi.resetAllMocks();
     });
 
     afterAll(async () => {

@@ -104,7 +104,7 @@ rad node connect z6MkiXzPZSV6yx6wHSdSPNpVVytxauiLzhU1jG8sVmxdZkcn@rad-node.smash
 4. **Run All Test Suites**:
 
 Looking at tests is a great way to understand how to use the library.
-Tests have been written using [Jest](https://jestjs.io/) and designed to provide a comprehensive set of examples on interacting with the `Smash-Node-Lib` library.
+Tests have been written using [Vitest](https://vitest.dev/) and designed to provide a comprehensive set of examples on interacting with the `Smash-Node-Lib` library.
 
 ```bash
 npm test

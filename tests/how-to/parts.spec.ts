@@ -1,19 +1,27 @@
 import { Crypto } from '@peculiar/webcrypto';
-import {
-    IM_CHAT_TEXT,
-    IM_MEDIA_EMBEDDED,
-} from '@src/shared/lexicon/improto.lexicon.js';
-import { IMMediaEmbedded } from '@src/shared/types/messages/IMMediaEmbeddedMessage.js';
-import { IMText } from '@src/shared/types/messages/IMTextMessage.js';
-import { socketServerUrl } from '@tests/jest.global.js';
 import { TEST_CONFIG, aliasWaitFor, delay } from '@tests/utils/time.utils.js';
 import { TestPeer, createPeer } from '@tests/utils/user.utils.js';
+import { socketServerUrl } from '@tests/vitest.sme-server.js';
 import {
+    IMMediaEmbedded,
     IMProtoMessage,
+    IMText,
+    IM_CHAT_TEXT,
+    IM_MEDIA_EMBEDDED,
     Logger,
     MAX_MESSAGE_SIZE,
     SmashMessaging,
 } from 'smash-node-lib';
+import {
+    afterAll,
+    afterEach,
+    beforeAll,
+    beforeEach,
+    describe,
+    expect,
+    test,
+    vi,
+} from 'vitest';
 
 /**
  * @tutorial-meta
@@ -40,7 +48,7 @@ describe('Message Splitting', () => {
         await Promise.all(waitForEventCancelFns.map((cancel) => cancel()));
         waitForEventCancelFns.length = 0;
         logger.debug('>> resetting mocks');
-        jest.resetAllMocks();
+        vi.resetAllMocks();
     });
 
     afterAll(async () => {
@@ -80,10 +88,10 @@ describe('Message Splitting', () => {
         test('Sending a large text message', async () => {
             const message = new IMText(largeText);
 
-            const onBobMessage = jest.fn();
+            const onBobMessage = vi.fn();
             bob.messaging.on(IM_CHAT_TEXT, onBobMessage);
 
-            const onAliceStatus = jest.fn();
+            const onAliceStatus = vi.fn();
             alice.messaging.on('status', onAliceStatus);
 
             const bobReceivedMessage = waitFor(bob.messaging, IM_CHAT_TEXT);
@@ -127,7 +135,7 @@ describe('Message Splitting', () => {
                 'Large file',
             );
 
-            const onBobMessage = jest.fn();
+            const onBobMessage = vi.fn();
             bob.messaging.on(IM_MEDIA_EMBEDDED, onBobMessage);
 
             const bobReceivedMessage = waitFor(

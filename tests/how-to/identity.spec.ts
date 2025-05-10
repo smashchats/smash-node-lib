@@ -1,5 +1,6 @@
 import { Crypto } from '@peculiar/webcrypto';
 import { DIDDocManager, IMPeerIdentity, SmashMessaging } from 'smash-node-lib';
+import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 describe('DIDManager: Identity Management', () => {
     let didManager: DIDDocManager;

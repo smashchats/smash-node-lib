@@ -1,7 +1,7 @@
 {
     "recommendations": [
-        "ms-vsliveshare.vsliveshare",
-        "SonarSource.sonarlint-vscode",
-        "Orta.vscode-jest"
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "vitest.explorer"
     ]
 }

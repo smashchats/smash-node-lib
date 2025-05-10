@@ -19,3 +19,8 @@ export * from '@src/shared/lexicon/index.js';
 export * from '@src/shared/types/index.js';
 
 export type { IMPeerIdentity } from '@src/core/identity/IMPeerIdentity.js';
+
+// Crypto utilities
+export { BufferUtils } from '@src/core/crypto/utils/BufferUtils.js';
+export { KeyUtils } from '@src/core/crypto/utils/KeyUtils.js';
+export { SigningUtils } from '@src/core/crypto/utils/SigningUtils.js';

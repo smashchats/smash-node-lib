@@ -1,9 +1,4 @@
 import { Crypto } from '@peculiar/webcrypto';
-import {
-    SME_PUBLIC_KEY,
-    secondarySocketServerUrl,
-    socketServerUrl,
-} from '@tests/jest.global.js';
 import { TestUtils } from '@tests/utils/events.utils.js';
 import { TEST_CONFIG, aliasWaitFor, delay } from '@tests/utils/time.utils.js';
 import {
@@ -11,7 +6,13 @@ import {
     createPeer,
     defaultDidManager,
 } from '@tests/utils/user.utils.js';
+import {
+    SME_PUBLIC_KEY,
+    secondarySocketServerUrl,
+    socketServerUrl,
+} from '@tests/vitest.sme-server.js';
 import { IMText, IM_CHAT_TEXT, Logger, SmashMessaging } from 'smash-node-lib';
+import { afterEach, beforeAll, beforeEach, describe, expect, vi } from 'vitest';
 
 // TODO: refactor test suite into How To guides generation material
 
@@ -43,7 +44,7 @@ describe('[Sessions] Session Management', () => {
         await Promise.all([alice?.messaging.close(), bob?.messaging.close()]);
         waitForEventCancelFns.forEach((cancel) => cancel());
         waitForEventCancelFns.length = 0;
-        jest.resetAllMocks();
+        vi.resetAllMocks();
         await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
     }, TEST_CONFIG.TEST_TIMEOUT_MS * 2);
 
@@ -56,10 +57,12 @@ describe('[Sessions] Session Management', () => {
                 // Clear existing events
                 logger.debug('Clearing existing events');
                 await TestUtils.getDataEvents(
+                    logger,
                     bob.did.endpoints[0].preKey,
                     'DELETE',
                 );
                 await TestUtils.getDataEvents(
+                    logger,
                     alice.did.endpoints[0].preKey,
                     'DELETE',
                 );
@@ -79,6 +82,7 @@ describe('[Sessions] Session Management', () => {
                 // Get initial session ID from SME events
                 logger.debug('Getting initial session ID');
                 const events1 = await TestUtils.pollForDataEvent(
+                    logger,
                     bob.did.endpoints[0].preKey,
                 );
                 const initialSessionId = (events1[0] as { sessionId: string })
@@ -89,10 +93,12 @@ describe('[Sessions] Session Management', () => {
                 // Clear events again
                 logger.debug('Clearing events before second message');
                 await TestUtils.getDataEvents(
+                    logger,
                     bob.did.endpoints[0].preKey,
                     'DELETE',
                 );
                 await TestUtils.getDataEvents(
+                    logger,
                     alice.did.endpoints[0].preKey,
                     'DELETE',
                 );
@@ -112,6 +118,7 @@ describe('[Sessions] Session Management', () => {
                 // Get events for second message
                 logger.debug('Getting events for second message');
                 const events2 = await TestUtils.pollForDataEvent(
+                    logger,
                     alice.did.endpoints[0].preKey,
                 );
 
@@ -148,6 +155,7 @@ describe('[Sessions] Session Management', () => {
                 // Clear existing events for both endpoints
                 logger.debug('Clearing existing events for Alice');
                 await TestUtils.getDataEvents(
+                    logger,
                     alice.did.endpoints[0].preKey,
                     'DELETE',
                 );
@@ -168,6 +176,7 @@ describe('[Sessions] Session Management', () => {
                     'Verifying Bob received message through his endpoint',
                 );
                 const bobEvents = await TestUtils.pollForDataEvent(
+                    logger,
                     bob.did.endpoints[0].preKey,
                 );
                 expect(bobEvents.length).toBeGreaterThan(0);
@@ -187,6 +196,7 @@ describe('[Sessions] Session Management', () => {
                     'Verifying Alice received reply through her preferred endpoint',
                 );
                 const aliceEvents = await TestUtils.pollForDataEvent(
+                    logger,
                     alice.did.endpoints[0].preKey,
                 );
                 expect(

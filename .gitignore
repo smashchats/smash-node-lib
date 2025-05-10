@@ -3,3 +3,4 @@ config/
 .env
 dist/
 coverage/
+junit.xml

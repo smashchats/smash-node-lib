@@ -77,10 +77,8 @@ jobs:
                       ~/.npm
                   key: ${{ needs.install.outputs.cache-key }}
 
-            - run: npm install jest-junit
-
             - name: Run Tests
-              run: npm test -- --coverage --coverageReporters=lcov --coverageReporters=json-summary --reporters=default --reporters=jest-junit
+              run: npm run test:coverage
 
             - name: Process Coverage Report
               id: coverageComment

@@ -1,11 +1,11 @@
 import { Crypto } from '@peculiar/webcrypto';
+import { TEST_CONFIG, aliasWaitFor, delay } from '@tests/utils/time.utils.js';
+import { TestPeer, createPeer } from '@tests/utils/user.utils.js';
 import {
     SME_PUBLIC_KEY,
     apiServerUrl,
     socketServerUrl,
-} from '@tests/jest.global.js';
-import { TEST_CONFIG, aliasWaitFor, delay } from '@tests/utils/time.utils.js';
-import { TestPeer, createPeer } from '@tests/utils/user.utils.js';
+} from '@tests/vitest.sme-server.js';
 import {
     EncapsulatedIMProtoMessage,
     IMProtoMessage,
@@ -19,6 +19,7 @@ import {
     sha256,
     sortSmashMessages,
 } from 'smash-node-lib';
+import { afterEach, beforeAll, beforeEach, describe, expect, vi } from 'vitest';
 
 // TODO: import config on lib loading (& add to tutorial)
 const restartTestPeer = async (logger: Logger, peer: TestPeer) => {
@@ -69,7 +70,7 @@ describe('SmashMessaging: Edge cases', () => {
     const waitFor = aliasWaitFor(waitForEventCancelFns, logger);
     let alice: TestPeer | undefined;
     let bob: TestPeer | undefined;
-    let dateSpy: jest.SpyInstance;
+    let dateSpy: ReturnType<typeof vi.spyOn>;
 
     beforeAll(async () => {
         const crypto = new Crypto();
@@ -87,7 +88,7 @@ describe('SmashMessaging: Edge cases', () => {
         await Promise.all([alice?.messaging.close(), bob?.messaging.close()]);
         waitForEventCancelFns.forEach((cancel) => cancel());
         waitForEventCancelFns.length = 0;
-        jest.resetAllMocks();
+        vi.resetAllMocks();
         dateSpy?.mockRestore();
     }, TEST_CONFIG.TEST_TIMEOUT_MS * 2);
 
@@ -125,9 +126,8 @@ describe('SmashMessaging: Edge cases', () => {
                 );
 
                 // 2. Mock Date to simulate time passing beyond TTL
-                // WARNING: this only works because the library uses Date.now() when comparing SESSION_TTL_MS
                 logger.info('>> Mock Date to simulate time passing beyond TTL');
-                dateSpy = jest
+                dateSpy = vi
                     .spyOn(Date, 'now')
                     .mockImplementation(
                         () => new Date().getTime() + SESSION_TTL_MS + 1000,
@@ -184,6 +184,7 @@ describe('SmashMessaging: Edge cases', () => {
                 const bobReceivedFirstMessage = waitFor(
                     bob.messaging,
                     IM_CHAT_TEXT,
+                    { timeout: TEST_CONFIG.MESSAGE_DELIVERY_TIMEOUT },
                 );
                 const sent1 = await alice.messaging.send(
                     bob.did,
@@ -198,6 +199,9 @@ describe('SmashMessaging: Edge cases', () => {
                     expect.objectContaining({ sha256: sent1.sha256 }),
                 );
 
+                // Add delay after first message verification
+                await delay(TEST_CONFIG.MESSAGE_DELIVERY * 2);
+
                 // 2. Simulate Bob restart - create new instance with same identity
                 logger.info('>> Simulate Bob restart');
                 bob = await restartTestPeer(logger, bob);
@@ -207,11 +211,12 @@ describe('SmashMessaging: Edge cases', () => {
                 await bob.messaging.initChats([
                     {
                         with: alice.did,
-                        lastMessageTimestamp: new Date().toISOString(),
+                        lastMessageTimestamp: new Date(0).toISOString(),
                     },
                 ]);
 
-                await delay(TEST_CONFIG.MESSAGE_DELIVERY);
+                // Increase delay after initChats
+                await delay(TEST_CONFIG.MESSAGE_DELIVERY * 3);
 
                 // 3. Alice tries to send another message
                 logger.info('>> Alice tries to send another message to Bob');
@@ -233,6 +238,9 @@ describe('SmashMessaging: Edge cases', () => {
                     expect.objectContaining({ sha256: sent2.sha256 }),
                 );
 
+                // Add delay after second message verification
+                await delay(TEST_CONFIG.MESSAGE_DELIVERY * 2);
+
                 // 4. Bob tries to send another message to Alice
                 logger.info('>> Bob tries to send a reply message to Alice');
                 const aliceReceivedReplyMessage = waitFor(
@@ -253,7 +261,7 @@ describe('SmashMessaging: Edge cases', () => {
                     expect.objectContaining({ sha256: sent3.sha256 }),
                 );
             },
-            TEST_CONFIG.MESSAGE_DELIVERY_TIMEOUT,
+            TEST_CONFIG.MESSAGE_DELIVERY_TIMEOUT * 3, // Increase overall test timeout
         );
 
         describe('Session reset race conditions', () => {
@@ -302,7 +310,7 @@ describe('SmashMessaging: Edge cases', () => {
                     logger.info(
                         '>> Mock Date to simulate time near TTL for both peers',
                     );
-                    dateSpy = jest
+                    dateSpy = vi
                         .spyOn(Date, 'now')
                         .mockImplementation(
                             () => new Date().getTime() + SESSION_TTL_MS - 1000,

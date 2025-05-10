@@ -1,7 +1,7 @@
-import { socketServerUrl } from '@tests/jest.global.js';
 import { TestMessage, TestUtils } from '@tests/utils/events.utils.js';
 import { TEST_CONFIG, aliasWaitFor, delay } from '@tests/utils/time.utils.js';
 import { TestPeer, createPeer } from '@tests/utils/user.utils.js';
+import { socketServerUrl } from '@tests/vitest.sme-server.js';
 import {
     EncapsulatedIMProtoMessage,
     IMProfile,
@@ -12,6 +12,15 @@ import {
     MessageStatusDelivered,
     SmashMessaging,
 } from 'smash-node-lib';
+import {
+    afterAll,
+    afterEach,
+    beforeAll,
+    beforeEach,
+    describe,
+    expect,
+    vi,
+} from 'vitest';
 
 const ISO8601_TIMESTAMP_REGEX =
     /^(?<year>-?(?:[1-9][0-9]*)?[0-9]{4})-(?<month>1[0-2]|0[1-9])-(?<day>3[01]|0[1-9]|[12][0-9])T(?<hour>2[0-3]|[01][0-9]):(?<minute>[0-5][0-9]):(?<second>[0-5][0-9])(?:\.(?<ms>[0-9]+))?(?<timezone>Z|[+-](?:2[0-3]|[01][0-9]):[0-5][0-9])$/;
@@ -34,7 +43,7 @@ describe('[SmashMessaging] Between peers registered to a SME', () => {
 
     let RealDate: DateConstructor;
     let mockedNow: Date;
-    let dateSpy: jest.SpyInstance;
+    let dateSpy: ReturnType<typeof vi.spyOn>;
 
     let alice: TestPeer;
     let bob: TestPeer;
@@ -60,7 +69,7 @@ describe('[SmashMessaging] Between peers registered to a SME', () => {
     });
 
     beforeEach(async () => {
-        dateSpy = jest
+        dateSpy = vi
             .spyOn(Date, 'now')
             .mockImplementation(() => mockedNow.getTime());
         [alice, bob] = await Promise.all([
@@ -79,7 +88,7 @@ describe('[SmashMessaging] Between peers registered to a SME', () => {
         await Promise.all([alice?.messaging.close(), bob?.messaging.close()]);
         waitForEventCancelFns.forEach((cancel) => cancel());
         waitForEventCancelFns.length = 0;
-        jest.resetAllMocks();
+        vi.resetAllMocks();
         dateSpy.mockRestore();
     }, TEST_CONFIG.TEST_TIMEOUT_MS * 3);
 
@@ -108,6 +117,7 @@ describe('[SmashMessaging] Between peers registered to a SME', () => {
 
             // Clear existing events
             await TestUtils.getDataEvents(
+                logger,
                 bob.did.endpoints[0].preKey,
                 'DELETE',
             );
@@ -123,29 +133,24 @@ describe('[SmashMessaging] Between peers registered to a SME', () => {
             await delay(TEST_CONFIG.MESSAGE_DELIVERY);
         });
 
-        it(
-            "delivers the initial message to Bob's declared SME",
-            async () => {
-                const events = await TestUtils.pollForDataEvent(
-                    bob.did.endpoints[0].preKey,
-                );
-
-                expect(events?.length).toBeGreaterThan(0);
-                expect(events[0]).toMatchObject({
-                    peerId: bob.did.endpoints[0].preKey,
-                    sessionId: expect.any(String),
-                    data: expect.anything(),
-                });
-
-                await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
-
-                expect(alice.onStatus).toHaveBeenCalledWith(
-                    MessageStatusDelivered,
-                    expect.arrayContaining([TEST_MESSAGE.sha256]),
-                );
-            },
-            TEST_CONFIG.MESSAGE_DELIVERY_TIMEOUT,
-        );
+        it("delivers the initial message to Bob's declared SME", async () => {
+            logger.debug('[Test] About to call pollForDataEvent');
+            const events = await TestUtils.pollForDataEvent(
+                logger,
+                bob.did.endpoints[0].preKey,
+            );
+            expect(events.length).toBeGreaterThan(0);
+            expect(events[0]).toMatchObject({
+                peerId: bob.did.endpoints[0].preKey,
+                sessionId: expect.any(String),
+                data: expect.anything(),
+            });
+            await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
+            expect(alice.onStatus).toHaveBeenCalledWith(
+                MessageStatusDelivered,
+                expect.arrayContaining([TEST_MESSAGE.sha256]),
+            );
+        });
 
         it('contains a content-addressable ID', async () => {
             expect(aliceSentMessage).toMatchObject({
@@ -218,16 +223,17 @@ describe('[SmashMessaging] Between peers registered to a SME', () => {
 
             it('successfully replies to Alice', async () => {
                 const REPLY_MESSAGE = 'hello back';
-                const lastMessage = bob.onData.mock.lastCall[1];
-                const receivedAliceDID = bob.onData.mock.lastCall[0];
+                const lastMessage = bob.onData.mock.lastCall?.[1];
+                const receivedAliceDID = bob.onData.mock.lastCall?.[0];
 
                 expect(receivedAliceDID).toBe(alice.did.id);
 
-                jest.resetAllMocks();
+                vi.resetAllMocks();
 
                 const aliceReceivedTextMessage = waitFor(
                     alice.messaging,
                     IM_CHAT_TEXT,
+                    { timeout: TEST_CONFIG.MESSAGE_DELIVERY_TIMEOUT },
                 );
                 await bob.messaging.send(
                     alice.did,

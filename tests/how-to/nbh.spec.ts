@@ -1,7 +1,7 @@
 import { Crypto } from '@peculiar/webcrypto';
-import { SME_PUBLIC_KEY, socketServerUrl } from '@tests/jest.global.js';
 import { TEST_CONFIG, aliasWaitFor, delay } from '@tests/utils/time.utils.js';
 import { defaultDidManager } from '@tests/utils/user.utils.js';
+import { SME_PUBLIC_KEY, socketServerUrl } from '@tests/vitest.sme-server.js';
 import {
     DIDDocument,
     DIDString,
@@ -22,6 +22,17 @@ import {
     SmashProfileList,
     SmashUser,
 } from 'smash-node-lib';
+import {
+    Mock,
+    afterAll,
+    afterEach,
+    beforeAll,
+    beforeEach,
+    describe,
+    expect,
+    it,
+    vi,
+} from 'vitest';
 
 // TODO docs library interface (config, events, etc)
 // TODO docs neighborhood admin bot API and example
@@ -35,9 +46,9 @@ import {
  */
 
 class TestNAB extends SmashNAB {
-    public onJoin = jest.fn();
-    public onDiscover = jest.fn();
-    public onRelationship = jest.fn();
+    public onJoin = vi.fn();
+    public onDiscover = vi.fn();
+    public onRelationship = vi.fn();
 }
 
 describe('SmashMessaging: Neighborhood-related actions', () => {
@@ -76,7 +87,7 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
         await nab.close();
         waitForEventCancelFns.forEach((cancel) => cancel());
         waitForEventCancelFns.length = 0;
-        jest.resetAllMocks();
+        vi.resetAllMocks();
     }, TEST_CONFIG.TEST_TIMEOUT_MS * 2);
 
     afterAll(async () => {
@@ -178,8 +189,8 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
     describe('when a user', () => {
         let user: SmashUser;
         let userIdentity: IMPeerIdentity;
-        const onUserNBHAdded: jest.Mock = jest.fn();
-        const onUserDiscover = jest.fn();
+        const onUserNBHAdded: ReturnType<typeof vi.fn> = vi.fn();
+        const onUserDiscover = vi.fn();
 
         beforeEach(async () => {
             const identity = await defaultDidManager.generate();
@@ -322,7 +333,7 @@ describe('SmashMessaging: Neighborhood-related actions', () => {
                     targetUser = new SmashUser(identity, 'targetUser');
                     targetDid = targetUser.did;
                     counter = 0;
-                    (nab.onRelationship as jest.Mock).mockClear();
+                    (nab.onRelationship as Mock).mockClear();
                 }, TEST_CONFIG.TEST_TIMEOUT_MS * 3);
 
                 afterEach(async () => {

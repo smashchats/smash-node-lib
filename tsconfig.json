@@ -13,7 +13,9 @@
         "esModuleInterop": true,
         "skipLibCheck": true,
         "strict": true,
+        "isolatedModules": true,
         "baseUrl": ".",
+        "types": ["vitest/globals"],
         "paths": {
             "smash-node-lib": ["src/index.ts"],
             "@src/*": ["src/*"],

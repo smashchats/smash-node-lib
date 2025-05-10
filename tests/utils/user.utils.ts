@@ -1,16 +1,17 @@
-import { SME_PUBLIC_KEY } from '@tests/jest.global.js';
+import { SME_PUBLIC_KEY } from '@tests/vitest.sme-server.js';
 import {
     DIDDocManager,
     DIDDocument,
     IMPeerIdentity,
     SmashMessaging,
 } from 'smash-node-lib';
+import { vi } from 'vitest';
 
 export interface TestPeer {
     messaging: SmashMessaging;
     did: DIDDocument;
-    onData: jest.Mock;
-    onStatus: jest.Mock;
+    onData: ReturnType<typeof vi.fn>;
+    onStatus: ReturnType<typeof vi.fn>;
     identity: IMPeerIdentity;
     name: string;
 }
@@ -43,8 +44,8 @@ export const createPeer = async (
     const did = await messaging.getDIDDocument();
 
     // Firehose events
-    const onData = jest.fn();
-    const onStatus = jest.fn();
+    const onData = vi.fn();
+    const onStatus = vi.fn();
     // Status events
     messaging.on('data', onData);
     messaging.on('status', onStatus);

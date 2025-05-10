@@ -1,35 +1,33 @@
 import { ECPublicKey } from '2key-ratchet';
 import { Crypto } from '@peculiar/webcrypto';
-import { BufferUtils } from '@src/core/crypto/utils/BufferUtils.js';
-import { KeyUtils } from '@src/core/crypto/utils/KeyUtils.js';
-import { SigningUtils } from '@src/core/crypto/utils/SigningUtils.js';
-import {
-    AspectRatio,
-    IMMediaEmbedded,
-    IMMediaEmbeddedMessage,
-    IMProfile,
-    IMProfileMessage,
-    IMText,
-} from '@src/shared/types/messages/index.js';
-import { SME_PUBLIC_KEY, socketServerUrl } from '@tests/jest.global.js';
 import { TEST_CONFIG, aliasWaitFor, delay } from '@tests/utils/time.utils.js';
 import { defaultDidManager } from '@tests/utils/user.utils.js';
+import { SME_PUBLIC_KEY, socketServerUrl } from '@tests/vitest.sme-server.js';
 import {
+    AspectRatio,
+    BufferUtils,
     DID,
     DIDDocManager,
     DIDDocument,
     DIDString,
+    IMMediaEmbedded,
+    IMMediaEmbeddedMessage,
     IMPeerIdentity,
+    IMProfile,
+    IMProfileMessage,
     IMProtoMessage,
+    IMText,
     IM_CHAT_TEXT,
     IM_MEDIA_EMBEDDED,
     IM_PROFILE,
+    KeyUtils,
     Logger,
     NBH_ADDED,
     NBH_PROFILE_LIST,
     Relationship,
     SMASH_NBH_JOIN,
     SMASH_NBH_RELATIONSHIP,
+    SigningUtils,
     SmashEndpoint,
     SmashMessaging,
     SmashNAB,
@@ -38,6 +36,16 @@ import {
     SmashUser,
     sha256,
 } from 'smash-node-lib';
+import {
+    afterAll,
+    afterEach,
+    beforeAll,
+    beforeEach,
+    describe,
+    expect,
+    test,
+    vi,
+} from 'vitest';
 
 /**
  * **************************************************************
@@ -85,7 +93,7 @@ describe('Smash Tutorial', () => {
                 this.waitForEventCancelFns.map((cancel) => cancel()),
             );
             this.waitForEventCancelFns.length = 0;
-            jest.resetAllMocks();
+            vi.resetAllMocks();
             await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
         },
     };
@@ -372,7 +380,7 @@ describe('Smash Tutorial', () => {
          * - Message handling
          */
         test('Receiving messages', async () => {
-            const onBobMessage = jest.fn();
+            const onBobMessage = vi.fn();
             bob.on(IM_CHAT_TEXT, onBobMessage);
 
             const bobReceivedMessage = waitFor(bob, IM_CHAT_TEXT);
@@ -420,7 +428,7 @@ describe('Smash Tutorial', () => {
              * @task Monitor message delivery
              */
             test('Message delivery confirmation', async () => {
-                const onStatus = jest.fn();
+                const onStatus = vi.fn();
                 alice.on('status', onStatus);
                 const sent = await testContext.exchangeMessage(alice, bob);
                 expect(onStatus).toHaveBeenCalledWith('delivered', [
@@ -433,7 +441,7 @@ describe('Smash Tutorial', () => {
              * @task Track message reception
              */
             test('Message reception confirmation', async () => {
-                const onStatus = jest.fn();
+                const onStatus = vi.fn();
                 alice.on('status', onStatus);
                 const sent = await testContext.exchangeMessage(alice, bob);
                 await delay(TEST_CONFIG.MESSAGE_DELIVERY * 2);
@@ -448,7 +456,7 @@ describe('Smash Tutorial', () => {
              * @task Implement read receipts
              */
             test('Message read status', async () => {
-                const aliceAck = jest.fn();
+                const aliceAck = vi.fn();
                 alice.on('status', aliceAck);
                 const sent = await testContext.exchangeMessage(alice, bob);
 
@@ -472,7 +480,7 @@ describe('Smash Tutorial', () => {
          * - Protocol overhead
          */
         test('Using the firehose', async () => {
-            const onData = jest.fn();
+            const onData = vi.fn();
             bob.on('data', onData);
 
             await alice.send(bob.did, new IMText('Hello, Bob!'));
@@ -546,7 +554,7 @@ describe('Smash Tutorial', () => {
          * - Profile exchange
          */
         test('Initial profile exchange', async () => {
-            const onProfile = jest.fn();
+            const onProfile = vi.fn();
             duane.on(IM_PROFILE, onProfile);
 
             await duane.send(emily.did, new IMText('hello'));
@@ -577,7 +585,7 @@ describe('Smash Tutorial', () => {
          * - Update propagation
          */
         test('Profile update propagation', async () => {
-            const onProfile = jest.fn();
+            const onProfile = vi.fn();
             duane.on(IM_PROFILE, onProfile);
 
             // Establish initial contact
@@ -653,7 +661,7 @@ describe('Smash Tutorial', () => {
              * - Join events
              * - NAB responses
              */
-            public onJoin = jest.fn(async (did: DID) => {
+            public onJoin = vi.fn(async (did: DID) => {
                 const didDoc = await SmashMessaging.resolve(did);
                 this.members.push(didDoc.id);
             });
@@ -680,7 +688,7 @@ describe('Smash Tutorial', () => {
              * - Pass
              * - Social graph
              */
-            public onRelationship = jest.fn(
+            public onRelationship = vi.fn(
                 async (
                     from: DIDString,
                     to: DIDString,
@@ -755,7 +763,7 @@ describe('Smash Tutorial', () => {
              * - Profile broadcasting
              * - NAB-mediated discovery
              */
-            public onDiscover = jest.fn(async (from: DIDString) => {
+            public onDiscover = vi.fn(async (from: DIDString) => {
                 const otherMembers = this.members.filter(
                     (member) => member !== from,
                 );
@@ -814,7 +822,7 @@ describe('Smash Tutorial', () => {
                 const waitForJoin = waitFor(nab, SMASH_NBH_JOIN, {
                     timeout: JOIN_TIMEOUT,
                 });
-                const onNbhAdded = jest.fn();
+                const onNbhAdded = vi.fn();
                 lola.on(NBH_ADDED, onNbhAdded);
 
                 // Join neighborhood and wait for confirmation
@@ -905,7 +913,7 @@ describe('Smash Tutorial', () => {
              * - NAB-mediated discovery
              */
             test('Discovering neighborhood peers', async () => {
-                const onNeighborhoodProfiles = jest.fn();
+                const onNeighborhoodProfiles = vi.fn();
                 bob.on(NBH_PROFILE_LIST, onNeighborhoodProfiles);
                 const waitForDiscovery = waitFor(bob, NBH_PROFILE_LIST);
 
@@ -1194,7 +1202,7 @@ describe('Smash Tutorial', () => {
             }, TEST_CONFIG.TEST_TIMEOUT_MS * 2);
 
             test('6.2. Sending and receiving media messages', async () => {
-                const onBobMediaMessage = jest.fn();
+                const onBobMediaMessage = vi.fn();
                 bob.on(IM_MEDIA_EMBEDDED, onBobMediaMessage);
 
                 const imageData = {
