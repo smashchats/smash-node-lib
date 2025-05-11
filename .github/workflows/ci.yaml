@@ -191,7 +191,7 @@ jobs:
               run: sleep 10
 
             - name: Send Failure Email
-              uses: dawidd6/action-send-mail@v3
+              uses: dawidd6/action-send-mail@v5
               with:
                   server_address: '100.103.0.14'
                   server_port: '2526'
@@ -219,7 +219,7 @@ jobs:
               run: sleep 10
 
             - name: Send Failure Email
-              uses: dawidd6/action-send-mail@v3
+              uses: dawidd6/action-send-mail@v5
               with:
                   server_address: '100.103.0.14'
                   server_port: '2526'
@@ -247,7 +247,7 @@ jobs:
               run: sleep 10
 
             - name: Send Success Email
-              uses: dawidd6/action-send-mail@v3
+              uses: dawidd6/action-send-mail@v5
               with:
                   server_address: '100.103.0.14'
                   server_port: '2525'
