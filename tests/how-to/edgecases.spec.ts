@@ -1,11 +1,11 @@
 import { Crypto } from '@peculiar/webcrypto';
 import { TEST_CONFIG, aliasWaitFor, delay } from '@tests/utils/time.utils.js';
-import { TestPeer, createPeer } from '@tests/utils/user.utils.js';
 import {
-    SME_PUBLIC_KEY,
-    apiServerUrl,
-    socketServerUrl,
-} from '@tests/vitest.sme-server.js';
+    TestPeer,
+    createPeer,
+    restartTestPeer,
+} from '@tests/utils/user.utils.js';
+import { apiServerUrl, socketServerUrl } from '@tests/vitest.sme-server.js';
 import {
     EncapsulatedIMProtoMessage,
     IMProtoMessage,
@@ -20,42 +20,6 @@ import {
     sortSmashMessages,
 } from 'smash-node-lib';
 import { afterEach, beforeAll, beforeEach, describe, expect, vi } from 'vitest';
-
-// TODO: import config on lib loading (& add to tutorial)
-const restartTestPeer = async (logger: Logger, peer: TestPeer) => {
-    logger.debug('>> Exporting peer identity');
-    const peerExportedIdentity = await peer.messaging.exportIdentity();
-    logger.debug('> Exported', JSON.stringify(peerExportedIdentity, null, 2));
-
-    const oldEndpoints = [...peer.did.endpoints];
-
-    logger.debug('>> Closing peer messaging');
-    await peer.messaging.close();
-    await delay(TEST_CONFIG.DEFAULT_SETUP_DELAY);
-
-    logger.debug('>> Importing peer identity');
-    const peerIdentity = await SmashMessaging.importIdentity(
-        JSON.parse(peerExportedIdentity),
-    );
-    logger.debug(
-        '> Imported',
-        JSON.stringify(await peerIdentity.serialize(), null, 2),
-    );
-
-    logger.debug('>> Creating restarted peer');
-    const restartedPeer = await createPeer(
-        `${peer.name} (after restart)`,
-        [],
-        peerIdentity,
-    );
-    const peerEndpointsReconfig = oldEndpoints.map((endpoint, index) => ({
-        ...endpoint,
-        smePublicKey: SME_PUBLIC_KEY,
-        preKeyPair: peer.identity.signedPreKeys[index],
-    }));
-    await restartedPeer.messaging.endpoints.reset(peerEndpointsReconfig);
-    return restartedPeer;
-};
 
 // TODO: refactor test suite into How To guides generation material
 

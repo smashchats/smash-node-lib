@@ -207,7 +207,7 @@ export class SmashPeer {
         });
     }
 
-    private async flushQueue(
+    async flushQueue(
         attempt = 0,
         delay = this.config.initialRetryDelayMs,
         recursiveCall = false,

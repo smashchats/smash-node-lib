@@ -331,17 +331,35 @@ export class SmashMessaging extends EventEmitter {
 
     /**
      * Initialize chats with peers
+     * @param chats - Array of chat configurations
+     * @param chats[].with - The DID of the peer to initialize chat with
+     * @param chats[].lastMessageTimestamp - Optional timestamp of the last message in the chat
+     * @param chats[].pendingMessages - Optional array of messages that need to be resent
      */
     public async initChats(
-        chats: { with: DID; lastMessageTimestamp?: string }[],
+        chats: {
+            with: DID;
+            lastMessageTimestamp?: string;
+            pendingMessages?: EncapsulatedIMProtoMessage[];
+        }[],
     ): Promise<void> {
         if (this.isClosed) {
             throw new Error('SmashMessaging is closed');
         }
         const results = await Promise.allSettled(
-            chats.map(async (chat) =>
-                this.peers.getOrCreate(chat.with, chat.lastMessageTimestamp),
-            ),
+            chats.map(async (chat) => {
+                const peer = await this.peers.getOrCreate(
+                    chat.with,
+                    chat.lastMessageTimestamp,
+                );
+                if (chat.pendingMessages?.length) {
+                    for (const message of chat.pendingMessages) {
+                        await peer.queueMessage(message);
+                    }
+                    await peer.flushQueue();
+                }
+                return peer;
+            }),
         );
         const failures = results.filter((r) => r.status === 'rejected');
         if (failures.length > 0) {

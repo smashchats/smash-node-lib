@@ -50,9 +50,11 @@ export class PeerRegistry extends Map<DIDString, SmashPeer> {
             return this.pendingPeers[peerDid.id];
         }
 
-        const lastMessageTime = lastMessageTimestamp
-            ? new Date(lastMessageTimestamp).getTime()
-            : new Date().getTime();
+        // we default to 0 in order to force session reset as reloading sessions is not supported yet
+        const lastMessageTime = new Date(0).getTime();
+        // const lastMessageTime = lastMessageTimestamp
+        //     ? new Date(lastMessageTimestamp).getTime()
+        //     : new Date().getTime(); // TODO
 
         this.logger.debug(`CreatePeer ${peerDid.id}`);
         const newPeerPromise = this.createNewPeer(peerDid, lastMessageTime);

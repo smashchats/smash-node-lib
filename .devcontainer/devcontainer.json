@@ -17,8 +17,7 @@
         "source=${localEnv:HOME}${localEnv:USERPROFILE}/.radicle,target=/home/node/.radicle,type=bind",
         "source=1-22-bookworm-radicle,target=/home/node/.radicle/bin,type=volume",
         "source=${localWorkspaceFolderBasename}-node_modules,target=${containerWorkspaceFolder}/node_modules,type=volume",
-        "source=${localWorkspaceFolderBasename}-dist,target=${containerWorkspaceFolder}/dist,type=volume",
-        "source=${localWorkspaceFolderBasename}-coverage,target=${containerWorkspaceFolder}/coverage,type=volume"
+        "source=${localWorkspaceFolderBasename}-dist,target=${containerWorkspaceFolder}/dist,type=volume"
     ],
     "postCreateCommand": "chmod +x .devcontainer/postCreateCommand.sh && .devcontainer/postCreateCommand.sh"
 }

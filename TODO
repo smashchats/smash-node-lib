@@ -29,8 +29,12 @@
     - [ ] test persistence and resilience (save/load state between restarts)
 
 - [x] FIX - **Investigate INITCHATS: new Date() or new Date(0)–why?? FIX DOCS.**
+- 22fefd3
 
 - [ ] loading the library with existing _data_ : convs, queues, ...
+- b777f6d
+- e33a796
+- [ ] DID docs database + load in state
 
 - [ ] PDS to store backup and settings (livesync multi device)
 
