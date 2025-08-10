@@ -97,7 +97,7 @@ jobs:
 
             - name: Analyze with SonarQube
               if: github.ref_name == 'main'
-              uses: SonarSource/sonarqube-scan-action@v5.1.0
+              uses: SonarSource/sonarqube-scan-action@v5.3.0
               continue-on-error: true
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
