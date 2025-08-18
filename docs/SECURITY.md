@@ -22,14 +22,12 @@ Here's how to report a vulnerability:
 
 2. **Provide Detailed Information**:
    Include the following in your report:
-
     - A detailed description of the vulnerability.
     - Steps to reproduce the issue.
     - Potential impact and any known mitigation.
     - Your contact information (optional).
 
 3. **Response Timeline**:
-
     - We will acknowledge your report within **2 business days**.
     - We will investigate the issue and respond with our findings and next steps within **5 business days**.
 

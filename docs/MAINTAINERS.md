@@ -32,20 +32,16 @@ For more details, see:
 To become a maintainer:
 
 1. **Demonstrate Consistent Contributions**:
-
     - Regularly submit high-quality patches.
     - Actively participate in discussions and reviews.
 
 2. **Understand the Smash Protocol Values and Principles**:
-
     - Familiarize yourself with the project [values](https://dev.smashchats.com/Smash%20Values) and [principles](https://dev.smashchats.com/Smash%20Principles) and adhere to them in your contributions.
 
 3. **Apply for Maintainer Role**:
-
     - Submit a request to the existing maintainers via the issue tracker or contact [contribute@smashchats.com](mailto:contribute@smashchats.com).
 
 4. **Signature Verification**:
-
     - Provide your Radicle DID and public key for verification.
     - Your details will be added to this document after approval.
 

@@ -38,12 +38,10 @@ Explore more reading our developer notes on [dev.smashchats.com](https://dev.sma
 Are you new to Smash-Node-Lib? Start here:
 
 1. **Set Up Your Development Environment**:
-
     - [Create a Radicle Identity](https://radicle.xyz/guides/user#come-into-being-from-the-elliptic-aether).
     - Clone the library repository using [Radicle](https://radicle.xyz/) or its [GitHub mirror](https://github.com/smashchats/smash-node-lib).
 
 2. **Follow the Tutorials**:
-
     - [Building Your First Smash Client](./tutorials/first-smash-client.md)
     - [Creating a Neighborhood](./tutorials/create-neighborhood.md)
 
