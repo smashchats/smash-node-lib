@@ -62,7 +62,7 @@
         "prettier": "^3.4.2",
         "socket.io": "^4.8.1",
         "ts-node": "^10.9.2",
-        "tsc-alias": "^1.8.10",
+        "tsc-alias": "^1.8.16",
         "typescript": "^5.7.2",
         "typescript-eslint": "^8.18.0",
         "vite-tsconfig-paths": "^5.1.4",
